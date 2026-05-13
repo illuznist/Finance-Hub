@@ -64,15 +64,25 @@ function ExpenseRow({
   onToggle: () => void;
 }) {
   const colors = useColors();
+  const suffix =
+    dueDate === 1 ? "st" : dueDate === 2 ? "nd" : dueDate === 3 ? "rd" : "th";
   return (
-    <View style={[styles.expenseRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.expenseRow,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <View style={[styles.expenseIcon, { backgroundColor: color + "20" }]}>
         <Feather name={iconName as any} size={18} color={color} />
       </View>
       <View style={styles.expenseInfo}>
-        <Text style={[styles.expenseName, { color: colors.foreground }]}>{name}</Text>
+        <Text style={[styles.expenseName, { color: colors.foreground }]}>
+          {name}
+        </Text>
         <Text style={[styles.expenseDue, { color: colors.mutedForeground }]}>
-          Due {dueDate}{dueDate === 1 ? "st" : dueDate === 2 ? "nd" : dueDate === 3 ? "rd" : "th"}
+          Due {dueDate}
+          {suffix}
         </Text>
       </View>
       <Text style={[styles.expenseAmount, { color: colors.foreground }]}>
@@ -107,7 +117,11 @@ const INSIGHTS = [
   { icon: "trending-up", text: "18% more spent\nthis month", color: "#F59E0B" },
   { icon: "bell", text: "3 payments due\nnext week", color: "#EF4444" },
   { icon: "layers", text: "SAR 117 on\nsubscriptions", color: "#8B5CF6" },
-  { icon: "trending-down", text: "Can save SAR 900\non food delivery", color: "#10B981" },
+  {
+    icon: "trending-down",
+    text: "Can save SAR 900\non food delivery",
+    color: "#10B981",
+  },
 ];
 
 export default function DashboardScreen() {
@@ -116,11 +130,34 @@ export default function DashboardScreen() {
   const finance = useFinance();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const totalSpentPerc = Math.min(
-    1,
-    (finance.totalMonthlyExpenses + finance.totalEMIMonthly) / finance.monthlyBudget
-  );
+  const totalSpent = finance.totalMonthlyExpenses + finance.totalEMIMonthly;
+  const totalSpentPerc = Math.min(1, totalSpent / finance.monthlyBudget);
   const remaining = Math.max(0, finance.remainingBudget);
+  const remainingPerc = Math.min(1, remaining / finance.monthlyBudget);
+
+  // Savings: sum of savings-type accounts
+  const totalSavings = finance.accounts
+    .filter((a) => a.type === "savings")
+    .reduce((s, a) => s + a.balance, 0);
+  // Savings goal: e.g. 3x monthly income as target
+  const savingsGoal = finance.totalMonthlyIncome * 3;
+  const savingsPerc = savingsGoal > 0 ? Math.min(1, totalSavings / savingsGoal) : 0;
+  // Monthly savings contribution
+  const monthlySavings = Math.max(
+    0,
+    finance.totalMonthlyIncome - totalSpent
+  );
+  const monthlySavingsRate =
+    finance.totalMonthlyIncome > 0
+      ? Math.round((monthlySavings / finance.totalMonthlyIncome) * 100)
+      : 0;
+
+  const remainingColor =
+    totalSpentPerc > 0.85
+      ? colors.destructive
+      : totalSpentPerc > 0.65
+      ? colors.warning
+      : colors.success;
 
   return (
     <ScrollView
@@ -130,18 +167,21 @@ export default function DashboardScreen() {
       }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
+      {/* ── Hero gradient header ── */}
       <LinearGradient
         colors={[colors.gradientStart, colors.gradientEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.heroGradient, { paddingTop: topPad + 16 }]}
       >
+        {/* Greeting row */}
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greetingText}>{greeting(finance.userName)}</Text>
+            <Text style={styles.greetingText}>
+              {greeting(finance.userName)}
+            </Text>
             <Text style={styles.greetingSubtitle}>
-              {fmt(remaining, finance.currency)} remaining this month
+              Here's your financial summary
             </Text>
           </View>
           <View style={styles.avatarCircle}>
@@ -151,9 +191,9 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Balance Card */}
+        {/* Total Balance card (hero number) */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Balance</Text>
+          <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
           <Text style={styles.balanceAmount}>
             {fmt(finance.totalBalance, finance.currency)}
           </Text>
@@ -163,7 +203,7 @@ export default function DashboardScreen() {
               <View style={styles.balanceItemIcon}>
                 <Feather name="arrow-down-circle" size={14} color="#34D399" />
               </View>
-              <Text style={styles.balanceItemLabel}>Income</Text>
+              <Text style={styles.balanceItemLabel}>Monthly Income</Text>
               <Text style={styles.balanceItemValue}>
                 {fmt(finance.totalMonthlyIncome, finance.currency)}
               </Text>
@@ -173,9 +213,9 @@ export default function DashboardScreen() {
               <View style={styles.balanceItemIcon}>
                 <Feather name="arrow-up-circle" size={14} color="#F87171" />
               </View>
-              <Text style={styles.balanceItemLabel}>Expenses</Text>
+              <Text style={styles.balanceItemLabel}>Monthly Spent</Text>
               <Text style={styles.balanceItemValue}>
-                {fmt(finance.totalMonthlyExpenses + finance.totalEMIMonthly, finance.currency)}
+                {fmt(totalSpent, finance.currency)}
               </Text>
             </View>
           </View>
@@ -183,40 +223,220 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
-        {/* Budget Progress */}
-        <View style={[styles.budgetCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.budgetHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Monthly Budget
-            </Text>
-            <Text style={[styles.budgetRemaining, { color: colors.primary }]}>
-              {fmt(remaining, finance.currency)} left
-            </Text>
-          </View>
-          <View style={[styles.progressBg, { backgroundColor: colors.muted }]}>
+        {/* ── Remaining Balance card (prominent, below hero) ── */}
+        <View
+          style={[
+            styles.remainingCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: remainingColor + "50",
+              borderWidth: 1.5,
+            },
+          ]}
+        >
+          <View style={styles.remainingTop}>
+            <View>
+              <Text
+                style={[styles.remainingLabel, { color: colors.mutedForeground }]}
+              >
+                Remaining this month
+              </Text>
+              <Text
+                style={[styles.remainingAmount, { color: remainingColor }]}
+              >
+                {fmt(remaining, finance.currency)}
+              </Text>
+              <Text
+                style={[
+                  styles.remainingSubtitle,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                of {fmt(finance.monthlyBudget, finance.currency)} budget
+              </Text>
+            </View>
             <View
               style={[
-                styles.progressFill,
+                styles.remainingBadge,
+                { backgroundColor: remainingColor + "20" },
+              ]}
+            >
+              <Feather
+                name={
+                  totalSpentPerc > 0.85
+                    ? "alert-triangle"
+                    : totalSpentPerc > 0.65
+                    ? "clock"
+                    : "check-circle"
+                }
+                size={20}
+                color={remainingColor}
+              />
+              <Text
+                style={[styles.remainingBadgeText, { color: remainingColor }]}
+              >
+                {Math.round(remainingPerc * 100)}%
+              </Text>
+            </View>
+          </View>
+
+          {/* Progress bar */}
+          <View
+            style={[
+              styles.remainingTrack,
+              { backgroundColor: colors.muted },
+            ]}
+          >
+            <View
+              style={[
+                styles.remainingFill,
                 {
-                  width: `${Math.min(100, totalSpentPerc * 100)}%`,
-                  backgroundColor:
-                    totalSpentPerc > 0.85
-                      ? colors.destructive
-                      : totalSpentPerc > 0.65
-                      ? colors.warning
-                      : colors.success,
+                  width: `${Math.min(100, remainingPerc * 100)}%`,
+                  backgroundColor: remainingColor,
                 },
               ]}
             />
           </View>
-          <Text style={[styles.budgetCaption, { color: colors.mutedForeground }]}>
-            {fmt(finance.totalMonthlyExpenses + finance.totalEMIMonthly, finance.currency)} of{" "}
-            {fmt(finance.monthlyBudget, finance.currency)} spent
-          </Text>
+          <View style={styles.remainingCapRow}>
+            <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
+              Spent {fmt(totalSpent, finance.currency)}
+            </Text>
+            <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
+              Budget {fmt(finance.monthlyBudget, finance.currency)}
+            </Text>
+          </View>
         </View>
 
-        {/* Insights */}
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 12 }]}>
+        {/* ── Savings card with bar ── */}
+        <View
+          style={[
+            styles.savingsCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.savingsHeader}>
+            <View style={styles.savingsHeaderLeft}>
+              <View
+                style={[
+                  styles.savingsIcon,
+                  { backgroundColor: colors.success + "20" },
+                ]}
+              >
+                <Feather name="trending-up" size={18} color={colors.success} />
+              </View>
+              <View>
+                <Text
+                  style={[styles.savingsTitle, { color: colors.foreground }]}
+                >
+                  Savings
+                </Text>
+                <Text
+                  style={[
+                    styles.savingsSubtitle,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {monthlySavingsRate}% rate this month
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={[styles.savingsTotal, { color: colors.success }]}
+            >
+              {fmt(totalSavings, finance.currency)}
+            </Text>
+          </View>
+
+          {/* Savings goal progress */}
+          <View style={styles.savingsGoalRow}>
+            <Text
+              style={[styles.savingsGoalLabel, { color: colors.mutedForeground }]}
+            >
+              Goal progress
+            </Text>
+            <Text
+              style={[styles.savingsGoalPct, { color: colors.foreground }]}
+            >
+              {Math.round(savingsPerc * 100)}% of {fmt(savingsGoal, finance.currency)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.savingsTrack,
+              { backgroundColor: colors.muted },
+            ]}
+          >
+            {/* Glow effect layer */}
+            <View
+              style={[
+                styles.savingsFill,
+                {
+                  width: `${Math.min(100, savingsPerc * 100)}%`,
+                  backgroundColor: colors.success,
+                },
+              ]}
+            />
+          </View>
+
+          {/* Monthly savings breakdown row */}
+          <View
+            style={[
+              styles.savingsBreakdownRow,
+              { borderTopColor: colors.border },
+            ]}
+          >
+            <View style={styles.savingsBreakdownItem}>
+              <Text
+                style={[
+                  styles.savingsBreakdownLabel,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                Saved this month
+              </Text>
+              <Text
+                style={[
+                  styles.savingsBreakdownValue,
+                  { color: colors.success },
+                ]}
+              >
+                +{fmt(monthlySavings, finance.currency)}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.savingsBreakdownDivider,
+                { backgroundColor: colors.border },
+              ]}
+            />
+            <View style={styles.savingsBreakdownItem}>
+              <Text
+                style={[
+                  styles.savingsBreakdownLabel,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                In savings accounts
+              </Text>
+              <Text
+                style={[
+                  styles.savingsBreakdownValue,
+                  { color: colors.foreground },
+                ]}
+              >
+                {fmt(totalSavings, finance.currency)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Smart Insights ── */}
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: colors.foreground, marginBottom: 12 },
+          ]}
+        >
           Smart Insights
         </Text>
         <ScrollView
@@ -237,10 +457,17 @@ export default function DashboardScreen() {
                   },
                 ]}
               >
-                <View style={[styles.insightIconWrap, { backgroundColor: ins.color + "20" }]}>
+                <View
+                  style={[
+                    styles.insightIconWrap,
+                    { backgroundColor: ins.color + "20" },
+                  ]}
+                >
                   <Feather name={ins.icon as any} size={16} color={ins.color} />
                 </View>
-                <Text style={[styles.insightText, { color: colors.foreground }]}>
+                <Text
+                  style={[styles.insightText, { color: colors.foreground }]}
+                >
                   {ins.text}
                 </Text>
               </View>
@@ -248,7 +475,7 @@ export default function DashboardScreen() {
           ))}
         </ScrollView>
 
-        {/* This Month's Payments */}
+        {/* ── This Month's Payments ── */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
             This Month
@@ -273,8 +500,13 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        {/* Upcoming EMIs */}
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 12 }]}>
+        {/* ── Active EMIs ── */}
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: colors.foreground, marginBottom: 12 },
+          ]}
+        >
           Active EMIs
         </Text>
         <View style={{ gap: 8 }}>
@@ -283,25 +515,59 @@ export default function DashboardScreen() {
             .slice(0, 3)
             .map((emi) => {
               const progress = emi.paidInstallments / emi.totalInstallments;
-              const remaining2 = emi.totalInstallments - emi.paidInstallments;
+              const rem = emi.totalInstallments - emi.paidInstallments;
               return (
                 <View
                   key={emi.id}
-                  style={[styles.emiMini, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  style={[
+                    styles.emiMini,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
                 >
-                  <View style={[styles.expenseIcon, { backgroundColor: emi.color + "20" }]}>
-                    <Feather name={emi.iconName as any} size={18} color={emi.color} />
+                  <View
+                    style={[
+                      styles.expenseIcon,
+                      { backgroundColor: emi.color + "20" },
+                    ]}
+                  >
+                    <Feather
+                      name={emi.iconName as any}
+                      size={18}
+                      color={emi.color}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={styles.emiMiniHeader}>
-                      <Text style={[styles.expenseName, { color: colors.foreground }]}>
+                      <Text
+                        style={[
+                          styles.expenseName,
+                          { color: colors.foreground },
+                        ]}
+                      >
                         {emi.name}
                       </Text>
-                      <Text style={[styles.expenseAmount, { color: colors.foreground }]}>
+                      <Text
+                        style={[
+                          styles.expenseAmount,
+                          { color: colors.foreground },
+                        ]}
+                      >
                         {fmt(emi.monthlyAmount, finance.currency)}/mo
                       </Text>
                     </View>
-                    <View style={[styles.progressBg, { backgroundColor: colors.muted, marginTop: 6, height: 4 }]}>
+                    <View
+                      style={[
+                        styles.progressBg,
+                        {
+                          backgroundColor: colors.muted,
+                          marginTop: 6,
+                          height: 4,
+                        },
+                      ]}
+                    >
                       <View
                         style={[
                           styles.progressFill,
@@ -313,8 +579,14 @@ export default function DashboardScreen() {
                         ]}
                       />
                     </View>
-                    <Text style={[styles.emiMiniCaption, { color: colors.mutedForeground }]}>
-                      {emi.paidInstallments}/{emi.totalInstallments} paid · {remaining2} left
+                    <Text
+                      style={[
+                        styles.emiMiniCaption,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
+                      {emi.paidInstallments}/{emi.totalInstallments} paid ·{" "}
+                      {rem} left
                     </Text>
                   </View>
                 </View>
@@ -359,6 +631,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
   },
+  // Hero balance card
   balanceCard: {
     backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 20,
@@ -367,10 +640,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.2)",
   },
   balanceLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 1,
+    color: "rgba(255,255,255,0.65)",
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   balanceAmount: {
@@ -385,10 +658,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     marginBottom: 16,
   },
-  balanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  balanceRow: { flexDirection: "row", alignItems: "center" },
   balanceItem: { flex: 1, alignItems: "center" },
   balanceItemIcon: {
     width: 28,
@@ -415,40 +685,149 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: "rgba(255,255,255,0.2)",
   },
-  content: { padding: 20 },
-  budgetCard: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 24,
+  content: { padding: 20, gap: 16 },
+
+  // Remaining Balance card
+  remainingCard: {
+    borderRadius: 20,
+    padding: 18,
+    gap: 12,
   },
-  budgetHeader: {
+  remainingTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  remainingLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  remainingAmount: {
+    fontSize: 30,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 34,
+  },
+  remainingSubtitle: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 4,
+  },
+  remainingBadge: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    gap: 4,
+  },
+  remainingBadgeText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  remainingTrack: {
+    height: 10,
+    borderRadius: 5,
+    overflow: "hidden",
+  },
+  remainingFill: {
+    height: 10,
+    borderRadius: 5,
+  },
+  remainingCapRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  remainingCap: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+  },
+
+  // Savings card
+  savingsCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    gap: 12,
+  },
+  savingsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  savingsHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  savingsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  savingsTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+  },
+  savingsSubtitle: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+  },
+  savingsTotal: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
+  savingsGoalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
   },
-  budgetRemaining: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  progressBg: {
-    height: 8,
-    borderRadius: 4,
+  savingsGoalLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  savingsGoalPct: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  savingsTrack: {
+    height: 12,
+    borderRadius: 6,
     overflow: "hidden",
   },
-  progressFill: {
-    height: 8,
-    borderRadius: 4,
+  savingsFill: {
+    height: 12,
+    borderRadius: 6,
   },
-  budgetCaption: {
-    fontSize: 12,
+  savingsBreakdownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    paddingTop: 12,
+    gap: 12,
+  },
+  savingsBreakdownItem: { flex: 1, gap: 2 },
+  savingsBreakdownDivider: { width: 1, height: 32 },
+  savingsBreakdownLabel: {
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
-    marginTop: 8,
   },
+  savingsBreakdownValue: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+
+  // Shared
+  progressBg: { height: 8, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: 8, borderRadius: 4 },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
   },
   sectionCount: { fontSize: 13, fontFamily: "Inter_400Regular" },
   insightChip: {
