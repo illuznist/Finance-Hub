@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Platform,
@@ -110,6 +110,87 @@ function ExpenseRow({
         </Text>
       </Pressable>
     </View>
+  );
+}
+
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+type AlertLevel = "warning" | "danger" | "exceeded";
+
+function BudgetAlertBanner({
+  spentPerc,
+  remaining,
+  overspend,
+  currency,
+}: {
+  spentPerc: number;
+  remaining: number;
+  overspend: number;
+  currency: string;
+}) {
+  const colors = useColors();
+  const [dismissedDay, setDismissedDay] = useState<string | null>(null);
+  const slideAnim = useRef(new Animated.Value(-80)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  const level: AlertLevel =
+    spentPerc >= 1 ? "exceeded" : spentPerc >= 0.95 ? "danger" : "warning";
+
+  const isVisible = spentPerc >= 0.8 && dismissedDay !== todayKey();
+
+  useEffect(() => {
+    if (isVisible) {
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false, tension: 65, friction: 10 }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: false }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, { toValue: -80, duration: 200, useNativeDriver: false }),
+        Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: false }),
+      ]).start();
+    }
+  }, [isVisible]);
+
+  if (!isVisible) return null;
+
+  const config = {
+    warning:  { bg: "#7C4A00", border: "#F59E0B", icon: "alert-triangle" as const, color: "#FCD34D", title: "Heads up", body: `You've used ${Math.round(spentPerc * 100)}% of your monthly budget` },
+    danger:   { bg: "#7F1D1D", border: "#EF4444", icon: "alert-circle"   as const, color: "#FCA5A5", title: "Low budget", body: `Only ${currency} ${remaining.toLocaleString()} left this month` },
+    exceeded: { bg: "#7F1D1D", border: "#EF4444", icon: "x-circle"       as const, color: "#FCA5A5", title: "Budget exceeded", body: `Over by ${currency} ${overspend.toLocaleString()} — review your spending` },
+  }[level];
+
+  function dismiss() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDismissedDay(todayKey());
+  }
+
+  return (
+    <Animated.View
+      style={[
+        styles.alertBanner,
+        {
+          backgroundColor: config.bg,
+          borderColor: config.border,
+          transform: [{ translateY: slideAnim }],
+          opacity: opacityAnim,
+        },
+      ]}
+    >
+      <View style={[styles.alertIconWrap, { backgroundColor: config.border + "30" }]}>
+        <Feather name={config.icon} size={18} color={config.color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.alertTitle, { color: config.color }]}>{config.title}</Text>
+        <Text style={[styles.alertBody, { color: config.color + "CC" }]}>{config.body}</Text>
+      </View>
+      <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10}>
+        <Feather name="x" size={16} color={config.color + "99"} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -223,6 +304,14 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
+        {/* ── Budget Alert Banner ── */}
+        <BudgetAlertBanner
+          spentPerc={totalSpentPerc}
+          remaining={remaining}
+          overspend={Math.max(0, totalSpent - finance.monthlyBudget)}
+          currency={finance.currency}
+        />
+
         {/* ── Remaining Balance card (prominent, below hero) ── */}
         <View
           style={[
@@ -600,6 +689,40 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  alertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    gap: 12,
+    overflow: "hidden",
+  },
+  alertIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  alertTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 2,
+  },
+  alertBody: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 16,
+  },
+  alertDismiss: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   heroGradient: { paddingHorizontal: 20, paddingBottom: 32 },
   headerRow: {
     flexDirection: "row",

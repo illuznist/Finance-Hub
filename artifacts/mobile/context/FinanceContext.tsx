@@ -99,7 +99,7 @@ interface FinanceContextType extends FinanceState {
 const defaultState: FinanceState = {
   userName: "Manzoor",
   currency: "SAR",
-  monthlyBudget: 8000,
+  monthlyBudget: 7500,
   expenses: [
     { id: "exp1", name: "Rent", category: "Housing", amount: 2000, dueDate: 1, isPaid: true, iconName: "home", color: "#0D9488" },
     { id: "exp2", name: "Netflix", category: "Entertainment", amount: 55, dueDate: 5, isPaid: false, iconName: "tv", color: "#E50914" },
