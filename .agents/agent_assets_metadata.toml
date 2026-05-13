@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "x9tfu01Xl7J7FQQxJQ0re"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "finance app icon"
