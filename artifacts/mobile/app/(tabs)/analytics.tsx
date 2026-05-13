@@ -1,7 +1,12 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
+import { generateMonthlyReportHTML } from "@/utils/generateReport";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -23,11 +29,16 @@ function fmt(amount: number, currency: string): string {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function generateMonthlyData(baseIncome: number, baseExpense: number) {
-  return MONTHS.slice(0, 6).map((month, i) => ({
-    month,
-    income: Math.round(baseIncome * (0.9 + Math.random() * 0.2)),
-    expense: Math.round(baseExpense * (0.75 + Math.random() * 0.35)),
-  }));
+  // Use seeded values derived from the actual income/expense so they're stable
+  return MONTHS.slice(0, 6).map((month, i) => {
+    const seed = (baseIncome + i * 137) % 100;
+    const seed2 = (baseExpense + i * 97) % 100;
+    return {
+      month,
+      income: Math.round(baseIncome * (0.88 + (seed / 100) * 0.24)),
+      expense: Math.round(baseExpense * (0.72 + (seed2 / 100) * 0.36)),
+    };
+  });
 }
 
 function BarChartSection({
@@ -62,20 +73,10 @@ function BarChartSection({
             <View key={item.month} style={styles.barGroup}>
               <View style={[styles.barsWrap, { height: BAR_MAX_H }]}>
                 <View style={{ height: BAR_MAX_H, justifyContent: "flex-end", flex: 1 }}>
-                  <View
-                    style={[
-                      styles.bar,
-                      { height: incH, backgroundColor: colors.success, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-                    ]}
-                  />
+                  <View style={[styles.bar, { height: incH, backgroundColor: colors.success, borderTopLeftRadius: 4, borderTopRightRadius: 4 }]} />
                 </View>
                 <View style={{ height: BAR_MAX_H, justifyContent: "flex-end", flex: 1 }}>
-                  <View
-                    style={[
-                      styles.bar,
-                      { height: expH, backgroundColor: colors.destructive, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-                    ]}
-                  />
+                  <View style={[styles.bar, { height: expH, backgroundColor: colors.destructive, borderTopLeftRadius: 4, borderTopRightRadius: 4 }]} />
                 </View>
               </View>
               <Text style={[styles.barLabel, { color: colors.mutedForeground }]}>{item.month}</Text>
@@ -103,7 +104,7 @@ function CategoryBreakdown() {
       <Text style={[styles.chartTitle, { color: colors.foreground }]}>Category Breakdown</Text>
       <View style={{ gap: 12 }}>
         {sorted.map(([cat, amount], i) => {
-          const pct = total > 0 ? (amount / total) * 100 : 0;
+          const p = total > 0 ? (amount / total) * 100 : 0;
           const color = colors.chartColors[i % colors.chartColors.length];
           return (
             <View key={cat}>
@@ -111,20 +112,11 @@ function CategoryBreakdown() {
                 <View style={[styles.catDot, { backgroundColor: color }]} />
                 <Text style={[styles.catLabel, { color: colors.foreground }]}>{cat}</Text>
                 <View style={{ flex: 1 }} />
-                <Text style={[styles.catPct, { color: colors.mutedForeground }]}>
-                  {pct.toFixed(1)}%
-                </Text>
-                <Text style={[styles.catAmount, { color: colors.foreground }]}>
-                  {fmt(amount, finance.currency)}
-                </Text>
+                <Text style={[styles.catPct, { color: colors.mutedForeground }]}>{p.toFixed(1)}%</Text>
+                <Text style={[styles.catAmount, { color: colors.foreground }]}>{fmt(amount, finance.currency)}</Text>
               </View>
               <View style={[styles.catTrack, { backgroundColor: colors.muted }]}>
-                <View
-                  style={[
-                    styles.catFill,
-                    { width: `${pct}%`, backgroundColor: color },
-                  ]}
-                />
+                <View style={[styles.catFill, { width: `${p}%`, backgroundColor: color }]} />
               </View>
             </View>
           );
@@ -139,28 +131,84 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const [exporting, setExporting] = useState(false);
 
   const monthlyData = React.useMemo(
     () => generateMonthlyData(finance.totalMonthlyIncome, finance.totalMonthlyExpenses + finance.totalEMIMonthly),
     [finance.totalMonthlyIncome, finance.totalMonthlyExpenses, finance.totalEMIMonthly]
   );
 
-  const savingsRate = finance.totalMonthlyIncome > 0
-    ? Math.max(
-        0,
-        ((finance.totalMonthlyIncome - finance.totalMonthlyExpenses - finance.totalEMIMonthly) /
-          finance.totalMonthlyIncome) *
-          100
-      )
-    : 0;
+  const savingsRate =
+    finance.totalMonthlyIncome > 0
+      ? Math.max(0, ((finance.totalMonthlyIncome - finance.totalMonthlyExpenses - finance.totalEMIMonthly) / finance.totalMonthlyIncome) * 100)
+      : 0;
 
   const TABS = ["Overview", "Trends"] as const;
   const [activeTab, setActiveTab] = useState<"Overview" | "Trends">("Overview");
 
+  async function handleExport() {
+    if (Platform.OS === "web") {
+      Alert.alert("Export", "PDF export is available on iOS and Android devices.");
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setExporting(true);
+    try {
+      const html = generateMonthlyReportHTML({
+        userName: finance.userName,
+        currency: finance.currency,
+        monthlyBudget: finance.monthlyBudget,
+        totalMonthlyIncome: finance.totalMonthlyIncome,
+        totalMonthlyExpenses: finance.totalMonthlyExpenses,
+        totalEMIMonthly: finance.totalEMIMonthly,
+        remainingBudget: finance.remainingBudget,
+        totalBalance: finance.totalBalance,
+        totalSavings: finance.totalSavings,
+        expenses: finance.expenses,
+        emis: finance.emis,
+        accounts: finance.accounts,
+        incomes: finance.incomes,
+        savingsGoals: finance.savingsGoals,
+      });
+
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: `${finance.userName}'s Finance Report`,
+          UTI: "com.adobe.pdf",
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert("Export ready", `Report saved to: ${uri}`);
+      }
+    } catch (err) {
+      Alert.alert("Export failed", "Could not generate the report. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Analytics</Text>
+        <Pressable
+          onPress={handleExport}
+          disabled={exporting}
+          style={[styles.exportBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+        >
+          {exporting ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <>
+              <Feather name="download" size={14} color={colors.primary} />
+              <Text style={[styles.exportBtnText, { color: colors.primary }]}>Export PDF</Text>
+            </>
+          )}
+        </Pressable>
       </View>
 
       {/* Tab switcher */}
@@ -169,17 +217,9 @@ export default function AnalyticsScreen() {
           <Pressable
             key={tab}
             onPress={() => setActiveTab(tab)}
-            style={[
-              styles.tabBtn,
-              activeTab === tab && [styles.tabBtnActive, { borderBottomColor: colors.primary }],
-            ]}
+            style={[styles.tabBtn, activeTab === tab && [styles.tabBtnActive, { borderBottomColor: colors.primary }]]}
           >
-            <Text
-              style={[
-                styles.tabBtnText,
-                { color: activeTab === tab ? colors.primary : colors.mutedForeground },
-              ]}
-            >
+            <Text style={[styles.tabBtnText, { color: activeTab === tab ? colors.primary : colors.mutedForeground }]}>
               {tab}
             </Text>
           </Pressable>
@@ -187,12 +227,7 @@ export default function AnalyticsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 16,
-          paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0),
-          gap: 16,
-        }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0), gap: 16 }}
         showsVerticalScrollIndicator={false}
       >
         {activeTab === "Overview" && (
@@ -223,12 +258,7 @@ export default function AnalyticsScreen() {
                 <Feather name="credit-card" size={18} color={colors.warning} />
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Subscriptions</Text>
                 <Text style={[styles.kpiValue, { color: colors.foreground }]}>
-                  {fmt(
-                    finance.expenses
-                      .filter((e) => e.category === "Entertainment")
-                      .reduce((s, e) => s + e.amount, 0),
-                    finance.currency
-                  )}
+                  {fmt(finance.expenses.filter((e) => e.category === "Entertainment").reduce((s, e) => s + e.amount, 0), finance.currency)}
                 </Text>
               </View>
               <View style={[styles.kpiCard, { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
@@ -241,6 +271,35 @@ export default function AnalyticsScreen() {
             </View>
 
             <CategoryBreakdown />
+
+            {/* Export teaser card */}
+            <Pressable
+              onPress={handleExport}
+              disabled={exporting}
+              style={[styles.exportCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                style={styles.exportCardIcon}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                {exporting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Feather name="file-text" size={20} color="#FFFFFF" />
+                )}
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.exportCardTitle, { color: colors.foreground }]}>
+                  {exporting ? "Generating report..." : "Export Monthly Report"}
+                </Text>
+                <Text style={[styles.exportCardSub, { color: colors.mutedForeground }]}>
+                  Full PDF with expenses, EMIs, savings and balances
+                </Text>
+              </View>
+              {!exporting && <Feather name="chevron-right" size={18} color={colors.mutedForeground} />}
+            </Pressable>
           </>
         )}
 
@@ -256,18 +315,12 @@ export default function AnalyticsScreen() {
                   <View key={i} style={styles.monthRow}>
                     <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>{item.month}</Text>
                     <View style={{ flex: 1 }}>
-                      <View style={styles.monthBars}>
+                      <View style={[styles.monthBars, { backgroundColor: colors.muted }]}>
                         <View style={[styles.monthBar, { width: `${Math.min(100, (item.income / (item.income + item.expense)) * 100)}%`, backgroundColor: colors.success }]} />
                       </View>
                     </View>
-                    <Text
-                      style={[
-                        styles.monthSaved,
-                        { color: saved >= 0 ? colors.success : colors.destructive },
-                      ]}
-                    >
-                      {saved >= 0 ? "+" : ""}
-                      {fmt(saved, finance.currency)}
+                    <Text style={[styles.monthSaved, { color: saved >= 0 ? colors.success : colors.destructive }]}>
+                      {saved >= 0 ? "+" : ""}{fmt(saved, finance.currency)}
                     </Text>
                   </View>
                 );
@@ -286,43 +339,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   headerTitle: { fontSize: 24, fontFamily: "Inter_700Bold" },
-  tabSwitcher: {
+  exportBtn: {
     flexDirection: "row",
-    borderBottomWidth: 1,
-    paddingHorizontal: 20,
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 44,
+    justifyContent: "center",
   },
-  tabBtn: {
-    paddingVertical: 12,
-    marginRight: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
+  exportBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  tabSwitcher: { flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 20 },
+  tabBtn: { paddingVertical: 12, marginRight: 24, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabBtnActive: {},
   tabBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  kpiCard: {
-    borderRadius: 16,
-    padding: 16,
-    gap: 6,
-  },
-  kpiLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.7)",
-    marginTop: 4,
-  },
-  kpiValue: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-  },
-  chartCard: {
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    gap: 8,
-  },
+  kpiCard: { borderRadius: 16, padding: 16, gap: 6 },
+  kpiLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", marginTop: 4 },
+  kpiValue: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
+  chartCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 8 },
   chartTitle: { fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 4 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
@@ -332,26 +373,34 @@ const styles = StyleSheet.create({
   barsWrap: { flexDirection: "row", gap: 2, alignItems: "flex-end" },
   bar: { width: 10 },
   barLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
-  catRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 6,
-  },
+  catRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   catDot: { width: 10, height: 10, borderRadius: 5 },
   catLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
   catPct: { fontSize: 12, fontFamily: "Inter_400Regular", marginRight: 8 },
   catAmount: { fontSize: 13, fontFamily: "Inter_600SemiBold", minWidth: 80, textAlign: "right" },
   catTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   catFill: { height: 6, borderRadius: 3 },
-  monthRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 6,
-  },
+  monthRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
   monthLabel: { fontSize: 13, fontFamily: "Inter_500Medium", width: 28 },
-  monthBars: { height: 8, borderRadius: 4, backgroundColor: "rgba(0,0,0,0.05)", overflow: "hidden" },
+  monthBars: { height: 8, borderRadius: 4, overflow: "hidden" },
   monthBar: { height: 8, borderRadius: 4 },
   monthSaved: { fontSize: 12, fontFamily: "Inter_600SemiBold", minWidth: 80, textAlign: "right" },
+  // Export card at the bottom of overview
+  exportCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  exportCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exportCardTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 3 },
+  exportCardSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
 });
