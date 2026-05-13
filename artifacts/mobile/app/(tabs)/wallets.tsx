@@ -126,9 +126,9 @@ function IncomeRow({
   );
 }
 
-// ─── Savings Goal Card ────────────────────────────────────────────────────────
+// ─── Savings Goal Row (minimal) ───────────────────────────────────────────────
 
-function SavingsGoalCard({
+function SavingsGoalRow({
   goal,
   currency,
   onAddFunds,
@@ -143,7 +143,6 @@ function SavingsGoalCard({
   const [showAdd, setShowAdd] = useState(false);
   const [addAmt, setAddAmt] = useState("");
   const progress = goal.targetAmount > 0 ? Math.min(1, goal.savedAmount / goal.targetAmount) : 0;
-  const remaining = Math.max(0, goal.targetAmount - goal.savedAmount);
   const isComplete = goal.savedAmount >= goal.targetAmount;
 
   function submitAdd() {
@@ -157,110 +156,61 @@ function SavingsGoalCard({
   }
 
   return (
-    <View
-      style={[
-        styles.goalCard,
-        { backgroundColor: colors.card, borderColor: isComplete ? goal.color + "60" : colors.border, borderWidth: isComplete ? 1.5 : 1 },
-      ]}
-    >
-      <View style={styles.goalTop}>
-        <View style={[styles.goalIcon, { backgroundColor: goal.color + "20" }]}>
-          <Feather name={goal.iconName as any} size={20} color={goal.color} />
-        </View>
+    <View style={[styles.goalRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.goalRowMain}>
+        <View style={[styles.goalDot, { backgroundColor: goal.color }]} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.goalName, { color: colors.foreground }]}>
-            {goal.name}
-          </Text>
-          {goal.deadline && (
-            <Text style={[styles.goalDeadline, { color: colors.mutedForeground }]}>
-              Target: {goal.deadline}
+          <View style={styles.goalRowHeader}>
+            <Text style={[styles.goalRowName, { color: colors.foreground }]}>{goal.name}</Text>
+            <Text style={[styles.goalRowPct, { color: colors.mutedForeground }]}>
+              {Math.round(progress * 100)}%
             </Text>
-          )}
-        </View>
-        {isComplete ? (
-          <View style={[styles.completeBadge, { backgroundColor: goal.color + "20" }]}>
-            <Feather name="check-circle" size={14} color={goal.color} />
-            <Text style={[styles.completeBadgeText, { color: goal.color }]}>Done</Text>
           </View>
-        ) : (
+          <View style={[styles.goalMiniTrack, { backgroundColor: colors.muted }]}>
+            <View style={[styles.goalMiniFill, { width: `${Math.min(100, progress * 100)}%`, backgroundColor: goal.color }]} />
+          </View>
+          <Text style={[styles.goalRowSub, { color: colors.mutedForeground }]}>
+            {fmt(goal.savedAmount, currency)} of {fmt(goal.targetAmount, currency)}
+            {goal.deadline ? `  ·  ${goal.deadline}` : ""}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+          {!isComplete && (
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAdd(!showAdd); }}
+              style={[styles.goalAddBtn, { backgroundColor: colors.primary + "18" }]}
+            >
+              <Feather name="plus" size={14} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          {isComplete && (
+            <View style={[styles.goalAddBtn, { backgroundColor: colors.success + "20" }]}>
+              <Feather name="check" size={14} color={colors.success} />
+            </View>
+          )}
           <TouchableOpacity
-            onPress={() => setShowAdd(!showAdd)}
-            style={[styles.addFundsBtn, { backgroundColor: goal.color + "20", borderColor: goal.color + "40" }]}
+            onPress={onDelete}
+            style={[styles.goalAddBtn, { backgroundColor: colors.errorLight }]}
           >
-            <Feather name="plus" size={14} color={goal.color} />
-            <Text style={[styles.addFundsBtnText, { color: goal.color }]}>Add</Text>
+            <Feather name="trash-2" size={12} color={colors.destructive} />
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          onPress={onDelete}
-          style={[styles.deleteSmall, { backgroundColor: colors.errorLight, marginLeft: 6 }]}
-        >
-          <Feather name="trash-2" size={12} color={colors.destructive} />
-        </TouchableOpacity>
+        </View>
       </View>
-
-      {/* Add funds input */}
       {showAdd && (
         <View style={[styles.addFundsRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <TextInput
             style={[styles.addFundsInput, { color: colors.foreground }]}
-            placeholder={`Amount (${currency})`}
+            placeholder={`Add amount (${currency})`}
             placeholderTextColor={colors.mutedForeground}
             keyboardType="numeric"
             value={addAmt}
             onChangeText={setAddAmt}
             autoFocus
           />
-          <TouchableOpacity
-            onPress={submitAdd}
-            style={[styles.addFundsConfirm, { backgroundColor: goal.color }]}
-          >
+          <TouchableOpacity onPress={submitAdd} style={[styles.addFundsConfirm, { backgroundColor: goal.color }]}>
             <Feather name="check" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      )}
-
-      {/* Amounts */}
-      <View style={styles.goalAmounts}>
-        <View>
-          <Text style={[styles.goalAmountLabel, { color: colors.mutedForeground }]}>
-            Saved
-          </Text>
-          <Text style={[styles.goalAmountValue, { color: goal.color }]}>
-            {fmt(goal.savedAmount, currency)}
-          </Text>
-        </View>
-        <View style={{ alignItems: "center" }}>
-          <Text style={[styles.goalAmountLabel, { color: colors.mutedForeground }]}>
-            Progress
-          </Text>
-          <Text style={[styles.goalPct, { color: colors.foreground }]}>
-            {Math.round(progress * 100)}%
-          </Text>
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={[styles.goalAmountLabel, { color: colors.mutedForeground }]}>
-            Target
-          </Text>
-          <Text style={[styles.goalAmountValue, { color: colors.foreground }]}>
-            {fmt(goal.targetAmount, currency)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Progress bar */}
-      <View style={[styles.goalTrack, { backgroundColor: colors.muted }]}>
-        <View
-          style={[
-            styles.goalFill,
-            { width: `${Math.min(100, progress * 100)}%`, backgroundColor: goal.color },
-          ]}
-        />
-      </View>
-      {!isComplete && (
-        <Text style={[styles.goalRemaining, { color: colors.mutedForeground }]}>
-          {fmt(remaining, currency)} still needed
-        </Text>
       )}
     </View>
   );
@@ -513,20 +463,28 @@ export default function WalletsScreen() {
           </View>
         )}
 
-        {finance.savingsGoals.map((goal) => (
-          <SavingsGoalCard
-            key={goal.id}
-            goal={goal}
-            currency={finance.currency}
-            onAddFunds={(amount) => finance.updateSavingsGoal(goal.id, { savedAmount: goal.savedAmount + amount })}
-            onDelete={() =>
-              Alert.alert("Delete goal?", `Remove "${goal.name}"?`, [
-                { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => finance.deleteSavingsGoal(goal.id) },
-              ])
-            }
-          />
-        ))}
+        {finance.savingsGoals.length > 0 && (
+          <View style={[styles.goalListCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {finance.savingsGoals.map((goal, i) => (
+              <React.Fragment key={goal.id}>
+                <SavingsGoalRow
+                  goal={goal}
+                  currency={finance.currency}
+                  onAddFunds={(amount) => finance.updateSavingsGoal(goal.id, { savedAmount: goal.savedAmount + amount })}
+                  onDelete={() =>
+                    Alert.alert("Delete goal?", `Remove "${goal.name}"?`, [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Delete", style: "destructive", onPress: () => finance.deleteSavingsGoal(goal.id) },
+                    ])
+                  }
+                />
+                {i < finance.savingsGoals.length - 1 && (
+                  <View style={[styles.goalDivider, { backgroundColor: colors.border }]} />
+                )}
+              </React.Fragment>
+            ))}
+          </View>
+        )}
         {finance.savingsGoals.length === 0 && (
           <View style={styles.emptyState}>
             <Feather name="target" size={36} color={colors.mutedForeground} />
@@ -612,26 +570,22 @@ const styles = StyleSheet.create({
   rowMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   incomeAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
   deleteSmall: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  // Savings goal card
-  goalCard: { borderRadius: 18, padding: 16, gap: 12 },
-  goalTop: { flexDirection: "row", alignItems: "center", gap: 12 },
-  goalIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  goalName: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  goalDeadline: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
-  completeBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  completeBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  addFundsBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
-  addFundsBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  addFundsRow: { flexDirection: "row", borderRadius: 12, borderWidth: 1, overflow: "hidden" },
+  // Savings goal rows (minimal)
+  goalListCard: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
+  goalRow: { padding: 16, gap: 10 },
+  goalRowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
+  goalDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  goalRowHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  goalRowName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  goalRowPct: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  goalMiniTrack: { height: 4, borderRadius: 2, overflow: "hidden", marginBottom: 5 },
+  goalMiniFill: { height: 4, borderRadius: 2 },
+  goalRowSub: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  goalAddBtn: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  goalDivider: { height: 1, marginHorizontal: 16 },
+  addFundsRow: { flexDirection: "row", borderRadius: 10, borderWidth: 1, overflow: "hidden", marginTop: 4 },
   addFundsInput: { flex: 1, padding: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
   addFundsConfirm: { width: 44, alignItems: "center", justifyContent: "center" },
-  goalAmounts: { flexDirection: "row", justifyContent: "space-between" },
-  goalAmountLabel: { fontSize: 11, fontFamily: "Inter_400Regular", marginBottom: 2 },
-  goalAmountValue: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  goalPct: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  goalTrack: { height: 10, borderRadius: 5, overflow: "hidden" },
-  goalFill: { height: 10, borderRadius: 5 },
-  goalRemaining: { fontSize: 11, fontFamily: "Inter_400Regular" },
   overallGoalBar: { borderRadius: 12, padding: 12, borderWidth: 1 },
   overviewCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 12 },
   overviewRow: { flexDirection: "row", alignItems: "center", gap: 10 },
