@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useState } from "react";
@@ -143,8 +144,62 @@ export default function AnalyticsScreen() {
       ? Math.max(0, ((finance.totalMonthlyIncome - finance.totalMonthlyExpenses - finance.totalEMIMonthly) / finance.totalMonthlyIncome) * 100)
       : 0;
 
+  const [exportingCSV, setExportingCSV] = useState(false);
+
   const TABS = ["Overview", "Trends"] as const;
   const [activeTab, setActiveTab] = useState<"Overview" | "Trends">("Overview");
+
+  async function handleCSVExport() {
+    if (Platform.OS === "web") {
+      Alert.alert("Export", "CSV export is available on iOS and Android devices.");
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setExportingCSV(true);
+    try {
+      const rows: string[][] = [
+        ["Type", "Name", "Category", "Amount (SAR)", "Recurrence", "Due Date", "Status"],
+        ...finance.expenses.map((e) => [
+          "Expense",
+          e.name,
+          e.category,
+          e.amount.toString(),
+          e.recurrence ?? "none",
+          e.dueDate.toString(),
+          e.isPaid ? "Paid" : "Unpaid",
+        ]),
+        [],
+        ["Type", "Name", "Total Amount (SAR)", "Monthly Amount (SAR)", "Paid Installments", "Total Installments", "Progress %"],
+        ...finance.emis.map((emi) => [
+          "EMI",
+          emi.name,
+          emi.totalAmount.toString(),
+          emi.monthlyAmount.toString(),
+          emi.paidInstallments.toString(),
+          emi.totalInstallments.toString(),
+          Math.round((emi.paidInstallments / emi.totalInstallments) * 100) + "%",
+        ]),
+        [],
+        ["Type", "Name", "Balance (SAR)", "Account Type"],
+        ...finance.accounts.map((a) => ["Account", a.name, a.balance.toString(), a.type]),
+      ];
+
+      const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+      const uri = (FileSystem.documentDirectory ?? "") + `finance-export-${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: "text/csv", dialogTitle: "Export CSV" });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert("Export ready", `CSV saved to: ${uri}`);
+      }
+    } catch {
+      Alert.alert("Export failed", "Could not generate the CSV. Please try again.");
+    } finally {
+      setExportingCSV(false);
+    }
+  }
 
   async function handleExport() {
     if (Platform.OS === "web") {
@@ -195,20 +250,36 @@ export default function AnalyticsScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Analytics</Text>
-        <Pressable
-          onPress={handleExport}
-          disabled={exporting}
-          style={[styles.exportBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
-        >
-          {exporting ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <>
-              <Feather name="download" size={14} color={colors.primary} />
-              <Text style={[styles.exportBtnText, { color: colors.primary }]}>Export PDF</Text>
-            </>
-          )}
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+            onPress={handleCSVExport}
+            disabled={exportingCSV}
+            style={[styles.exportBtn, { backgroundColor: colors.success + "18", borderColor: colors.success + "40" }]}
+          >
+            {exportingCSV ? (
+              <ActivityIndicator size="small" color={colors.success} />
+            ) : (
+              <>
+                <Feather name="file-text" size={14} color={colors.success} />
+                <Text style={[styles.exportBtnText, { color: colors.success }]}>CSV</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={handleExport}
+            disabled={exporting}
+            style={[styles.exportBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Feather name="download" size={14} color={colors.primary} />
+                <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/* Tab switcher */}

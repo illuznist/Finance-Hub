@@ -586,6 +586,8 @@ const styles = StyleSheet.create({
   addFundsRow: { flexDirection: "row", borderRadius: 10, borderWidth: 1, overflow: "hidden", marginTop: 4 },
   addFundsInput: { flex: 1, padding: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
   addFundsConfirm: { width: 44, alignItems: "center", justifyContent: "center" },
+  goalTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
+  goalFill: { height: 6, borderRadius: 3 },
   overallGoalBar: { borderRadius: 12, padding: 12, borderWidth: 1 },
   overviewCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 12 },
   overviewRow: { flexDirection: "row", alignItems: "center", gap: 10 },

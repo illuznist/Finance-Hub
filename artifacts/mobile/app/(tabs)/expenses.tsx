@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type Expense, useFinance } from "@/context/FinanceContext";
@@ -228,11 +229,12 @@ export default function ExpensesScreen() {
   const finance = useFinance();
   const [selectedCat, setSelectedCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState("");
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const filtered = selectedCat === "All"
-    ? finance.expenses
-    : finance.expenses.filter((e) => e.category === selectedCat);
+  const filtered = finance.expenses
+    .filter((e) => selectedCat === "All" || e.category === selectedCat)
+    .filter((e) => !search.trim() || e.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   const totalFiltered = filtered.reduce((s, e) => s + e.amount, 0);
   const paidCount = filtered.filter((e) => e.isPaid).length;
@@ -251,6 +253,25 @@ export default function ExpensesScreen() {
         >
           <Feather name="plus" size={20} color={colors.primaryForeground} />
         </Pressable>
+      </View>
+
+      {/* Search bar */}
+      <View style={[styles.searchWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+        <Feather name="search" size={16} color={colors.mutedForeground} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.foreground }]}
+          placeholder="Search expenses..."
+          placeholderTextColor={colors.mutedForeground}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        {search.length > 0 && (
+          <Pressable onPress={() => setSearch("")} hitSlop={8}>
+            <Feather name="x" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
       </View>
 
       <CategoryFilter selected={selectedCat} onSelect={setSelectedCat} />
@@ -337,6 +358,13 @@ function ExpenseCard({
         <Text style={[styles.expMeta, { color: colors.mutedForeground }]}>
           {expense.category} · Due {expense.dueDate}{suffix}
         </Text>
+        {expense.recurrence && expense.recurrence !== "none" && (
+          <View style={[styles.recurBadge, { backgroundColor: colors.primary + "20" }]}>
+            <Text style={[styles.recurBadgeText, { color: colors.primary }]}>
+              {expense.recurrence.charAt(0).toUpperCase() + expense.recurrence.slice(1)}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.expRight}>
         <Text style={[styles.expAmount, { color: colors.foreground }]}>
@@ -441,6 +469,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  },
+  recurBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+    alignSelf: "flex-start",
+  },
+  recurBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   emptyState: {
     alignItems: "center",
     paddingTop: 60,

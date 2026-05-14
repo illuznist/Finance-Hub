@@ -1,0 +1,167 @@
+FEATURES TO ADD:
+
+Push Notifications & Payment Reminders
+Implement local push notifications for:
+EMI due reminders
+Monthly bill reminders
+Subscription renewals
+Salary expected notifications
+Budget limit warnings
+
+Examples:
+
+“Your Tabby payment of SAR 250 is due tomorrow.”
+“You have crossed 80% of your food budget.”
+“3 upcoming payments this week.”
+
+Requirements:
+
+Allow users to enable/disable notifications
+Allow choosing reminder timing:
+same day
+1 day before
+3 days before
+Add notification settings page
+Use native mobile push notifications
+Notifications must work reliably in the background
+Multi-Currency Support
+Add complete currency selection and conversion support.
+
+Requirements:
+
+User can choose a default/base currency
+Support:
+SAR
+USD
+AED
+EUR
+GBP
+INR
+All balances, EMIs, analytics, and expenses should dynamically convert
+Store original transaction currency separately
+Add currency selector in Settings/Profile
+Automatically update conversion rates using a free exchange rate API
+Cache rates locally for offline support
+Smooth animated currency updates in UI
+Security Features
+Add secure app protection features.
+
+Requirements:
+
+Face ID / Fingerprint authentication
+Optional 4-digit PIN lock
+Session timeout lock after inactivity
+Secure local storage
+Encrypt sensitive financial data
+Add Security settings screen
+Allow toggling:
+biometric lock
+PIN lock
+auto-lock timing
+Recurring Expense Automation
+Allow users to create recurring expenses.
+
+Examples:
+
+Netflix every month
+Internet bill monthly
+Car EMI monthly
+
+Requirements:
+
+Auto-generate recurring payments monthly
+Support:
+weekly
+monthly
+yearly
+Allow editing future recurring payments
+Show next due date clearly
+Enhanced EMI Management
+Upgrade the EMI section with:
+animated circular progress rings
+completed installments in green
+pending installments in red
+bold monthly EMI amount in center
+total purchase amount below
+remaining installment count
+payment history timeline
+Advanced Analytics
+Improve analytics with:
+spending trends
+category breakdown
+monthly comparisons
+savings progress
+income vs expenses
+top spending category
+financial insights cards
+
+Add smart insights like:
+
+“You spent 22% more on shopping this month.”
+“Your subscriptions total SAR 145/month.”
+Expense Filtering & Search
+Add:
+search bar
+category filters
+date filters
+monthly/yearly filtering
+quick sorting options
+Export & Backup
+Add:
+export to PDF
+export to CSV
+local backup
+cloud sync preparation structure
+Performance & Mobile Optimization
+Requirements:
+optimize animations
+smooth scrolling
+responsive on all mobile sizes
+improve loading performance
+prevent unnecessary rerenders
+optimize state management
+App Store Readiness
+Prepare the app for production release.
+
+Requirements:
+
+proper folder structure
+clean reusable components
+environment variable setup
+secure API key handling
+production-ready error handling
+loading states
+empty states
+onboarding screens
+app permissions handling
+privacy-ready architecture
+Maintain Existing Design System
+Important:
+keep the existing minimal aesthetic
+maintain current navigation
+preserve current screens
+use soft modern fintech styling
+rounded cards
+smooth transitions
+subtle shadows
+elegant typography
+premium clean UI
+
+Do not overcomplicate the interface.
+
+Tech Stack Improvements
+If needed:
+improve backend architecture
+optimize database structure
+use secure authentication patterns
+improve scalability for future subscriptions and cloud sync
+
+At the end:
+
+explain all changes made
+list all newly added dependencies
+explain where API keys should be added
+mention any required setup steps for mobile deployment
+prepare the project for App Store and Play Store publishing later
+
+Focus on stability, production quality, clean architecture, and preserving the current design.

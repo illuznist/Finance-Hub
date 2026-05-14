@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -206,6 +207,7 @@ const INSIGHTS = [
 ];
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
@@ -265,11 +267,14 @@ export default function DashboardScreen() {
               Here's your financial summary
             </Text>
           </View>
-          <View style={styles.avatarCircle}>
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/settings"); }}
+            style={styles.avatarCircle}
+          >
             <Text style={styles.avatarText}>
               {finance.userName.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </Pressable>
         </View>
 
         {/* Total Balance card (hero number) */}

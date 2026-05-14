@@ -17,6 +17,7 @@ export interface Expense {
   iconName: string;
   color: string;
   notes?: string;
+  recurrence?: "none" | "weekly" | "monthly" | "yearly";
 }
 
 export interface EMI {
@@ -58,6 +59,20 @@ export interface SavingsGoal {
   deadline?: string;
 }
 
+export interface NotificationSettings {
+  enabled: boolean;
+  timing: "same" | "1day" | "3days";
+  emiEnabled: boolean;
+  expenseEnabled: boolean;
+  budgetEnabled: boolean;
+}
+
+export interface SecuritySettings {
+  pinEnabled: boolean;
+  pin: string;
+  autoLockMinutes: number;
+}
+
 interface FinanceState {
   userName: string;
   currency: string;
@@ -67,7 +82,29 @@ interface FinanceState {
   accounts: Account[];
   incomes: Income[];
   savingsGoals: SavingsGoal[];
+  notificationSettings: NotificationSettings;
+  securitySettings: SecuritySettings;
 }
+
+export const EXCHANGE_RATES: Record<string, number> = {
+  SAR: 1,
+  USD: 0.2666,
+  AED: 0.9788,
+  EUR: 0.2451,
+  GBP: 0.2108,
+  INR: 22.34,
+};
+
+export const SUPPORTED_CURRENCIES = [
+  { code: "SAR", name: "Saudi Riyal", symbol: "SAR" },
+  { code: "USD", name: "US Dollar", symbol: "USD" },
+  { code: "AED", name: "UAE Dirham", symbol: "AED" },
+  { code: "EUR", name: "Euro", symbol: "EUR" },
+  { code: "GBP", name: "British Pound", symbol: "GBP" },
+  { code: "INR", name: "Indian Rupee", symbol: "INR" },
+];
+
+export const PIN_STORAGE_KEY = "@finance_pin_v1";
 
 interface FinanceContextType extends FinanceState {
   addExpense: (e: Omit<Expense, "id">) => void;
@@ -88,27 +125,45 @@ interface FinanceContextType extends FinanceState {
   deleteSavingsGoal: (id: string) => void;
   setMonthlyBudget: (amount: number) => void;
   setUserName: (name: string) => void;
+  setCurrency: (currency: string) => void;
+  setNotificationSettings: (s: NotificationSettings) => void;
+  setSecuritySettings: (s: SecuritySettings) => void;
   totalBalance: number;
   totalMonthlyIncome: number;
   totalMonthlyExpenses: number;
   totalEMIMonthly: number;
   remainingBudget: number;
   totalSavings: number;
+  currencyRate: number;
 }
+
+const defaultNotificationSettings: NotificationSettings = {
+  enabled: true,
+  timing: "1day",
+  emiEnabled: true,
+  expenseEnabled: true,
+  budgetEnabled: true,
+};
+
+const defaultSecuritySettings: SecuritySettings = {
+  pinEnabled: false,
+  pin: "",
+  autoLockMinutes: 5,
+};
 
 const defaultState: FinanceState = {
   userName: "Manzoor",
   currency: "SAR",
   monthlyBudget: 7500,
   expenses: [
-    { id: "exp1", name: "Rent", category: "Housing", amount: 2000, dueDate: 1, isPaid: true, iconName: "home", color: "#0D9488" },
-    { id: "exp2", name: "Netflix", category: "Entertainment", amount: 55, dueDate: 5, isPaid: false, iconName: "tv", color: "#E50914" },
-    { id: "exp3", name: "Spotify", category: "Entertainment", amount: 22, dueDate: 8, isPaid: false, iconName: "music", color: "#1DB954" },
-    { id: "exp4", name: "STC Internet", category: "Bills", amount: 180, dueDate: 10, isPaid: true, iconName: "wifi", color: "#0891B2" },
-    { id: "exp5", name: "Electricity", category: "Bills", amount: 280, dueDate: 12, isPaid: false, iconName: "zap", color: "#F59E0B" },
-    { id: "exp6", name: "Gym Membership", category: "Health", amount: 120, dueDate: 15, isPaid: true, iconName: "activity", color: "#EF4444" },
-    { id: "exp7", name: "Car Insurance", category: "Transport", amount: 350, dueDate: 20, isPaid: false, iconName: "shield", color: "#3B82F6" },
-    { id: "exp8", name: "Amazon Prime", category: "Entertainment", amount: 40, dueDate: 25, isPaid: false, iconName: "package", color: "#FF9900" },
+    { id: "exp1", name: "Rent", category: "Housing", amount: 2000, dueDate: 1, isPaid: true, iconName: "home", color: "#0D9488", recurrence: "monthly" },
+    { id: "exp2", name: "Netflix", category: "Entertainment", amount: 55, dueDate: 5, isPaid: false, iconName: "tv", color: "#E50914", recurrence: "monthly" },
+    { id: "exp3", name: "Spotify", category: "Entertainment", amount: 22, dueDate: 8, isPaid: false, iconName: "music", color: "#1DB954", recurrence: "monthly" },
+    { id: "exp4", name: "STC Internet", category: "Bills", amount: 180, dueDate: 10, isPaid: true, iconName: "wifi", color: "#0891B2", recurrence: "monthly" },
+    { id: "exp5", name: "Electricity", category: "Bills", amount: 280, dueDate: 12, isPaid: false, iconName: "zap", color: "#F59E0B", recurrence: "monthly" },
+    { id: "exp6", name: "Gym Membership", category: "Health", amount: 120, dueDate: 15, isPaid: true, iconName: "activity", color: "#EF4444", recurrence: "monthly" },
+    { id: "exp7", name: "Car Insurance", category: "Transport", amount: 350, dueDate: 20, isPaid: false, iconName: "shield", color: "#3B82F6", recurrence: "yearly" },
+    { id: "exp8", name: "Amazon Prime", category: "Entertainment", amount: 40, dueDate: 25, isPaid: false, iconName: "package", color: "#FF9900", recurrence: "monthly" },
   ],
   emis: [
     { id: "emi1", name: "iPhone 15 Pro", totalAmount: 4000, monthlyAmount: 500, totalInstallments: 8, paidInstallments: 1, startMonth: "2025-01", dueDayOfMonth: 7, color: "#0D9488", iconName: "smartphone" },
@@ -130,9 +185,11 @@ const defaultState: FinanceState = {
     { id: "sg2", name: "Vacation", targetAmount: 10000, savedAmount: 3500, color: "#0891B2", iconName: "map", deadline: "2025-12" },
     { id: "sg3", name: "New Car", targetAmount: 60000, savedAmount: 12000, color: "#F59E0B", iconName: "truck" },
   ],
+  notificationSettings: defaultNotificationSettings,
+  securitySettings: defaultSecuritySettings,
 };
 
-const STORAGE_KEY = "@finance_state_v3";
+const STORAGE_KEY = "@finance_state_v4";
 
 const FinanceContext = createContext<FinanceContextType | null>(null);
 
@@ -148,8 +205,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         try {
           const parsed = JSON.parse(raw) as Partial<FinanceState>;
-          // Merge with defaults so new fields (e.g. savingsGoals) are always present
-          setState({ ...defaultState, ...parsed });
+          setState({
+            ...defaultState,
+            ...parsed,
+            notificationSettings: { ...defaultNotificationSettings, ...(parsed.notificationSettings ?? {}) },
+            securitySettings: { ...defaultSecuritySettings, ...(parsed.securitySettings ?? {}) },
+          });
         } catch {
           // ignore parse errors, keep defaults
         }
@@ -256,6 +317,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     (name: string) => persist({ ...state, userName: name }),
     [state, persist]
   );
+  const setCurrency = useCallback(
+    (currency: string) => persist({ ...state, currency }),
+    [state, persist]
+  );
+  const setNotificationSettings = useCallback(
+    (notificationSettings: NotificationSettings) => persist({ ...state, notificationSettings }),
+    [state, persist]
+  );
+  const setSecuritySettings = useCallback(
+    (securitySettings: SecuritySettings) => {
+      persist({ ...state, securitySettings });
+      AsyncStorage.setItem(
+        PIN_STORAGE_KEY,
+        JSON.stringify({ pinEnabled: securitySettings.pinEnabled, pin: securitySettings.pin })
+      ).catch(() => {});
+    },
+    [state, persist]
+  );
 
   const totalBalance = state.accounts.reduce((s, a) => s + a.balance, 0);
   const totalMonthlyIncome = state.incomes.reduce((s, i) => s + i.amount, 0);
@@ -266,6 +345,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
   const remainingBudget = state.monthlyBudget - totalMonthlyExpenses - totalEMIMonthly;
   const totalSavings = state.accounts.filter((a) => a.type === "savings").reduce((s, a) => s + a.balance, 0);
+  const currencyRate = EXCHANGE_RATES[state.currency] ?? 1;
 
   return (
     <FinanceContext.Provider
@@ -289,12 +369,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         deleteSavingsGoal,
         setMonthlyBudget,
         setUserName,
+        setCurrency,
+        setNotificationSettings,
+        setSecuritySettings,
         totalBalance,
         totalMonthlyIncome,
         totalMonthlyExpenses,
         totalEMIMonthly,
         remainingBudget,
         totalSavings,
+        currencyRate,
       }}
     >
       {children}
