@@ -24,6 +24,7 @@ import {
   PIN_STORAGE_KEY,
   useFinance,
 } from "@/context/FinanceContext";
+import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
 
 function SectionHeader({ title }: { title: string }) {
@@ -220,8 +221,12 @@ export default function SettingsScreen() {
   const notif = finance.notificationSettings;
   const security = finance.securitySettings;
 
-  function updateNotif(updates: Partial<NotificationSettings>) {
-    finance.setNotificationSettings({ ...notif, ...updates });
+  async function updateNotif(updates: Partial<NotificationSettings>) {
+    const next = { ...notif, ...updates };
+    if (updates.enabled === true) {
+      await requestNotificationPermissions();
+    }
+    finance.setNotificationSettings(next);
   }
 
   function updateSecurity(updates: Partial<SecuritySettings>) {

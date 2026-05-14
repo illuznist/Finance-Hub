@@ -23,9 +23,16 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { FinanceProvider, PIN_STORAGE_KEY } from "@/context/FinanceContext";
+import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
+import {
+  cancelAllScheduledNotifications,
+  scheduleAllNotifications,
+  setupNotificationHandler,
+} from "@/utils/notifications";
 
 SplashScreen.preventAutoHideAsync();
+
+setupNotificationHandler().catch(() => {});
 
 const queryClient = new QueryClient();
 
@@ -147,12 +154,46 @@ function PinGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function NotificationScheduler() {
+  const finance = useFinance();
+
+  useEffect(() => {
+    const s = finance.notificationSettings;
+    if (!s.enabled) {
+      cancelAllScheduledNotifications().catch(() => {});
+      return;
+    }
+    scheduleAllNotifications({
+      expenses: finance.expenses,
+      emis: finance.emis,
+      settings: s,
+      currency: finance.currency,
+      monthlyBudget: finance.monthlyBudget,
+      totalMonthlyExpenses: finance.totalMonthlyExpenses,
+      totalEMIMonthly: finance.totalEMIMonthly,
+    }).catch(() => {});
+  }, [
+    finance.notificationSettings,
+    finance.expenses,
+    finance.emis,
+    finance.currency,
+    finance.monthlyBudget,
+    finance.totalMonthlyExpenses,
+    finance.totalEMIMonthly,
+  ]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
-    </Stack>
+    <>
+      <NotificationScheduler />
+      <Stack screenOptions={{ headerBackTitle: "Back" }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
+      </Stack>
+    </>
   );
 }
 
