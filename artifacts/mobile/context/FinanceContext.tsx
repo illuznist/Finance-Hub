@@ -84,6 +84,8 @@ interface FinanceState {
   savingsGoals: SavingsGoal[];
   notificationSettings: NotificationSettings;
   securitySettings: SecuritySettings;
+  lastResetMonth: string;
+  lastResetYear: string;
 }
 
 export const EXCHANGE_RATES: Record<string, number> = {
@@ -128,6 +130,8 @@ interface FinanceContextType extends FinanceState {
   setCurrency: (currency: string) => void;
   setNotificationSettings: (s: NotificationSettings) => void;
   setSecuritySettings: (s: SecuritySettings) => void;
+  monthResetInfo: { count: number; month: string } | null;
+  dismissResetInfo: () => void;
   totalBalance: number;
   totalMonthlyIncome: number;
   totalMonthlyExpenses: number;
@@ -187,6 +191,8 @@ const defaultState: FinanceState = {
   ],
   notificationSettings: defaultNotificationSettings,
   securitySettings: defaultSecuritySettings,
+  lastResetMonth: "",
+  lastResetYear: "",
 };
 
 const STORAGE_KEY = "@finance_state_v4";
@@ -197,24 +203,82 @@ function genId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function currentYYYYMM(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+function currentYYYY(): string {
+  return String(new Date().getFullYear());
+}
+function monthLabel(yyyymm: string): string {
+  const [, mm] = yyyymm.split("-");
+  return MONTH_NAMES[parseInt(mm, 10) - 1] ?? yyyymm;
+}
+
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<FinanceState>(defaultState);
+  const [monthResetInfo, setMonthResetInfo] = useState<{ count: number; month: string } | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+      let loaded: FinanceState = defaultState;
       if (raw) {
         try {
           const parsed = JSON.parse(raw) as Partial<FinanceState>;
-          setState({
+          loaded = {
             ...defaultState,
             ...parsed,
             notificationSettings: { ...defaultNotificationSettings, ...(parsed.notificationSettings ?? {}) },
             securitySettings: { ...defaultSecuritySettings, ...(parsed.securitySettings ?? {}) },
-          });
+            lastResetMonth: parsed.lastResetMonth ?? "",
+            lastResetYear: parsed.lastResetYear ?? "",
+          };
         } catch {
           // ignore parse errors, keep defaults
         }
       }
+
+      // ── Recurring reset engine ──
+      const nowMonth = currentYYYYMM();
+      const nowYear = currentYYYY();
+      const isNewMonth = loaded.lastResetMonth !== nowMonth;
+      const isNewYear = loaded.lastResetYear !== nowYear;
+
+      if (isNewMonth || isNewYear) {
+        let resetCount = 0;
+        const updatedExpenses = loaded.expenses.map((e) => {
+          const rec = e.recurrence ?? "none";
+          const shouldReset =
+            (rec === "monthly" && isNewMonth) ||
+            (rec === "weekly" && isNewMonth) ||
+            (rec === "yearly" && isNewYear);
+          if (shouldReset) {
+            resetCount++;
+            return { ...e, isPaid: false };
+          }
+          return e;
+        });
+
+        loaded = {
+          ...loaded,
+          expenses: updatedExpenses,
+          lastResetMonth: isNewMonth ? nowMonth : loaded.lastResetMonth,
+          lastResetYear: isNewYear ? nowYear : loaded.lastResetYear,
+        };
+
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loaded)).catch(() => {});
+
+        if (resetCount > 0) {
+          setMonthResetInfo({ count: resetCount, month: monthLabel(nowMonth) });
+        }
+      }
+
+      setState(loaded);
     });
   }, []);
 
@@ -336,6 +400,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [state, persist]
   );
 
+  const dismissResetInfo = useCallback(() => setMonthResetInfo(null), []);
+
   const totalBalance = state.accounts.reduce((s, a) => s + a.balance, 0);
   const totalMonthlyIncome = state.incomes.reduce((s, i) => s + i.amount, 0);
   const totalMonthlyExpenses = state.expenses.reduce((s, e) => s + e.amount, 0);
@@ -372,6 +438,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         setCurrency,
         setNotificationSettings,
         setSecuritySettings,
+        monthResetInfo,
+        dismissResetInfo,
         totalBalance,
         totalMonthlyIncome,
         totalMonthlyExpenses,

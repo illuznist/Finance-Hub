@@ -195,6 +195,61 @@ function BudgetAlertBanner({
   );
 }
 
+function ResetBanner() {
+  const finance = useFinance();
+  const info = finance.monthResetInfo;
+  const slideAnim = useRef(new Animated.Value(-60)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (info) {
+      Animated.parallel([
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+      ]).start();
+    }
+  }, [info]);
+
+  if (!info) return null;
+
+  function dismiss() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: -60, duration: 250, useNativeDriver: false }),
+      Animated.timing(opacityAnim, { toValue: 0, duration: 250, useNativeDriver: false }),
+    ]).start(() => finance.dismissResetInfo());
+  }
+
+  return (
+    <Animated.View
+      style={[
+        styles.alertBanner,
+        {
+          backgroundColor: "#0C2340",
+          borderColor: "#3B82F6",
+          transform: [{ translateY: slideAnim }],
+          opacity: opacityAnim,
+        },
+      ]}
+    >
+      <View style={[styles.alertIconWrap, { backgroundColor: "#3B82F633" }]}>
+        <Feather name="refresh-cw" size={18} color="#60A5FA" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.alertTitle, { color: "#60A5FA" }]}>
+          {info.month} is here
+        </Text>
+        <Text style={[styles.alertBody, { color: "#93C5FDCC" }]}>
+          {info.count} recurring {info.count === 1 ? "expense" : "expenses"} reset and ready to track
+        </Text>
+      </View>
+      <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10}>
+        <Feather name="x" size={16} color="#60A5FA99" />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 const INSIGHTS = [
   { icon: "trending-up", text: "18% more spent\nthis month", color: "#F59E0B" },
   { icon: "bell", text: "3 payments due\nnext week", color: "#EF4444" },
@@ -309,6 +364,9 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
+        {/* ── Monthly Reset Banner ── */}
+        <ResetBanner />
+
         {/* ── Budget Alert Banner ── */}
         <BudgetAlertBanner
           spentPerc={totalSpentPerc}

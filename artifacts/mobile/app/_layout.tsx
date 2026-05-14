@@ -171,6 +171,39 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ResetNotifier() {
+  const finance = useFinance();
+  const info = finance.monthResetInfo;
+  const sentRef = useRef(false);
+
+  useEffect(() => {
+    if (!info || sentRef.current) return;
+    if (!finance.notificationSettings.enabled) return;
+    sentRef.current = true;
+
+    import("@/utils/notifications").then(({ requestNotificationPermissions }) => {
+      requestNotificationPermissions().then((granted) => {
+        if (!granted) return;
+        const Notifications = require("expo-notifications");
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: `${info.month} tracker reset`,
+            body: `${info.count} recurring ${info.count === 1 ? "expense" : "expenses"} marked unpaid for ${info.month}. Start tracking your new month.`,
+            data: { type: "reset" },
+            sound: "default",
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: new Date(Date.now() + 3000),
+          },
+        }).catch(() => {});
+      });
+    });
+  }, [info, finance.notificationSettings.enabled]);
+
+  return null;
+}
+
 function NotificationScheduler() {
   const finance = useFinance();
 
@@ -205,6 +238,7 @@ function NotificationScheduler() {
 function RootLayoutNav() {
   return (
     <>
+      <ResetNotifier />
       <NotificationScheduler />
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
