@@ -23,6 +23,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import OnboardingScreen, { ONBOARDING_KEY } from "@/components/OnboardingScreen";
 import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
 import {
   cancelAllScheduledNotifications,
@@ -154,6 +155,22 @@ function PinGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const [status, setStatus] = useState<"loading" | "onboarding" | "done">("loading");
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
+      setStatus(val ? "done" : "onboarding");
+    });
+  }, []);
+
+  if (status === "loading") return null;
+  if (status === "onboarding") {
+    return <OnboardingScreen onComplete={() => setStatus("done")} />;
+  }
+  return <>{children}</>;
+}
+
 function NotificationScheduler() {
   const finance = useFinance();
 
@@ -220,9 +237,11 @@ export default function RootLayout() {
           <FinanceProvider>
             <GestureHandlerRootView>
               <KeyboardProvider>
-                <PinGate>
-                  <RootLayoutNav />
-                </PinGate>
+                <OnboardingGate>
+                  <PinGate>
+                    <RootLayoutNav />
+                  </PinGate>
+                </OnboardingGate>
               </KeyboardProvider>
             </GestureHandlerRootView>
           </FinanceProvider>
