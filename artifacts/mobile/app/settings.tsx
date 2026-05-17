@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import * as SecureStore from "expo-secure-store";
+
 import {
   type NotificationSettings,
   type SecuritySettings,
@@ -24,6 +26,7 @@ import {
   PIN_STORAGE_KEY,
   useFinance,
 } from "@/context/FinanceContext";
+import { useAuth, PIN_SECURE_KEY } from "@/context/AuthContext";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
 
@@ -210,6 +213,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const finance = useFinance();
+  const auth = useAuth();
   const topPad = Platform.OS === "web" ? 20 : insets.top;
 
   const [editingName, setEditingName] = useState(false);
@@ -251,10 +255,31 @@ export default function SettingsScreen() {
     }
   }
 
-  function handlePinSaved(pin: string) {
+  async function handlePinSaved(pin: string) {
     setShowPinSetup(false);
     updateSecurity({ pinEnabled: true, pin });
+    const pinData = JSON.stringify({ pinEnabled: true, pin });
+    if (Platform.OS !== "web") {
+      await SecureStore.setItemAsync(PIN_SECURE_KEY, pinData).catch(() => {});
+    } else {
+      localStorage.setItem(PIN_SECURE_KEY, pinData);
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  async function handleSignOut() {
+    Alert.alert(
+      "Sign Out",
+      "You will need to sign in again to access your data.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: () => auth.signOut(),
+        },
+      ]
+    );
   }
 
   const timingLabels: Record<string, string> = {
@@ -485,6 +510,31 @@ export default function SettingsScreen() {
         {/* Security */}
         <SectionHeader title="SECURITY" />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>
+          {/* Biometric */}
+          {auth.biometricAvailable && (
+            <>
+              <View style={styles.settingRow}>
+                <View style={[styles.settingIconWrap, { backgroundColor: "#10B98120" }]}>
+                  <Feather name={auth.biometricType === "face" ? "smile" : "aperture"} size={17} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>
+                    {auth.biometricType === "face" ? "Face ID" : "Fingerprint"}
+                  </Text>
+                  <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>
+                    {auth.biometricEnabled ? "Biometric unlock is on" : "Use biometrics to unlock app"}
+                  </Text>
+                </View>
+                <Switch
+                  value={auth.biometricEnabled}
+                  onValueChange={(v) => auth.setBiometricEnabled(v)}
+                  trackColor={{ true: "#10B981", false: colors.muted }}
+                  thumbColor="#fff"
+                />
+              </View>
+              <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+            </>
+          )}
           <View style={styles.settingRow}>
             <View style={[styles.settingIconWrap, { backgroundColor: "#8B5CF620" }]}>
               <Feather name="lock" size={17} color="#8B5CF6" />
@@ -527,6 +577,35 @@ export default function SettingsScreen() {
               </Pressable>
             </>
           )}
+        </View>
+
+        {/* Account */}
+        <SectionHeader title="ACCOUNT" />
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>
+          {auth.userEmail && (
+            <>
+              <View style={styles.settingRow}>
+                <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
+                  <Feather name="user" size={17} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Signed in as</Text>
+                  <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {auth.userEmail}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+            </>
+          )}
+          <Pressable style={styles.settingRow} onPress={handleSignOut}>
+            <View style={[styles.settingIconWrap, { backgroundColor: "#EF444420" }]}>
+              <Feather name="log-out" size={17} color="#EF4444" />
+            </View>
+            <Text style={[styles.settingLabel, { color: "#EF4444" }]}>Sign Out</Text>
+            <View style={{ flex: 1 }} />
+            <Feather name="chevron-right" size={16} color="#EF444480" />
+          </Pressable>
         </View>
 
         {/* About */}
