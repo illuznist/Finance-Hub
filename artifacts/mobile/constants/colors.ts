@@ -23,8 +23,8 @@ const colors = {
     warning: "#F59E0B",
     warningLight: "#FFFBEB",
     errorLight: "#FEF2F2",
-    gradientStart: "#EEF2FF",
-    gradientEnd: "#DBEAFE",
+    gradientStart: "#1E3A8A",
+    gradientEnd: "#2563EB",
     chartColors: ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#EC4899", "#F97316"] as string[],
   },
   dark: {
