@@ -1,12 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,10 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, G } from "react-native-svg";
 
 import { type EMI, useFinance } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
+import { SkeletonEMICard } from "@/components/Skeleton";
 import { useColors } from "@/hooks/useColors";
 
 const TAB_BAR_HEIGHT = 90;
@@ -83,6 +88,16 @@ function EMICard({
   onDelete: () => void;
 }) {
   const colors = useColors();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 320, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 100, friction: 14, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   const progress = emi.paidInstallments / emi.totalInstallments;
   const remaining = emi.totalInstallments - emi.paidInstallments;
   const isComplete = remaining === 0;
@@ -90,6 +105,7 @@ function EMICard({
   const totalRemaining = remaining * emi.monthlyAmount;
 
   return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
     <View style={[styles.emiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.emiCardTop}>
         <View style={styles.emiCardLeft}>
@@ -188,6 +204,7 @@ function EMICard({
         </TouchableOpacity>
       )}
     </View>
+    </Animated.View>
   );
 }
 
@@ -200,6 +217,7 @@ function AddEMIModal({
 }) {
   const colors = useColors();
   const finance = useFinance();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [total, setTotal] = useState("");
   const [monthly, setMonthly] = useState("");
@@ -221,6 +239,7 @@ function AddEMIModal({
       iconName: "smartphone",
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast.show("Installment added");
     setName(""); setTotal(""); setMonthly("");
     setTotalInst(""); setPaidInst("0"); setDueDay("7");
     onClose();
@@ -321,8 +340,22 @@ export default function EMIsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowSkeleton(false), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
 
   const activeEMIs = finance.emis.filter((e) => e.paidInstallments < e.totalInstallments);
   const completedEMIs = finance.emis.filter((e) => e.paidInstallments >= e.totalInstallments);
@@ -347,6 +380,13 @@ export default function EMIsScreen() {
         </Pressable>
       </View>
 
+      {showSkeleton ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT, gap: 16 }} showsVerticalScrollIndicator={false}>
+          <SkeletonEMICard />
+          <SkeletonEMICard />
+          <SkeletonEMICard />
+        </ScrollView>
+      ) : (
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -355,6 +395,9 @@ export default function EMIsScreen() {
           gap: 16,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+        }
       >
         {/* Summary cards */}
         <View style={{ flexDirection: "row", gap: 12 }}>
@@ -394,14 +437,17 @@ export default function EMIsScreen() {
             key={emi.id}
             emi={emi}
             currency={finance.currency}
-            onMarkPaid={() => finance.markEMIPaid(emi.id)}
+            onMarkPaid={() => {
+              finance.markEMIPaid(emi.id);
+              toast.show("Payment recorded");
+            }}
             onDelete={() =>
               Alert.alert("Delete", `Remove ${emi.name}?`, [
                 { text: "Cancel", style: "cancel" },
                 {
                   text: "Delete",
                   style: "destructive",
-                  onPress: () => finance.deleteEMI(emi.id),
+                  onPress: () => { finance.deleteEMI(emi.id); toast.show("Installment removed"); },
                 },
               ])
             }
@@ -423,7 +469,7 @@ export default function EMIsScreen() {
                     {
                       text: "Delete",
                       style: "destructive",
-                      onPress: () => finance.deleteEMI(emi.id),
+                      onPress: () => { finance.deleteEMI(emi.id); toast.show("Installment removed"); },
                     },
                   ])
                 }
@@ -432,6 +478,7 @@ export default function EMIsScreen() {
           </>
         )}
       </ScrollView>
+      )}
 
       <AddEMIModal visible={showAdd} onClose={() => setShowAdd(false)} />
     </View>

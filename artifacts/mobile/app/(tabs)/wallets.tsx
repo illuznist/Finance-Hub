@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Alert,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +23,7 @@ import {
   type SavingsGoal,
   useFinance,
 } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 
 const TAB_BAR_HEIGHT = 90;
@@ -381,10 +383,18 @@ export default function WalletsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const toast = useToast();
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddIncome, setShowAddIncome] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const onRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
 
   const totalGoalTarget = finance.savingsGoals.reduce((s, g) => s + g.targetAmount, 0);
   const totalGoalSaved = finance.savingsGoals.reduce((s, g) => s + g.savedAmount, 0);
@@ -399,6 +409,9 @@ export default function WalletsScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0), gap: 20 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+        }
       >
         {/* Total balance hero */}
         <LinearGradient
@@ -434,7 +447,7 @@ export default function WalletsScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 4 }}>
           {finance.accounts.map((acc) => (
             <AccountCard key={acc.id} account={acc} currency={finance.currency}
-              onDelete={() => Alert.alert("Remove account?", `Remove ${acc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => finance.deleteAccount(acc.id) }])}
+              onDelete={() => Alert.alert("Remove account?", `Remove ${acc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteAccount(acc.id); toast.show("Account removed"); } }])}
             />
           ))}
           {finance.accounts.length === 0 && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No accounts added</Text>}
@@ -470,11 +483,11 @@ export default function WalletsScreen() {
                 <SavingsGoalRow
                   goal={goal}
                   currency={finance.currency}
-                  onAddFunds={(amount) => finance.updateSavingsGoal(goal.id, { savedAmount: goal.savedAmount + amount })}
+                  onAddFunds={(amount) => { finance.updateSavingsGoal(goal.id, { savedAmount: goal.savedAmount + amount }); toast.show("Funds added"); }}
                   onDelete={() =>
                     Alert.alert("Delete goal?", `Remove "${goal.name}"?`, [
                       { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => finance.deleteSavingsGoal(goal.id) },
+                      { text: "Delete", style: "destructive", onPress: () => { finance.deleteSavingsGoal(goal.id); toast.show("Goal removed"); } },
                     ])
                   }
                 />
@@ -502,7 +515,7 @@ export default function WalletsScreen() {
         <View style={{ gap: 8 }}>
           {finance.incomes.map((inc) => (
             <IncomeRow key={inc.id} income={inc} currency={finance.currency}
-              onDelete={() => Alert.alert("Remove income?", `Remove ${inc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => finance.deleteIncome(inc.id) }])}
+              onDelete={() => Alert.alert("Remove income?", `Remove ${inc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteIncome(inc.id); toast.show("Income source removed"); } }])}
             />
           ))}
           {finance.incomes.length === 0 && (

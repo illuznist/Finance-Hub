@@ -36,6 +36,7 @@ import {
 } from "@/context/AuthContext";
 import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { ToastProvider } from "@/context/ToastContext";
 import {
   cancelAllScheduledNotifications,
   scheduleAllNotifications,
@@ -360,6 +361,7 @@ export default function RootLayout() {
           <AuthProvider>
             <FinanceProvider>
               <GestureHandlerRootView>
+                <ToastProvider>
                 <KeyboardProvider>
                   <AuthGate>
                     <OnboardingGate>
@@ -369,6 +371,7 @@ export default function RootLayout() {
                     </OnboardingGate>
                   </AuthGate>
                 </KeyboardProvider>
+                </ToastProvider>
               </GestureHandlerRootView>
             </FinanceProvider>
           </AuthProvider>

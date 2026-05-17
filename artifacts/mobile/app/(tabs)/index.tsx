@@ -2,11 +2,12 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useFinance } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 
 const TAB_BAR_HEIGHT = 90;
@@ -266,6 +268,14 @@ export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const toast = useToast();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const totalSpent = finance.totalMonthlyExpenses + finance.totalEMIMonthly;
@@ -304,6 +314,9 @@ export default function DashboardScreen() {
         paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0),
       }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+      }
     >
       {/* ── Hero gradient header ── */}
       <LinearGradient

@@ -1,11 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,10 +15,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type Expense, useFinance } from "@/context/FinanceContext";
+import { useToast } from "@/context/ToastContext";
+import { SkeletonExpenseCard } from "@/components/Skeleton";
 import { useColors } from "@/hooks/useColors";
 
 const TAB_BAR_HEIGHT = 90;
@@ -96,6 +101,7 @@ function AddExpenseModal({
 }) {
   const colors = useColors();
   const finance = useFinance();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Bills");
   const [amount, setAmount] = useState("");
@@ -115,6 +121,7 @@ function AddExpenseModal({
       color: CATEGORY_COLORS[cat] || "#8B5CF6",
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast.show("Expense added");
     setName("");
     setAmount("");
     setDueDate("1");
@@ -227,10 +234,24 @@ export default function ExpensesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const toast = useToast();
   const [selectedCat, setSelectedCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowSkeleton(false), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
 
   const filtered = finance.expenses
     .filter((e) => selectedCat === "All" || e.category === selectedCat)
@@ -286,6 +307,11 @@ export default function ExpensesScreen() {
         </Text>
       </View>
 
+      {showSkeleton ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: TAB_BAR_HEIGHT, gap: 8 }} showsVerticalScrollIndicator={false}>
+          {[...Array(5)].map((_, i) => <SkeletonExpenseCard key={i} />)}
+        </ScrollView>
+      ) : (
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -293,6 +319,9 @@ export default function ExpensesScreen() {
           gap: 8,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+        }
       >
         {filtered.length === 0 && (
           <View style={styles.emptyState}>
@@ -307,20 +336,24 @@ export default function ExpensesScreen() {
             key={exp.id}
             expense={exp}
             currency={finance.currency}
-            onToggle={() => finance.toggleExpensePaid(exp.id)}
+            onToggle={() => {
+              finance.toggleExpensePaid(exp.id);
+              toast.show(exp.isPaid ? "Marked as due" : "Marked as paid", "info");
+            }}
             onDelete={() => {
               Alert.alert("Delete", `Remove ${exp.name}?`, [
                 { text: "Cancel", style: "cancel" },
                 {
                   text: "Delete",
                   style: "destructive",
-                  onPress: () => finance.deleteExpense(exp.id),
+                  onPress: () => { finance.deleteExpense(exp.id); toast.show("Expense removed"); },
                 },
               ]);
             }}
           />
         ))}
       </ScrollView>
+      )}
 
       <AddExpenseModal visible={showAdd} onClose={() => setShowAdd(false)} />
     </View>
@@ -339,6 +372,33 @@ function ExpenseCard({
   onDelete: () => void;
 }) {
   const colors = useColors();
+  const swipeRef = useRef<Swipeable>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 120, friction: 14, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  function renderRightActions() {
+    return (
+      <Pressable
+        onPress={() => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          swipeRef.current?.close();
+          onDelete();
+        }}
+        style={styles.swipeDelete}
+      >
+        <Feather name="trash-2" size={20} color="#fff" />
+        <Text style={styles.swipeDeleteLabel}>Delete</Text>
+      </Pressable>
+    );
+  }
+
   const suffix =
     expense.dueDate === 1
       ? "st"
@@ -349,6 +409,8 @@ function ExpenseCard({
       : "th";
 
   return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+    <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false} rightThreshold={60}>
     <View style={[styles.expCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={[styles.expIconWrap, { backgroundColor: expense.color + "20" }]}>
         <Feather name={expense.iconName as any} size={20} color={expense.color} />
@@ -401,6 +463,8 @@ function ExpenseCard({
         </View>
       </View>
     </View>
+    </Swipeable>
+    </Animated.View>
   );
 }
 
@@ -543,4 +607,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  swipeDelete: {
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    borderRadius: 16,
+    marginLeft: 8,
+    gap: 4,
+  },
+  swipeDeleteLabel: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
 });
