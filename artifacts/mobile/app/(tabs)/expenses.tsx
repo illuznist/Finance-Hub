@@ -416,51 +416,36 @@ function ExpenseCard({
         <Feather name={expense.iconName as any} size={20} color={expense.color} />
       </View>
       <View style={styles.expInfo}>
-        <Text style={[styles.expName, { color: colors.foreground }]}>{expense.name}</Text>
-        <Text style={[styles.expMeta, { color: colors.mutedForeground }]}>
+        <Text style={[styles.expName, { color: colors.foreground }]} numberOfLines={1}>
+          {expense.name}
+        </Text>
+        <Text style={[styles.expMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
           {expense.category} · Due {expense.dueDate}{suffix}
         </Text>
-        {expense.recurrence && expense.recurrence !== "none" && (
-          <View style={[styles.recurBadge, { backgroundColor: colors.primary + "20" }]}>
-            <Text style={[styles.recurBadgeText, { color: colors.primary }]}>
-              {expense.recurrence.charAt(0).toUpperCase() + expense.recurrence.slice(1)}
-            </Text>
-          </View>
-        )}
       </View>
       <View style={styles.expRight}>
         <Text style={[styles.expAmount, { color: colors.foreground }]}>
           {fmt(expense.amount, currency)}
         </Text>
-        <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onToggle();
-            }}
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onToggle();
+          }}
+          style={[
+            styles.statusBtn,
+            { backgroundColor: expense.isPaid ? colors.successLight : colors.errorLight },
+          ]}
+        >
+          <Text
             style={[
-              styles.statusBtn,
-              {
-                backgroundColor: expense.isPaid ? colors.successLight : colors.errorLight,
-              },
+              styles.statusBtnText,
+              { color: expense.isPaid ? colors.success : colors.destructive },
             ]}
           >
-            <Text
-              style={[
-                styles.statusBtnText,
-                { color: expense.isPaid ? colors.success : colors.destructive },
-              ]}
-            >
-              {expense.isPaid ? "Paid" : "Due"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onDelete}
-            style={[styles.deleteBtn, { backgroundColor: colors.errorLight }]}
-          >
-            <Feather name="trash-2" size={12} color={colors.destructive} />
-          </TouchableOpacity>
-        </View>
+            {expense.isPaid ? "Paid" : "Due"}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
     </Swipeable>
@@ -518,7 +503,7 @@ const styles = StyleSheet.create({
   expInfo: { flex: 1 },
   expName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   expMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 },
-  expRight: { alignItems: "flex-end" },
+  expRight: { alignItems: "flex-end", gap: 5 },
   expAmount: { fontSize: 15, fontFamily: "Inter_700Bold" },
   statusBtn: {
     paddingHorizontal: 10,
@@ -526,13 +511,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  deleteBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -550,14 +528,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
-  recurBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 4,
-    alignSelf: "flex-start",
-  },
-  recurBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   emptyState: {
     alignItems: "center",
     paddingTop: 60,
