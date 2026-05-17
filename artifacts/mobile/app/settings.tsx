@@ -27,6 +27,7 @@ import {
   useFinance,
 } from "@/context/FinanceContext";
 import { useAuth, PIN_SECURE_KEY } from "@/context/AuthContext";
+import { useTheme, type ThemeMode } from "@/context/ThemeContext";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
 
@@ -214,6 +215,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const finance = useFinance();
   const auth = useAuth();
+  const theme = useTheme();
   const topPad = Platform.OS === "web" ? 20 : insets.top;
 
   const [editingName, setEditingName] = useState(false);
@@ -321,6 +323,43 @@ export default function SettingsScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Appearance */}
+        <SectionHeader title="APPEARANCE" />
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
+          <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginBottom: 12 }]}>
+            Theme
+          </Text>
+          <View style={styles.themeToggle}>
+            {(["system", "light", "dark"] as ThemeMode[]).map((m) => {
+              const active = theme.mode === m;
+              const icon = m === "system" ? "monitor" : m === "light" ? "sun" : "moon";
+              const label = m === "system" ? "System" : m === "light" ? "Light" : "Dark";
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => { Haptics.selectionAsync(); theme.setMode(m); }}
+                  style={[
+                    styles.themeTab,
+                    active
+                      ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                      : { backgroundColor: colors.muted, borderColor: colors.border },
+                  ]}
+                >
+                  <Feather name={icon as any} size={15} color={active ? colors.primaryForeground : colors.mutedForeground} />
+                  <Text
+                    style={[
+                      styles.themeTabText,
+                      { color: active ? colors.primaryForeground : colors.mutedForeground },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Profile */}
         <SectionHeader title="PROFILE" />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -608,6 +647,46 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        {/* Support */}
+        <SectionHeader title="SUPPORT" />
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>
+          <Pressable
+            style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => router.push("/support")}
+          >
+            <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
+              <Feather name="life-buoy" size={17} color={colors.primary} />
+            </View>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Help & Support</Text>
+            <View style={{ flex: 1 }} />
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </Pressable>
+          <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+          <Pressable
+            style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => router.push({ pathname: "/legal", params: { type: "privacy" } })}
+          >
+            <View style={[styles.settingIconWrap, { backgroundColor: "#10B98120" }]}>
+              <Feather name="shield" size={17} color="#10B981" />
+            </View>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Privacy Policy</Text>
+            <View style={{ flex: 1 }} />
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </Pressable>
+          <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+          <Pressable
+            style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => router.push({ pathname: "/legal", params: { type: "terms" } })}
+          >
+            <View style={[styles.settingIconWrap, { backgroundColor: "#F59E0B20" }]}>
+              <Feather name="file-text" size={17} color="#F59E0B" />
+            </View>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Terms & Conditions</Text>
+            <View style={{ flex: 1 }} />
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+
         {/* About */}
         <SectionHeader title="ABOUT" />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -781,4 +860,22 @@ const styles = StyleSheet.create({
   numKeyText: { fontSize: 22, fontFamily: "Inter_600SemiBold" },
   cancelLink: { marginTop: 20, padding: 8 },
   cancelLinkText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  themeToggle: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  themeTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  themeTabText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
 });

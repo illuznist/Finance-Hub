@@ -35,6 +35,7 @@ import {
   PIN_SECURE_KEY,
 } from "@/context/AuthContext";
 import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import {
   cancelAllScheduledNotifications,
   scheduleAllNotifications,
@@ -329,6 +330,8 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="support" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="legal" options={{ headerShown: false, presentation: "card" }} />
       </Stack>
     </>
   );
@@ -353,6 +356,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
           <AuthProvider>
             <FinanceProvider>
               <GestureHandlerRootView>
@@ -368,6 +372,7 @@ export default function RootLayout() {
               </GestureHandlerRootView>
             </FinanceProvider>
           </AuthProvider>
+          </ThemeProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
