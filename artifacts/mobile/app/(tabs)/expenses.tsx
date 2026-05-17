@@ -58,7 +58,8 @@ function CategoryFilter({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8 }}
+      style={{ flexGrow: 0 }}
+      contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8, alignItems: "center" }}
     >
       {CATEGORIES.map((cat) => {
         const active = selected === cat;
