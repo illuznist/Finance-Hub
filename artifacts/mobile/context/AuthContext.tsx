@@ -1,4 +1,3 @@
-import * as Crypto from "expo-crypto";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import React, {
@@ -55,10 +54,12 @@ async function secureDelete(key: string): Promise<void> {
 }
 
 async function hashPassword(email: string, password: string): Promise<string> {
-  return Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `financeapp:${email.toLowerCase().trim()}:${password}`
-  );
+  const text = `financeapp:${email.toLowerCase().trim()}:${password}`;
+  const encoded = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
