@@ -282,122 +282,129 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const persist = useCallback((newState: FinanceState) => {
-    setState(newState);
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newState)).catch(() => {});
+  const persist = useCallback((updater: (prev: FinanceState) => FinanceState) => {
+    setState((prev) => {
+      const next = updater(prev);
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   }, []);
 
   const addExpense = useCallback(
-    (e: Omit<Expense, "id">) => persist({ ...state, expenses: [...state.expenses, { ...e, id: genId() }] }),
-    [state, persist]
+    (e: Omit<Expense, "id">) =>
+      persist((prev) => ({ ...prev, expenses: [...prev.expenses, { ...e, id: genId() }] })),
+    [persist]
   );
   const updateExpense = useCallback(
     (id: string, updates: Partial<Expense>) =>
-      persist({ ...state, expenses: state.expenses.map((exp) => (exp.id === id ? { ...exp, ...updates } : exp)) }),
-    [state, persist]
+      persist((prev) => ({ ...prev, expenses: prev.expenses.map((exp) => (exp.id === id ? { ...exp, ...updates } : exp)) })),
+    [persist]
   );
   const deleteExpense = useCallback(
-    (id: string) => persist({ ...state, expenses: state.expenses.filter((e) => e.id !== id) }),
-    [state, persist]
+    (id: string) => persist((prev) => ({ ...prev, expenses: prev.expenses.filter((e) => e.id !== id) })),
+    [persist]
   );
   const toggleExpensePaid = useCallback(
     (id: string) =>
-      persist({ ...state, expenses: state.expenses.map((e) => (e.id === id ? { ...e, isPaid: !e.isPaid } : e)) }),
-    [state, persist]
+      persist((prev) => ({ ...prev, expenses: prev.expenses.map((e) => (e.id === id ? { ...e, isPaid: !e.isPaid } : e)) })),
+    [persist]
   );
 
   const addEMI = useCallback(
-    (e: Omit<EMI, "id">) => persist({ ...state, emis: [...state.emis, { ...e, id: genId() }] }),
-    [state, persist]
+    (e: Omit<EMI, "id">) =>
+      persist((prev) => ({ ...prev, emis: [...prev.emis, { ...e, id: genId() }] })),
+    [persist]
   );
   const updateEMI = useCallback(
     (id: string, updates: Partial<EMI>) =>
-      persist({ ...state, emis: state.emis.map((emi) => (emi.id === id ? { ...emi, ...updates } : emi)) }),
-    [state, persist]
+      persist((prev) => ({ ...prev, emis: prev.emis.map((emi) => (emi.id === id ? { ...emi, ...updates } : emi)) })),
+    [persist]
   );
   const deleteEMI = useCallback(
-    (id: string) => persist({ ...state, emis: state.emis.filter((e) => e.id !== id) }),
-    [state, persist]
+    (id: string) => persist((prev) => ({ ...prev, emis: prev.emis.filter((e) => e.id !== id) })),
+    [persist]
   );
   const markEMIPaid = useCallback(
     (id: string) =>
-      persist({
-        ...state,
-        emis: state.emis.map((emi) =>
+      persist((prev) => ({
+        ...prev,
+        emis: prev.emis.map((emi) =>
           emi.id === id && emi.paidInstallments < emi.totalInstallments
             ? { ...emi, paidInstallments: emi.paidInstallments + 1 }
             : emi
         ),
-      }),
-    [state, persist]
+      })),
+    [persist]
   );
 
   const addAccount = useCallback(
-    (a: Omit<Account, "id">) => persist({ ...state, accounts: [...state.accounts, { ...a, id: genId() }] }),
-    [state, persist]
+    (a: Omit<Account, "id">) =>
+      persist((prev) => ({ ...prev, accounts: [...prev.accounts, { ...a, id: genId() }] })),
+    [persist]
   );
   const updateAccount = useCallback(
     (id: string, updates: Partial<Account>) =>
-      persist({ ...state, accounts: state.accounts.map((acc) => (acc.id === id ? { ...acc, ...updates } : acc)) }),
-    [state, persist]
+      persist((prev) => ({ ...prev, accounts: prev.accounts.map((acc) => (acc.id === id ? { ...acc, ...updates } : acc)) })),
+    [persist]
   );
   const deleteAccount = useCallback(
-    (id: string) => persist({ ...state, accounts: state.accounts.filter((a) => a.id !== id) }),
-    [state, persist]
+    (id: string) => persist((prev) => ({ ...prev, accounts: prev.accounts.filter((a) => a.id !== id) })),
+    [persist]
   );
 
   const addIncome = useCallback(
-    (i: Omit<Income, "id">) => persist({ ...state, incomes: [...state.incomes, { ...i, id: genId() }] }),
-    [state, persist]
+    (i: Omit<Income, "id">) =>
+      persist((prev) => ({ ...prev, incomes: [...prev.incomes, { ...i, id: genId() }] })),
+    [persist]
   );
   const deleteIncome = useCallback(
-    (id: string) => persist({ ...state, incomes: state.incomes.filter((i) => i.id !== id) }),
-    [state, persist]
+    (id: string) => persist((prev) => ({ ...prev, incomes: prev.incomes.filter((i) => i.id !== id) })),
+    [persist]
   );
 
   const addSavingsGoal = useCallback(
     (g: Omit<SavingsGoal, "id">) =>
-      persist({ ...state, savingsGoals: [...state.savingsGoals, { ...g, id: genId() }] }),
-    [state, persist]
+      persist((prev) => ({ ...prev, savingsGoals: [...prev.savingsGoals, { ...g, id: genId() }] })),
+    [persist]
   );
   const updateSavingsGoal = useCallback(
     (id: string, updates: Partial<SavingsGoal>) =>
-      persist({
-        ...state,
-        savingsGoals: state.savingsGoals.map((g) => (g.id === id ? { ...g, ...updates } : g)),
-      }),
-    [state, persist]
+      persist((prev) => ({
+        ...prev,
+        savingsGoals: prev.savingsGoals.map((g) => (g.id === id ? { ...g, ...updates } : g)),
+      })),
+    [persist]
   );
   const deleteSavingsGoal = useCallback(
-    (id: string) => persist({ ...state, savingsGoals: state.savingsGoals.filter((g) => g.id !== id) }),
-    [state, persist]
+    (id: string) => persist((prev) => ({ ...prev, savingsGoals: prev.savingsGoals.filter((g) => g.id !== id) })),
+    [persist]
   );
 
   const setMonthlyBudget = useCallback(
-    (amount: number) => persist({ ...state, monthlyBudget: amount }),
-    [state, persist]
+    (amount: number) => persist((prev) => ({ ...prev, monthlyBudget: amount })),
+    [persist]
   );
   const setUserName = useCallback(
-    (name: string) => persist({ ...state, userName: name }),
-    [state, persist]
+    (name: string) => persist((prev) => ({ ...prev, userName: name })),
+    [persist]
   );
   const setCurrency = useCallback(
-    (currency: string) => persist({ ...state, currency }),
-    [state, persist]
+    (currency: string) => persist((prev) => ({ ...prev, currency })),
+    [persist]
   );
   const setNotificationSettings = useCallback(
-    (notificationSettings: NotificationSettings) => persist({ ...state, notificationSettings }),
-    [state, persist]
+    (notificationSettings: NotificationSettings) => persist((prev) => ({ ...prev, notificationSettings })),
+    [persist]
   );
   const setSecuritySettings = useCallback(
     (securitySettings: SecuritySettings) => {
-      persist({ ...state, securitySettings });
+      persist((prev) => ({ ...prev, securitySettings }));
       AsyncStorage.setItem(
         PIN_STORAGE_KEY,
         JSON.stringify({ pinEnabled: securitySettings.pinEnabled, pin: securitySettings.pin })
       ).catch(() => {});
     },
-    [state, persist]
+    [persist]
   );
 
   const dismissResetInfo = useCallback(() => setMonthResetInfo(null), []);
