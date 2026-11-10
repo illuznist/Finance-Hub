@@ -7,6 +7,15 @@ import React, {
   useState,
 } from "react";
 
+import {
+  canRecordLoanPayment,
+  canUpdateLoanPayment,
+  getLoanOutstandingBalance,
+  getLoanPaidAmount,
+  isLoanSettled,
+  wouldLoanBeOverpaid,
+} from "@/utils/loanCalculations";
+
 export interface Expense {
   id: string;
   name: string;
@@ -58,6 +67,39 @@ export interface EMIPayment {
   notes?: string;
 }
 
+export type LoanDirection = "borrowed" | "lent";
+export type LoanSourceType = "bank" | "person" | "other";
+export type LoanCategory = "personal" | "home" | "vehicle" | "education" | "business" | "family" | "other";
+export type LoanRepaymentFrequency = "one-time" | "weekly" | "monthly" | "quarterly";
+
+export interface LoanPayment {
+  id: string;
+  amount: number;
+  date: string;
+  notes?: string;
+}
+
+export interface Loan {
+  id: string;
+  name: string;
+  direction: LoanDirection;
+  counterpartyName: string;
+  sourceType: LoanSourceType;
+  category: LoanCategory;
+  principalAmount: number;
+  totalRepaymentAmount?: number;
+  interestRate?: number;
+  startDate: string;
+  expectedEndDate?: string;
+  repaymentFrequency: LoanRepaymentFrequency;
+  plannedPaymentAmount?: number;
+  notes: string;
+  color?: string;
+  iconName?: string;
+  payments: LoanPayment[];
+  createdAt: string;
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -104,6 +146,7 @@ interface FinanceState {
   monthlyBudget: number;
   expenses: Expense[];
   emis: EMI[];
+  loans: Loan[];
   accounts: Account[];
   incomes: Income[];
   savingsGoals: SavingsGoal[];
@@ -145,6 +188,12 @@ interface FinanceContextType extends FinanceState {
   recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
   updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes">>) => boolean;
   deleteEMIPayment: (emiId: string, paymentId: string) => void;
+  addLoan: (loan: Omit<Loan, "id">) => void;
+  updateLoan: (id: string, updates: Partial<Loan>) => boolean;
+  deleteLoan: (id: string) => void;
+  recordLoanPayment: (id: string, payment: Omit<LoanPayment, "id">) => boolean;
+  updateLoanPayment: (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes">>) => boolean;
+  deleteLoanPayment: (loanId: string, paymentId: string) => void;
   addAccount: (a: Omit<Account, "id">) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
   deleteAccount: (id: string) => void;
@@ -167,6 +216,14 @@ interface FinanceContextType extends FinanceState {
   remainingBudget: number;
   totalSavings: number;
   currencyRate: number;
+  totalPrincipalBorrowed: number;
+  totalPrincipalLent: number;
+  totalRepaidOnBorrowedLoans: number;
+  totalReceivedOnLentLoans: number;
+  outstandingBorrowedBalance: number;
+  outstandingLentBalance: number;
+  activeLoanCount: number;
+  settledLoanCount: number;
 }
 
 const defaultNotificationSettings: NotificationSettings = {
@@ -202,6 +259,7 @@ const defaultState: FinanceState = {
     { id: "emi2", name: "MacBook Pro", totalAmount: 5600, monthlyAmount: 700, totalInstallments: 8, paidInstallments: 3, startMonth: "2024-11", dueDayOfMonth: 7, color: "#0891B2", iconName: "monitor" },
     { id: "emi3", name: "Toyota Corolla", totalAmount: 120000, monthlyAmount: 2000, totalInstallments: 60, paidInstallments: 12, startMonth: "2024-02", dueDayOfMonth: 1, color: "#10B981", iconName: "truck" },
   ],
+  loans: [],
   accounts: [
     { id: "acc1", name: "Al Rajhi Bank", balance: 12500, type: "bank", color: "#0D9488" },
     { id: "acc2", name: "SNB Account", balance: 5200, type: "bank", color: "#0891B2" },
@@ -253,6 +311,28 @@ function isStoredDateValid(value: string): boolean {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(year, month - 1, day);
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function normalizeLoan(loan: Loan): Loan {
+  const payments = Array.isArray(loan.payments)
+    ? loan.payments.filter((payment) =>
+      payment &&
+      typeof payment.id === "string" &&
+      Number.isFinite(Number(payment.amount)) &&
+      Number(payment.amount) > 0 &&
+      isStoredDateValid(payment.date)
+    ).map((payment) => ({ ...payment, amount: Number(payment.amount) }))
+    : [];
+  return {
+    ...loan,
+    direction: loan.direction === "lent" ? "lent" : "borrowed",
+    sourceType: loan.sourceType === "bank" || loan.sourceType === "person" ? loan.sourceType : "other",
+    category: loan.category ?? "other",
+    repaymentFrequency: loan.repaymentFrequency ?? "one-time",
+    notes: loan.notes ?? "",
+    payments,
+    createdAt: loan.createdAt || new Date().toISOString(),
+  };
 }
 
 function dateAtMonthOffset(firstDate: string, monthOffset: number, dueDay?: number): string {
@@ -339,6 +419,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             ...defaultState,
             ...parsed,
             emis: (Array.isArray(parsed.emis) ? parsed.emis : defaultState.emis).map(normalizeEMI),
+            loans: (Array.isArray(parsed.loans) ? parsed.loans : defaultState.loans).map(normalizeLoan),
             notificationSettings: { ...defaultNotificationSettings, ...(parsed.notificationSettings ?? {}) },
             securitySettings: { ...defaultSecuritySettings, ...(parsed.securitySettings ?? {}) },
             lastResetMonth: parsed.lastResetMonth ?? "",
@@ -349,6 +430,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         }
       }
       loaded = { ...loaded, emis: loaded.emis.map(normalizeEMI) };
+      loaded = { ...loaded, loans: loaded.loans.map(normalizeLoan) };
 
       // ── Recurring reset engine ──
       const nowMonth = currentYYYYMM();
@@ -543,6 +625,76 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
 
+  const addLoan = useCallback(
+    (loan: Omit<Loan, "id">) =>
+      persist((prev) => ({ ...prev, loans: [...prev.loans, normalizeLoan({ ...loan, id: genId() })] })),
+    [persist]
+  );
+  const updateLoan = useCallback(
+    (id: string, updates: Partial<Loan>): boolean => {
+      const existing = state.loans.find((loan) => loan.id === id);
+      if (!existing) return false;
+      const updated = normalizeLoan({ ...existing, ...updates, id, payments: existing.payments });
+      if (wouldLoanBeOverpaid(updated)) return false;
+      persist((prev) => ({ ...prev, loans: prev.loans.map((loan) => loan.id === id ? updated : loan) }));
+      return true;
+    },
+    [persist, state.loans]
+  );
+  const deleteLoan = useCallback(
+    (id: string) => persist((prev) => ({ ...prev, loans: prev.loans.filter((loan) => loan.id !== id) })),
+    [persist]
+  );
+  const recordLoanPayment = useCallback(
+    (id: string, payment: Omit<LoanPayment, "id">): boolean => {
+      const loan = state.loans.find((item) => item.id === id);
+      if (!loan || !Number.isFinite(payment.amount) || payment.amount <= 0 || !isStoredDateValid(payment.date)) return false;
+      if (!canRecordLoanPayment(loan, payment.amount)) return false;
+      persist((prev) => ({
+        ...prev,
+        loans: prev.loans.map((item) => item.id === id
+          ? normalizeLoan({ ...item, payments: [...item.payments, { ...payment, id: genId() }] })
+          : item),
+      }));
+      return true;
+    },
+    [persist, state.loans]
+  );
+  const updateLoanPayment = useCallback(
+    (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes">>): boolean => {
+      const loan = state.loans.find((item) => item.id === loanId);
+      const existing = loan?.payments.find((payment) => payment.id === paymentId);
+      if (!loan || !existing) return false;
+      const amount = updates.amount ?? existing.amount;
+      const date = updates.date ?? existing.date;
+      if (!Number.isFinite(amount) || amount <= 0 || !isStoredDateValid(date)) return false;
+      if (!canUpdateLoanPayment(loan, paymentId, amount)) return false;
+      persist((prev) => ({
+        ...prev,
+        loans: prev.loans.map((item) => item.id === loanId
+          ? normalizeLoan({
+            ...item,
+            payments: item.payments.map((payment) =>
+              payment.id === paymentId ? { ...payment, ...updates } : payment
+            ),
+          })
+          : item),
+      }));
+      return true;
+    },
+    [persist, state.loans]
+  );
+  const deleteLoanPayment = useCallback(
+    (loanId: string, paymentId: string) =>
+      persist((prev) => ({
+        ...prev,
+        loans: prev.loans.map((loan) => loan.id === loanId
+          ? normalizeLoan({ ...loan, payments: loan.payments.filter((payment) => payment.id !== paymentId) })
+          : loan),
+      })),
+    [persist]
+  );
+
   const addAccount = useCallback(
     (a: Omit<Account, "id">) =>
       persist((prev) => ({ ...prev, accounts: [...prev.accounts, { ...a, id: genId() }] })),
@@ -629,6 +781,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const remainingBudget = state.monthlyBudget - totalMonthlyExpenses - totalEMIMonthly;
   const totalSavings = state.accounts.filter((a) => a.type === "savings").reduce((s, a) => s + a.balance, 0);
   const currencyRate = EXCHANGE_RATES[state.currency] ?? 1;
+  const totalPrincipalBorrowed = state.loans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + loan.principalAmount, 0);
+  const totalPrincipalLent = state.loans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + loan.principalAmount, 0);
+  const totalRepaidOnBorrowedLoans = state.loans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + getLoanPaidAmount(loan), 0);
+  const totalReceivedOnLentLoans = state.loans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + getLoanPaidAmount(loan), 0);
+  const outstandingBorrowedBalance = state.loans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + getLoanOutstandingBalance(loan), 0);
+  const outstandingLentBalance = state.loans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + getLoanOutstandingBalance(loan), 0);
+  const activeLoanCount = state.loans.filter((loan) => !isLoanSettled(loan)).length;
+  const settledLoanCount = state.loans.length - activeLoanCount;
 
   return (
     <FinanceContext.Provider
@@ -645,6 +805,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         recordEMIPayment,
         updateEMIPayment,
         deleteEMIPayment,
+        addLoan,
+        updateLoan,
+        deleteLoan,
+        recordLoanPayment,
+        updateLoanPayment,
+        deleteLoanPayment,
         addAccount,
         updateAccount,
         deleteAccount,
@@ -667,6 +833,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         remainingBudget,
         totalSavings,
         currencyRate,
+        totalPrincipalBorrowed,
+        totalPrincipalLent,
+        totalRepaidOnBorrowedLoans,
+        totalReceivedOnLentLoans,
+        outstandingBorrowedBalance,
+        outstandingLentBalance,
+        activeLoanCount,
+        settledLoanCount,
       }}
     >
       {children}

@@ -25,14 +25,16 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar.badge.clock", selected: "calendar.badge.clock" }} />
         <Label>EMIs</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="analytics">
-        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-        <Label>Analytics</Label>
+      <NativeTabs.Trigger name="loans">
+        <Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
+        <Label>Loans</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="wallets">
-        <Icon sf={{ default: "creditcard", selected: "creditcard.fill" }} />
-        <Label>Wallets</Label>
+      <NativeTabs.Trigger name="more">
+        <Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
+        <Label>More</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="analytics" hidden />
+      <NativeTabs.Trigger name="wallets" hidden />
     </NativeTabs>
   );
 }
@@ -116,29 +118,31 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="analytics"
+        name="loans"
         options={{
-          title: "Analytics",
+          title: "Loans",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="chart.bar" tintColor={color} size={22} />
+              <SymbolView name="dollarsign.circle" tintColor={color} size={22} />
             ) : (
-              <Feather name="bar-chart-2" size={22} color={color} />
+              <Feather name="dollar-sign" size={20} color={color} />
             ),
         }}
       />
       <Tabs.Screen
-        name="wallets"
+        name="more"
         options={{
-          title: "Wallets",
+          title: "More",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="creditcard" tintColor={color} size={22} />
+              <SymbolView name="ellipsis" tintColor={color} size={22} />
             ) : (
-              <Feather name="credit-card" size={20} color={color} />
+              <Feather name="more-horizontal" size={21} color={color} />
             ),
         }}
       />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
+      <Tabs.Screen name="wallets" options={{ href: null }} />
     </Tabs>
   );
 }

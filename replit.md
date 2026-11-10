@@ -38,12 +38,12 @@ A premium mobile personal finance tracker for managing monthly expenses, EMI ins
 
 ## Product
 
-5-tab mobile finance app:
+5-tab mobile finance app. The tab bar keeps the five-tab limit; Analytics and Wallets remain available from More:
 - **Dashboard** — greeting, total balance, budget progress, insights, expenses list, EMI summary
 - **Expenses** — categorized recurring expenses with paid/unpaid toggle, add/delete
 - **EMIs** — installment tracking with donut ring charts, mark as paid, summary stats
-- **Analytics** — income vs expense bar chart, category breakdown, 6-month trends, KPI cards
-- **Wallets** — account cards (bank/cash/savings), income sources, monthly overview
+- **Loans** — separate borrowed/lent balances, payment history, and repayment tracking
+- **More** — shortcuts to **Analytics** (income vs expense, categories, trends) and **Wallets** (accounts, income, savings goals)
 
 ## User preferences
 
