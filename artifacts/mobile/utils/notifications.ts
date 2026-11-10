@@ -56,6 +56,39 @@ function nextOccurrenceOfDay(dayOfMonth: number, offsetDays: number): Date | nul
   return null;
 }
 
+function nextEMIPaymentDate(emi: EMI): Date | null {
+  const first = emi.firstPaymentDate;
+  if (!first || !/^\d{4}-\d{2}-\d{2}$/.test(first)) {
+    return nextOccurrenceOfDay(emi.paymentDueDay ?? emi.dueDayOfMonth, 0);
+  }
+
+  const [year, month, day] = first.split("-").map(Number);
+  const dueDay = emi.paymentDueDay ?? emi.dueDayOfMonth ?? day;
+  const duration = emi.durationMonths ?? emi.totalInstallments;
+  let index = emi.paidInstallments;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  while (index < duration) {
+    const date = new Date(year, month - 1 + index, 1, 9, 0, 0);
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    date.setDate(Math.min(index === 0 ? day : dueDay, lastDay));
+    if (date >= today) return date;
+    index += 1;
+  }
+  return null;
+}
+
+function dateWithReminderOffset(dateString: string, offsetDays: number): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
+  const [year, month, day] = dateString.split("-").map(Number);
+  const due = new Date(year, month - 1, day, 9, 0, 0);
+  if (due.getFullYear() !== year || due.getMonth() !== month - 1 || due.getDate() !== day) return null;
+  const date = new Date(year, month - 1, day, 9, 0, 0);
+  date.setDate(date.getDate() - offsetDays);
+  return date > new Date() ? date : null;
+}
+
 function dueDateLabel(timing: NotificationSettings["timing"]): string {
   if (timing === "1day") return "tomorrow";
   if (timing === "3days") return "in 3 days";
@@ -145,27 +178,58 @@ export async function scheduleAllNotifications(params: {
 
   // ── EMI reminders ──
   if (settings.emiEnabled) {
-    const activeEMIs = emis.filter((e) => e.paidInstallments < e.totalInstallments);
-    for (const emi of activeEMIs) {
-      const fireDate = nextOccurrenceOfDay(emi.dueDayOfMonth, offset);
-      if (!fireDate) continue;
+    for (const emi of emis) {
+      const duration = emi.durationMonths ?? emi.totalInstallments;
+      const paid = emi.paidInstallments;
+      const remaining = Math.max(0, duration - paid);
+      if (remaining > 0) {
+        const fireDate = nextEMIPaymentDate(emi);
+        if (fireDate) {
+          fireDate.setDate(fireDate.getDate() - offset);
+          if (fireDate > new Date()) {
+            scheduled.push(
+              Notifications.scheduleNotificationAsync({
+                content: {
+                  title: `${emi.name} EMI due ${when}`,
+                  body: `${currency} ${(emi.monthlyEMIAmount ?? emi.monthlyAmount).toLocaleString()} installment due ${when}. ${remaining} payments remaining.`,
+                  data: { type: "emi", id: emi.id, paymentType: "monthly_emi" },
+                  sound: "default",
+                  categoryIdentifier: NOTIFICATION_CHANNEL,
+                },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.DATE,
+                  date: fireDate,
+                },
+              })
+            );
+          }
+        }
+      }
 
-      const remaining = emi.totalInstallments - emi.paidInstallments;
-      scheduled.push(
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: `${emi.name} EMI due ${when}`,
-            body: `${currency} ${emi.monthlyAmount.toLocaleString()} installment due ${when}. ${remaining} payments remaining.`,
-            data: { type: "emi", id: emi.id },
-            sound: "default",
-            categoryIdentifier: NOTIFICATION_CHANNEL,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: fireDate,
-          },
-        })
-      );
+      if ((emi.balloonPaymentAmount ?? 0) > 0 && emi.balloonPaymentDueDate) {
+        const balloonPaid = (emi.paymentHistory ?? [])
+          .filter((payment) => payment.paymentType === "balloon" && payment.status === "paid")
+          .reduce((sum, payment) => sum + payment.amount, 0);
+        const balloonRemaining = Math.max(0, (emi.balloonPaymentAmount ?? 0) - balloonPaid);
+        const balloonDate = balloonRemaining > 0 ? dateWithReminderOffset(emi.balloonPaymentDueDate, offset) : null;
+        if (balloonDate) {
+          scheduled.push(
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: `${emi.name} balloon payment due ${when}`,
+                body: `${currency} ${balloonRemaining.toLocaleString()} balloon payment due ${when}.`,
+                data: { type: "emi", id: emi.id, paymentType: "balloon" },
+                sound: "default",
+                categoryIdentifier: NOTIFICATION_CHANNEL,
+              },
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DATE,
+                date: balloonDate,
+              },
+            })
+          );
+        }
+      }
     }
   }
 

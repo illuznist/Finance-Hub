@@ -23,6 +23,22 @@ export interface Expense {
 export interface EMI {
   id: string;
   name: string;
+  financeProvider?: string;
+  category?: "vehicle" | "personal" | "home" | "other" | string;
+  financedAmount?: number;
+  monthlyEMIAmount?: number;
+  durationMonths?: number;
+  startDate?: string;
+  firstPaymentDate?: string;
+  paymentDueDay?: number;
+  balloonPaymentAmount?: number;
+  balloonPaymentDueDate?: string;
+  linkedAccountId?: string;
+  autoDebitEnabled?: boolean;
+  notes?: string;
+  paymentHistory?: EMIPayment[];
+  createdAt?: string;
+  // Legacy names remain persisted so existing screens and reports keep working.
   totalAmount: number;
   monthlyAmount: number;
   totalInstallments: number;
@@ -31,6 +47,15 @@ export interface EMI {
   dueDayOfMonth: number;
   color: string;
   iconName: string;
+}
+
+export interface EMIPayment {
+  id: string;
+  amount: number;
+  date: string;
+  paymentType: "monthly_emi" | "balloon";
+  status: "paid";
+  notes?: string;
 }
 
 export interface Account {
@@ -117,6 +142,9 @@ interface FinanceContextType extends FinanceState {
   updateEMI: (id: string, updates: Partial<EMI>) => void;
   deleteEMI: (id: string) => void;
   markEMIPaid: (id: string) => void;
+  recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
+  updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes">>) => boolean;
+  deleteEMIPayment: (emiId: string, paymentId: string) => void;
   addAccount: (a: Omit<Account, "id">) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
   deleteAccount: (id: string) => void;
@@ -215,6 +243,83 @@ function currentYYYYMM(): string {
 function currentYYYY(): string {
   return String(new Date().getFullYear());
 }
+
+function formatLocalDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function isStoredDateValid(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function dateAtMonthOffset(firstDate: string, monthOffset: number, dueDay?: number): string {
+  const [year, month, originalDay] = firstDate.split("-").map(Number);
+  const target = new Date(year, month - 1 + monthOffset, 1);
+  const day = dueDay ?? originalDay;
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  return formatLocalDate(new Date(target.getFullYear(), target.getMonth(), Math.min(day, lastDay)));
+}
+
+function normalizeEMI(emi: EMI): EMI {
+  const monthlyAmount = Number(emi.monthlyEMIAmount ?? emi.monthlyAmount) || 0;
+  const totalInstallments = Math.max(1, Number(emi.durationMonths ?? emi.totalInstallments) || 1);
+  const paidCount = Math.max(0, Math.min(totalInstallments, Number(emi.paidInstallments) || 0));
+  const dueDay = Math.max(1, Math.min(31, Number(emi.paymentDueDay ?? emi.dueDayOfMonth) || 1));
+  const startDate = emi.startDate || `${emi.startMonth || currentYYYYMM()}-01`;
+  const firstPaymentDate = emi.firstPaymentDate || dateAtMonthOffset(startDate, 0, dueDay);
+  let paymentHistory = Array.isArray(emi.paymentHistory)
+    ? emi.paymentHistory.filter((payment) =>
+      payment &&
+      typeof payment.id === "string" &&
+      Number.isFinite(Number(payment.amount)) &&
+      Number(payment.amount) >= 0 &&
+      (payment.paymentType === "monthly_emi" || payment.paymentType === "balloon")
+    )
+    : [];
+
+  // Older records stored only a paid-installment count. Preserve it as dated
+  // history entries so future corrections/deletions remain fully trackable.
+  if (!Array.isArray(emi.paymentHistory) && paidCount > 0) {
+    paymentHistory = Array.from({ length: paidCount }, (_, index) => ({
+      id: `imported-${emi.id}-${index + 1}`,
+      amount: monthlyAmount,
+      date: dateAtMonthOffset(firstPaymentDate, index, dueDay),
+      paymentType: "monthly_emi" as const,
+      status: "paid" as const,
+      notes: "Imported from previous installment count",
+    }));
+  }
+
+  const monthlyPaidCount = paymentHistory.filter((payment) => payment.paymentType === "monthly_emi").length;
+  const financedAmount = Number(emi.financedAmount ?? emi.totalAmount) || 0;
+  return {
+    ...emi,
+    financeProvider: emi.financeProvider || "Finance provider",
+    category: emi.category || "other",
+    financedAmount,
+    monthlyEMIAmount: monthlyAmount,
+    durationMonths: totalInstallments,
+    startDate,
+    firstPaymentDate,
+    paymentDueDay: dueDay,
+    balloonPaymentAmount: Math.max(0, Number(emi.balloonPaymentAmount) || 0),
+    balloonPaymentDueDate: emi.balloonPaymentDueDate || undefined,
+    autoDebitEnabled: Boolean(emi.autoDebitEnabled),
+    notes: emi.notes || "",
+    paymentHistory,
+    createdAt: emi.createdAt || new Date().toISOString(),
+    totalAmount: financedAmount,
+    monthlyAmount,
+    totalInstallments,
+    paidInstallments: Math.min(totalInstallments, monthlyPaidCount || (paymentHistory.length === 0 ? paidCount : 0)),
+    startMonth: startDate.slice(0, 7),
+    dueDayOfMonth: dueDay,
+  };
+}
+
 function monthLabel(yyyymm: string): string {
   const [, mm] = yyyymm.split("-");
   return MONTH_NAMES[parseInt(mm, 10) - 1] ?? yyyymm;
@@ -233,6 +338,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           loaded = {
             ...defaultState,
             ...parsed,
+            emis: (Array.isArray(parsed.emis) ? parsed.emis : defaultState.emis).map(normalizeEMI),
             notificationSettings: { ...defaultNotificationSettings, ...(parsed.notificationSettings ?? {}) },
             securitySettings: { ...defaultSecuritySettings, ...(parsed.securitySettings ?? {}) },
             lastResetMonth: parsed.lastResetMonth ?? "",
@@ -242,6 +348,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           // ignore parse errors, keep defaults
         }
       }
+      loaded = { ...loaded, emis: loaded.emis.map(normalizeEMI) };
 
       // ── Recurring reset engine ──
       const nowMonth = currentYYYYMM();
@@ -271,13 +378,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           lastResetYear: isNewYear ? nowYear : loaded.lastResetYear,
         };
 
-        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loaded)).catch(() => {});
-
         if (resetCount > 0) {
           setMonthResetInfo({ count: resetCount, month: monthLabel(nowMonth) });
         }
       }
 
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loaded)).catch(() => {});
       setState(loaded);
     });
   }, []);
@@ -312,12 +418,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addEMI = useCallback(
     (e: Omit<EMI, "id">) =>
-      persist((prev) => ({ ...prev, emis: [...prev.emis, { ...e, id: genId() }] })),
+      persist((prev) => ({ ...prev, emis: [...prev.emis, normalizeEMI({ ...e, id: genId() })] })),
     [persist]
   );
   const updateEMI = useCallback(
     (id: string, updates: Partial<EMI>) =>
-      persist((prev) => ({ ...prev, emis: prev.emis.map((emi) => (emi.id === id ? { ...emi, ...updates } : emi)) })),
+      persist((prev) => ({
+        ...prev,
+        emis: prev.emis.map((emi) => (emi.id === id ? normalizeEMI({ ...emi, ...updates }) : emi)),
+      })),
     [persist]
   );
   const deleteEMI = useCallback(
@@ -325,14 +434,111 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const markEMIPaid = useCallback(
-    (id: string) =>
+    (id: string) => {
+      const emi = state.emis.find((item) => item.id === id);
+      if (!emi || emi.paidInstallments >= emi.totalInstallments) return;
+      const paymentHistory = emi.paymentHistory ?? [];
+      const hasRemaining = emi.totalInstallments - emi.paidInstallments > 0;
+      if (!hasRemaining) return;
       persist((prev) => ({
         ...prev,
-        emis: prev.emis.map((emi) =>
-          emi.id === id && emi.paidInstallments < emi.totalInstallments
-            ? { ...emi, paidInstallments: emi.paidInstallments + 1 }
-            : emi
-        ),
+        emis: prev.emis.map((item) => item.id === id
+          ? normalizeEMI({
+            ...item,
+            paymentHistory: [
+              ...(item.paymentHistory ?? []),
+              {
+                id: genId(),
+                amount: item.monthlyEMIAmount ?? item.monthlyAmount,
+                date: formatLocalDate(new Date()),
+                paymentType: "monthly_emi",
+                status: "paid",
+              },
+            ],
+            paidInstallments: (item.paidInstallments ?? 0) + 1,
+          })
+          : item),
+      }));
+    },
+    [persist, state.emis]
+  );
+  const recordEMIPayment = useCallback(
+    (id: string, payment: Omit<EMIPayment, "id" | "status">): boolean => {
+      const emi = state.emis.find((item) => item.id === id);
+      if (!emi || !Number.isFinite(payment.amount) || payment.amount <= 0 || !isStoredDateValid(payment.date)) return false;
+      if (payment.paymentType === "monthly_emi") {
+        const scheduled = emi.monthlyEMIAmount ?? emi.monthlyAmount;
+        if (emi.paidInstallments >= emi.totalInstallments || Math.abs(payment.amount - scheduled) > 0.01) return false;
+      } else {
+        const balloonTotal = emi.balloonPaymentAmount ?? 0;
+        const balloonPaid = (emi.paymentHistory ?? [])
+          .filter((item) => item.paymentType === "balloon")
+          .reduce((sum, item) => sum + item.amount, 0);
+        if (balloonTotal <= 0 || payment.amount > balloonTotal - balloonPaid + 0.01) return false;
+      }
+      persist((prev) => ({
+        ...prev,
+        emis: prev.emis.map((item) => {
+          if (item.id !== id) return item;
+          const nextPayments = [
+            ...(item.paymentHistory ?? []),
+            { ...payment, id: genId(), status: "paid" as const },
+          ];
+          const count = nextPayments.filter((entry) => entry.paymentType === "monthly_emi").length;
+          return normalizeEMI({ ...item, paymentHistory: nextPayments, paidInstallments: count });
+        }),
+      }));
+      return true;
+    },
+    [persist, state.emis]
+  );
+  const updateEMIPayment = useCallback(
+    (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes">>): boolean => {
+      const emi = state.emis.find((item) => item.id === emiId);
+      const payment = emi?.paymentHistory?.find((item) => item.id === paymentId);
+      if (!emi || !payment) return false;
+      const nextAmount = updates.amount ?? payment.amount;
+      const nextDate = updates.date ?? payment.date;
+      if (!Number.isFinite(nextAmount) || nextAmount <= 0 || !isStoredDateValid(nextDate)) return false;
+      const history = emi.paymentHistory ?? [];
+      if (payment.paymentType === "monthly_emi" && Math.abs(nextAmount - (emi.monthlyEMIAmount ?? emi.monthlyAmount)) > 0.01) return false;
+      if (payment.paymentType === "balloon") {
+        const otherBalloonPayments = history
+          .filter((item) => item.paymentType === "balloon" && item.id !== paymentId)
+          .reduce((sum, item) => sum + item.amount, 0);
+        if (nextAmount + otherBalloonPayments > (emi.balloonPaymentAmount ?? 0) + 0.01) return false;
+      }
+      persist((prev) => ({
+        ...prev,
+        emis: prev.emis.map((item) => {
+          if (item.id !== emiId) return item;
+          const nextPayments = (item.paymentHistory ?? []).map((entry) =>
+            entry.id === paymentId ? { ...entry, ...updates } : entry
+          );
+          return normalizeEMI({
+            ...item,
+            paymentHistory: nextPayments,
+            paidInstallments: nextPayments.filter((entry) => entry.paymentType === "monthly_emi").length,
+          });
+        }),
+      }));
+      return true;
+    },
+    [persist, state.emis]
+  );
+  const deleteEMIPayment = useCallback(
+    (emiId: string, paymentId: string) =>
+      persist((prev) => ({
+        ...prev,
+        emis: prev.emis.map((item) => {
+          if (item.id !== emiId) return item;
+          const paymentHistory = (item.paymentHistory ?? []).filter((entry) => entry.id !== paymentId);
+          return normalizeEMI({
+            ...item,
+            paymentHistory,
+            paidInstallments: paymentHistory.filter((entry) => entry.paymentType === "monthly_emi").length,
+          });
+        }),
       })),
     [persist]
   );
@@ -348,7 +554,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const deleteAccount = useCallback(
-    (id: string) => persist((prev) => ({ ...prev, accounts: prev.accounts.filter((a) => a.id !== id) })),
+    (id: string) => persist((prev) => ({
+      ...prev,
+      accounts: prev.accounts.filter((a) => a.id !== id),
+      emis: prev.emis.map((emi) => emi.linkedAccountId === id ? { ...emi, linkedAccountId: undefined } : emi),
+    })),
     [persist]
   );
 
@@ -413,7 +623,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const totalMonthlyIncome = state.incomes.reduce((s, i) => s + i.amount, 0);
   const totalMonthlyExpenses = state.expenses.reduce((s, e) => s + e.amount, 0);
   const totalEMIMonthly = state.emis.reduce(
-    (s, e) => (e.paidInstallments < e.totalInstallments ? s + e.monthlyAmount : s),
+    (s, e) => (e.paidInstallments < e.totalInstallments ? s + (e.monthlyEMIAmount ?? e.monthlyAmount) : s),
     0
   );
   const remainingBudget = state.monthlyBudget - totalMonthlyExpenses - totalEMIMonthly;
@@ -432,6 +642,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         updateEMI,
         deleteEMI,
         markEMIPaid,
+        recordEMIPayment,
+        updateEMIPayment,
+        deleteEMIPayment,
         addAccount,
         updateAccount,
         deleteAccount,
