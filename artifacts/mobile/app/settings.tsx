@@ -30,6 +30,7 @@ import { useAuth, PIN_SECURE_KEY } from "@/context/AuthContext";
 import { useTheme, type ThemeMode } from "@/context/ThemeContext";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 function SectionHeader({ title }: { title: string }) {
   const colors = useColors();
@@ -721,7 +722,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   backBtn: {
     width: 38,
     height: 38,
@@ -729,7 +730,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sectionHeader: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 1.2,
     marginTop: 16,
@@ -756,11 +757,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   profileInitial: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  profileName: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
-  profileSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  profileName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
+  profileSub: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
   nameInput: {
     flex: 1,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     borderBottomWidth: 1.5,
     paddingBottom: 4,
@@ -780,12 +781,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  settingLabel: { fontSize: 15, fontFamily: "Inter_500Medium" },
-  settingSubLabel: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  settingValue: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  settingLabel: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_500Medium" },
+  settingSubLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
+  settingValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_500Medium" },
   rowDivider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
   currencySection: { padding: 14 },
-  currencyLabel: { fontSize: 12, fontFamily: "Inter_500Medium", marginBottom: 10, letterSpacing: 0.4 },
+  currencyLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginBottom: 10, letterSpacing: 0.4 },
   currencyChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   currencyChip: {
     paddingHorizontal: 12,
@@ -796,8 +797,8 @@ const styles = StyleSheet.create({
     minWidth: 62,
   },
   currencyChipCode: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  currencyChipRate: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
-  currencyNote: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 10, lineHeight: 16 },
+  currencyChipRate: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
+  currencyNote: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 10, lineHeight: 18 },
   budgetRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -805,9 +806,9 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 56,
   },
-  budgetValue: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  budgetValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
   budgetInput: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     borderBottomWidth: 1.5,
     minWidth: 80,
@@ -832,8 +833,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginBottom: 24,
   },
-  pinTitle: { fontSize: 22, fontFamily: "Inter_700Bold", marginBottom: 6 },
-  pinSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 32 },
+  pinTitle: { fontSize: TYPOGRAPHY.dialogTitle, fontFamily: "Inter_700Bold", marginBottom: 6 },
+  pinSubtitle: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular", marginBottom: 32 },
   dotsRow: { flexDirection: "row", gap: 16, marginBottom: 8 },
   dot: {
     width: 16,
@@ -841,7 +842,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1.5,
   },
-  pinError: { fontSize: 13, fontFamily: "Inter_500Medium", marginBottom: 8 },
+  pinError: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", marginBottom: 8 },
   numpad: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -859,7 +860,7 @@ const styles = StyleSheet.create({
   },
   numKeyText: { fontSize: 22, fontFamily: "Inter_600SemiBold" },
   cancelLink: { marginTop: 20, padding: 8 },
-  cancelLinkText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  cancelLinkText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_500Medium" },
   themeToggle: {
     flexDirection: "row",
     gap: 8,
@@ -875,7 +876,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   themeTabText: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_600SemiBold",
   },
 });

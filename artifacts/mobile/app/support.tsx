@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   backBtn: {
     width: 38,
     height: 38,
@@ -263,18 +264,18 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.sectionHeading,
     marginBottom: 6,
     textAlign: "center",
   },
   heroSub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     lineHeight: 20,
     textAlign: "center",
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 1.2,
     marginTop: 12,
@@ -301,11 +302,11 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontFamily: "Inter_500Medium",
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.body,
   },
   actionSub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
     marginTop: 2,
   },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 68 },
@@ -318,12 +319,12 @@ const styles = StyleSheet.create({
   },
   faqQ: {
     fontFamily: "Inter_500Medium",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     lineHeight: 20,
   },
   faqA: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     lineHeight: 22,
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -331,7 +332,7 @@ const styles = StyleSheet.create({
   },
   footerNote: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
     textAlign: "center",
     marginTop: 12,
   },

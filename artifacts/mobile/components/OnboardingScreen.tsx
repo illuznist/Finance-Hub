@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SUPPORTED_CURRENCIES, useFinance } from "@/context/FinanceContext";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 export const ONBOARDING_KEY = "@finance_onboarded_v1";
 
@@ -386,17 +387,17 @@ const styles = StyleSheet.create({
 
   headline: {
     fontFamily: "Inter_700Bold",
-    fontSize: 30,
+    fontSize: TYPOGRAPHY.pageTitle,
     color: TEXT,
-    lineHeight: 38,
+    lineHeight: 32,
     marginBottom: 12,
     letterSpacing: -0.5,
   },
   sub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.body,
     color: MUTED,
-    lineHeight: 22,
+    lineHeight: 20,
     marginBottom: 28,
   },
 
@@ -422,13 +423,13 @@ const styles = StyleSheet.create({
   featureText: { flex: 1 },
   featureTitle: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.cardTitle,
     color: TEXT,
     marginBottom: 3,
   },
   featureDesc: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     color: MUTED,
     lineHeight: 18,
   },
@@ -436,7 +437,7 @@ const styles = StyleSheet.create({
   formGroup: { marginBottom: 24 },
   label: {
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.supporting,
     color: MUTED,
     marginBottom: 8,
     letterSpacing: 0.3,
@@ -477,12 +478,12 @@ const styles = StyleSheet.create({
   },
   currencyCode: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     color: TEXT,
   },
   currencySymbol: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     color: MUTED,
   },
 
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.body,
     color: MUTED,
   },
   nextBtn: {
@@ -565,7 +566,7 @@ const styles = StyleSheet.create({
   },
   nextText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.body,
     color: "#fff",
     letterSpacing: 0.2,
   },

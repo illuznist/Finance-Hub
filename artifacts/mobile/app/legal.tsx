@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 const LAST_UPDATED = "May 2025";
 
@@ -163,7 +164,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   backBtn: {
     width: 38,
     height: 38,
@@ -184,19 +185,19 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.body,
   },
   section: {
     gap: 8,
   },
   sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    fontSize: TYPOGRAPHY.sectionHeading,
     lineHeight: 22,
   },
   sectionBody: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     lineHeight: 22,
   },
   footer: {
@@ -206,6 +207,6 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
   },
 });

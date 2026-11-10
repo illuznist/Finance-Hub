@@ -37,6 +37,7 @@ import {
 import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { TYPOGRAPHY } from "@/constants/typography";
 import {
   cancelAllScheduledNotifications,
   scheduleAllNotifications,
@@ -401,13 +402,13 @@ const pinStyles = StyleSheet.create({
   },
   lockIconInner: { alignItems: "center", justifyContent: "center" },
   title: {
-    fontSize: 26,
+    fontSize: TYPOGRAPHY.dialogTitle,
     fontFamily: "Inter_700Bold",
     color: "#fff",
     marginBottom: 6,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.5)",
     marginBottom: 40,
@@ -415,7 +416,7 @@ const pinStyles = StyleSheet.create({
   dotsRow: { flexDirection: "row", gap: 18, marginBottom: 12 },
   dot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5 },
   errorText: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_500Medium",
     color: "#EF4444",
     marginBottom: 8,

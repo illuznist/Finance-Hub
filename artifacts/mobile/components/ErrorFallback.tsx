@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 export type ErrorFallbackProps = {
   error: Error;
@@ -188,13 +189,13 @@ const styles = StyleSheet.create({
     maxWidth: 600,
   },
   title: {
-    fontSize: 28,
+    fontSize: TYPOGRAPHY.pageTitle,
     fontWeight: "700",
     textAlign: "center",
     lineHeight: 40,
   },
   message: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.body,
     textAlign: "center",
     lineHeight: 24,
   },
@@ -249,7 +250,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.dialogTitle,
     fontWeight: "600",
   },
   closeButton: {
@@ -271,7 +272,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
     lineHeight: 18,
     width: "100%",
   },

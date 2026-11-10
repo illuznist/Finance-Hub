@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   alertTitle: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.cardTitle,
     fontFamily: "Inter_700Bold",
     marginBottom: 2,
   },
@@ -807,12 +808,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   greetingText: {
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.pageTitle,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
   },
   greetingSubtitle: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.75)",
     marginTop: 2,
@@ -839,14 +840,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.2)",
   },
   balanceLabel: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_500Medium",
     color: "rgba(255,255,255,0.65)",
     letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   balanceAmount: {
-    fontSize: 36,
+    fontSize: TYPOGRAPHY.displayValue,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
     marginTop: 4,
@@ -869,12 +870,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   balanceItemLabel: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.65)",
   },
   balanceItemValue: {
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.body,
     fontFamily: "Inter_600SemiBold",
     color: "#FFFFFF",
     marginTop: 2,
@@ -898,18 +899,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   remainingLabel: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_500Medium",
     letterSpacing: 0.4,
     marginBottom: 4,
   },
   remainingAmount: {
-    fontSize: 30,
+    fontSize: TYPOGRAPHY.heroValue,
     fontFamily: "Inter_700Bold",
     lineHeight: 34,
   },
   remainingSubtitle: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_400Regular",
     marginTop: 4,
   },
@@ -921,7 +922,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   remainingBadgeText: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_700Bold",
   },
   remainingTrack: {
@@ -938,7 +939,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   remainingCap: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_400Regular",
   },
 
@@ -967,11 +968,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   savingsTitle: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.cardTitle,
     fontFamily: "Inter_700Bold",
   },
   savingsSubtitle: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -985,11 +986,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   savingsGoalLabel: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_500Medium",
   },
   savingsGoalPct: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_600SemiBold",
   },
   savingsTrack: {
@@ -1011,7 +1012,7 @@ const styles = StyleSheet.create({
   savingsBreakdownItem: { flex: 1, gap: 2 },
   savingsBreakdownDivider: { width: 1, height: 32 },
   savingsBreakdownLabel: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_400Regular",
   },
   savingsBreakdownValue: {
@@ -1022,13 +1023,13 @@ const styles = StyleSheet.create({
   // Shared
   progressBg: { height: 8, borderRadius: 4, overflow: "hidden" },
   progressFill: { height: 8, borderRadius: 4 },
-  sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  sectionTitle: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold" },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sectionCount: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  sectionCount: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular" },
   insightChip: {
     borderRadius: 14,
     padding: 14,
@@ -1043,7 +1044,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   insightText: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_500Medium",
     lineHeight: 18,
   },
@@ -1063,15 +1064,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   expenseInfo: { flex: 1 },
-  expenseName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  expenseDue: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  expenseAmount: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  expenseName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
+  expenseDue: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
+  expenseAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
   paidBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
   },
-  paidBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  paidBadgeText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   emiMini: {
     flexDirection: "row",
     alignItems: "center",
@@ -1086,7 +1087,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emiMiniCaption: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_400Regular",
     marginTop: 4,
   },

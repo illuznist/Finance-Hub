@@ -9,6 +9,7 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 function NativeTabLayout() {
   return (
@@ -75,7 +76,7 @@ function ClassicTabLayout() {
             />
           ) : null,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: TYPOGRAPHY.supporting,
           fontFamily: "Inter_500Medium",
           marginTop: -2,
         },

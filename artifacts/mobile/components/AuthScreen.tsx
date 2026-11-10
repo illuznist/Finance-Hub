@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 const BG_TOP = "#0B1529";
 const BG_BOTTOM = "#070A12";
@@ -349,14 +350,14 @@ const styles = StyleSheet.create({
 
   headline: {
     fontFamily: "Inter_700Bold",
-    fontSize: 30,
+    fontSize: TYPOGRAPHY.pageTitle,
     color: TEXT,
     letterSpacing: -0.5,
     marginBottom: 8,
   },
   sub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.body,
     color: MUTED,
     lineHeight: 22,
     marginBottom: 28,
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
   modeTabActive: { backgroundColor: ACCENT + "25" },
   modeTabText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.body,
     color: MUTED,
   },
   modeTabTextActive: { color: ACCENT },
@@ -398,7 +399,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.bodySmall,
     color: ERROR,
     flex: 1,
   },
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.body,
     color: "#fff",
   },
 
@@ -436,7 +437,7 @@ const styles = StyleSheet.create({
   },
   bioBtnText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.body,
     color: SUCCESS,
   },
 

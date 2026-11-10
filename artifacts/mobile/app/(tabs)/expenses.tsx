@@ -26,6 +26,7 @@ import { type Expense, useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonExpenseCard } from "@/components/Skeleton";
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -467,7 +468,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   addBtn: {
     width: 38,
     height: 38,
@@ -481,14 +482,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  catChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  catChipText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium" },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  summaryText: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  summaryTotal: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  summaryText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular" },
+  summaryTotal: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
   expCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -505,16 +506,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   expInfo: { flex: 1 },
-  expName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  expMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 },
+  expName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
+  expMeta: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
   expRight: { alignItems: "flex-end", gap: 5 },
-  expAmount: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  expAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
   statusBtn: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  statusBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  statusBtnText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -537,7 +538,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     gap: 12,
   },
-  emptyText: { fontSize: 15, fontFamily: "Inter_400Regular" },
+  emptyText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -556,12 +557,12 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 20,
   },
-  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", marginBottom: 20 },
-  fieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", marginBottom: 6, letterSpacing: 0.5 },
+  modalTitle: { fontSize: TYPOGRAPHY.dialogTitle, fontFamily: "Inter_700Bold", marginBottom: 20 },
+  fieldLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginBottom: 6, letterSpacing: 0.5 },
   input: {
     borderRadius: 12,
     padding: 14,
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_400Regular",
     marginBottom: 16,
     borderWidth: 1,
@@ -580,7 +581,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  btnText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
   swipeDelete: {
     backgroundColor: "#EF4444",
     justifyContent: "center",
@@ -593,6 +594,6 @@ const styles = StyleSheet.create({
   swipeDeleteLabel: {
     color: "#fff",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
   },
 });

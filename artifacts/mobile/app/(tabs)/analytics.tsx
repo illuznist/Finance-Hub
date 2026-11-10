@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
+import { TYPOGRAPHY } from "@/constants/typography";
 import { generateMonthlyReportHTML } from "@/utils/generateReport";
 
 const TAB_BAR_HEIGHT = 90;
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerTitle: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   exportBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -437,24 +438,24 @@ const styles = StyleSheet.create({
     minWidth: 44,
     justifyContent: "center",
   },
-  exportBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  exportBtnText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
   tabSwitcher: { flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 20 },
   tabBtn: { paddingVertical: 12, marginRight: 24, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabBtnActive: {},
-  tabBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  tabBtnText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
   kpiCard: { borderRadius: 16, padding: 16, gap: 6 },
-  kpiLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", marginTop: 4 },
+  kpiLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", marginTop: 4 },
   kpiValue: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
   chartCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 8 },
-  chartTitle: { fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  chartTitle: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_700Bold", marginBottom: 4 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  legendText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
   barsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   barGroup: { alignItems: "center", gap: 4 },
   barsWrap: { flexDirection: "row", gap: 2, alignItems: "flex-end" },
   bar: { width: 10 },
-  barLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  barLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
   catRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   catDot: { width: 10, height: 10, borderRadius: 5 },
   catLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
