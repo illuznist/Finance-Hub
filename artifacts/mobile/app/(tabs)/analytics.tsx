@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useFinance } from "@/context/FinanceContext";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { generateMonthlyReportHTML } from "@/utils/generateReport";
@@ -256,40 +257,45 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Analytics</Text>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable
-            onPress={handleCSVExport}
-            disabled={exportingCSV}
-            style={[styles.exportBtn, { backgroundColor: colors.success + "18", borderColor: colors.success + "40" }]}
-          >
-            {exportingCSV ? (
-              <ActivityIndicator size="small" color={colors.success} />
-            ) : (
-              <>
-                <Feather name="file-text" size={14} color={colors.success} />
-                <Text style={[styles.exportBtnText, { color: colors.success }]}>CSV</Text>
-              </>
-            )}
-          </Pressable>
-          <Pressable
-            onPress={handleExport}
-            disabled={exporting}
-            style={[styles.exportBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
-          >
-            {exporting ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <>
-                <Feather name="download" size={14} color={colors.primary} />
-                <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
-              </>
-            )}
-          </Pressable>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Analytics"
+        topInset={topPad}
+        colors={colors}
+        trailing={
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable
+              accessibilityLabel="Export CSV"
+              onPress={handleCSVExport}
+              disabled={exportingCSV}
+              style={[styles.exportBtn, { backgroundColor: colors.success + "18", borderColor: colors.success + "40" }]}
+            >
+              {exportingCSV ? (
+                <ActivityIndicator size="small" color={colors.success} />
+              ) : (
+                <>
+                  <Feather name="file-text" size={14} color={colors.success} />
+                  <Text style={[styles.exportBtnText, { color: colors.success }]}>CSV</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Export PDF"
+              onPress={handleExport}
+              disabled={exporting}
+              style={[styles.exportBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Feather name="download" size={14} color={colors.primary} />
+                  <Text style={[styles.exportBtnText, { color: colors.primary }]}>PDF</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        }
+      />
 
       {/* Tab switcher */}
       <View style={[styles.tabSwitcher, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -418,15 +424,6 @@ export default function AnalyticsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   exportBtn: {
     flexDirection: "row",
     alignItems: "center",

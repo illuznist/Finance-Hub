@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type Expense, useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonExpenseCard } from "@/components/Skeleton";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
@@ -267,19 +268,23 @@ export default function ExpensesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Expenses</Text>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setShowAdd(true);
-          }}
-          style={[styles.addBtn, { backgroundColor: colors.primary }]}
-        >
-          <Feather name="plus" size={20} color={colors.primaryForeground} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Expenses"
+        topInset={topPad}
+        colors={colors}
+        trailing={
+          <Pressable
+            accessibilityLabel="Add expense"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setShowAdd(true);
+            }}
+            style={[styles.addBtn, { backgroundColor: colors.primary }]}
+          >
+            <Feather name="plus" size={20} color={colors.primaryForeground} />
+          </Pressable>
+        }
+      />
 
       {/* Search bar */}
       <View style={[styles.searchWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
@@ -460,15 +465,6 @@ function ExpenseCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   addBtn: {
     width: 38,
     height: 38,

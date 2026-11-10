@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { type Account, type EMI, type EMIPayment, useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonEMICard } from "@/components/Skeleton";
@@ -817,20 +818,22 @@ export default function EMIsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>EMI plans</Text>
-          <Text style={[styles.headerSubTitle, { color: colors.mutedForeground }]}>Repayment tracking</Text>
-        </View>
-        <Pressable
-          accessibilityLabel="Add EMI plan"
-          testID="emi-add-button"
-          onPress={() => openEdit()}
-          style={[styles.addBtn, { backgroundColor: colors.primary }]}
-        >
-          <Feather name="plus" size={20} color={colors.primaryForeground} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="EMI plans"
+        subtitle="Repayment tracking"
+        topInset={topPad}
+        colors={colors}
+        trailing={
+          <Pressable
+            accessibilityLabel="Add EMI plan"
+            testID="emi-add-button"
+            onPress={() => openEdit()}
+            style={[styles.addBtn, { backgroundColor: colors.primary }]}
+          >
+            <Feather name="plus" size={20} color={colors.primaryForeground} />
+          </Pressable>
+        }
+      />
 
       {showSkeleton ? (
         <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
@@ -952,16 +955,6 @@ export default function EMIsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
-  headerSubTitle: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", marginTop: 2 },
   addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   listContent: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT, gap: 13 },
   monthlyHero: { borderRadius: 19, padding: 18, minHeight: 133, justifyContent: "center" },

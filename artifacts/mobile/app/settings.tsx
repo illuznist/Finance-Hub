@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as SecureStore from "expo-secure-store";
 
+import { ScreenHeader } from "@/components/ScreenHeader";
 import {
   type NotificationSettings,
   type SecuritySettings,
@@ -306,14 +307,17 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Settings</Text>
-        <View style={{ width: 38 }} />
-      </View>
+      <ScreenHeader
+        title="Settings"
+        topInset={topPad}
+        colors={colors}
+        centered
+        leading={
+          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
+          </Pressable>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={{
@@ -714,15 +718,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   backBtn: {
     width: 38,
     height: 38,

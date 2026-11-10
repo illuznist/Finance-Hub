@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
 import {
   Dimensions,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -110,9 +111,12 @@ export default function OnboardingScreen({ onComplete }: Props) {
         {/* Header row */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <View style={styles.logoRow}>
-            <View style={styles.logoIcon}>
-              <Feather name="trending-up" size={18} color={ACCENT} />
-            </View>
+            <Image
+              source={require("../assets/images/icon.png")}
+              accessibilityLabel="FinanceApp logo"
+              resizeMode="cover"
+              style={styles.logoIcon}
+            />
             <Text style={styles.logoText}>FinanceApp</Text>
           </View>
           {page < 2 && (
@@ -323,9 +327,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: ACCENT + "22",
-    alignItems: "center",
-    justifyContent: "center",
+    overflow: "hidden",
   },
   logoText: {
     fontFamily: "Inter_700Bold",

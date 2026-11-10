@@ -4,6 +4,7 @@ import React from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
@@ -18,9 +19,7 @@ export default function MoreScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>More</Text>
-      </View>
+      <ScreenHeader title="More" topInset={topPad} colors={colors} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.intro, { color: colors.mutedForeground }]}>Your other finance tools</Text>
         {MORE_ITEMS.map((item) => (
@@ -48,8 +47,6 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   content: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 110, gap: 12 },
   intro: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular", marginBottom: 3 },
   item: { minHeight: 76, flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 16, borderWidth: 1 },

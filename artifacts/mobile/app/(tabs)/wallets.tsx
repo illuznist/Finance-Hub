@@ -24,6 +24,7 @@ import {
   useFinance,
 } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
@@ -403,9 +404,7 @@ export default function WalletsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Wallets</Text>
-      </View>
+      <ScreenHeader title="Wallets" topInset={topPad} colors={colors} />
 
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0), gap: 20 }}
@@ -557,8 +556,6 @@ export default function WalletsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
   totalCard: { borderRadius: 20, padding: 24 },
   totalLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
   totalAmount: { fontSize: 34, fontFamily: "Inter_700Bold", color: "#FFFFFF", marginTop: 4, marginBottom: 16 },

@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -12,6 +13,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -267,6 +269,7 @@ const INSIGHTS = [
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
@@ -326,9 +329,39 @@ export default function DashboardScreen() {
         end={{ x: 1, y: 1 }}
         style={[styles.heroGradient, { paddingTop: topPad + 16 }]}
       >
+        <View style={styles.brandRow}>
+          <View style={styles.brandIdentity}>
+            <Image
+              source={require("../../assets/images/icon.png")}
+              accessibilityLabel="FinanceApp logo"
+              resizeMode="cover"
+              style={styles.brandIcon}
+            />
+            <Text
+              style={[
+                styles.brandName,
+                { color: colors.primaryForeground, opacity: 0.94 },
+              ]}
+            >
+              FinanceApp
+            </Text>
+          </View>
+        </View>
         {/* Greeting row */}
         <View style={styles.headerRow}>
-          <View>
+          <View style={styles.greetingBlock}>
+            <Text
+              style={[
+                styles.dateText,
+                { color: colors.primaryForeground, opacity: 0.72 },
+              ]}
+            >
+              {new Date().toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
+            </Text>
             <Text style={styles.greetingText}>
               {greeting(finance.userName)}
             </Text>
@@ -480,7 +513,12 @@ export default function DashboardScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <View style={styles.savingsHeader}>
+          <View
+            style={[
+              styles.savingsHeader,
+              screenWidth <= 360 && styles.savingsHeaderCompact,
+            ]}
+          >
             <View style={styles.savingsHeaderLeft}>
               <View
                 style={[
@@ -490,7 +528,7 @@ export default function DashboardScreen() {
               >
                 <Feather name="trending-up" size={18} color={colors.success} />
               </View>
-              <View>
+              <View style={styles.savingsCopy}>
                 <Text
                   style={[styles.savingsTitle, { color: colors.foreground }]}
                 >
@@ -801,11 +839,32 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   heroGradient: { paddingHorizontal: 20, paddingBottom: 32 },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  brandIdentity: { flexDirection: "row", alignItems: "center", gap: 9 },
+  brandIcon: { width: 25, height: 25, borderRadius: 7 },
+  brandName: {
+    fontSize: TYPOGRAPHY.bodySmall,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.15,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 24,
+  },
+  greetingBlock: { flex: 1, minWidth: 0 },
+  dateText: {
+    fontSize: TYPOGRAPHY.supporting,
+    fontFamily: "Inter_500Medium",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 4,
   },
   greetingText: {
     fontSize: TYPOGRAPHY.pageTitle,
@@ -955,11 +1014,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  savingsHeaderCompact: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    gap: 8,
+  },
   savingsHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
+  savingsCopy: { flex: 1, minWidth: 0 },
   savingsIcon: {
     width: 40,
     height: 40,
@@ -979,6 +1045,7 @@ const styles = StyleSheet.create({
   savingsTotal: {
     fontSize: 20,
     fontFamily: "Inter_700Bold",
+    flexShrink: 0,
   },
   savingsGoalRow: {
     flexDirection: "row",

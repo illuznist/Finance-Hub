@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -193,9 +194,12 @@ export default function AuthScreen({ onComplete }: Props) {
           <Animated.View style={{ opacity: fadeAnim }}>
             {/* Logo */}
             <View style={styles.logoRow}>
-              <View style={styles.logoIcon}>
-                <Feather name="trending-up" size={22} color={ACCENT} />
-              </View>
+              <Image
+                source={require("../assets/images/icon.png")}
+                accessibilityLabel="FinanceApp logo"
+                resizeMode="cover"
+                style={styles.logoIcon}
+              />
               <Text style={styles.logoText}>FinanceApp</Text>
             </View>
 
@@ -337,9 +341,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: ACCENT + "22",
-    alignItems: "center",
-    justifyContent: "center",
+    overflow: "hidden",
   },
   logoText: {
     fontFamily: "Inter_700Bold",

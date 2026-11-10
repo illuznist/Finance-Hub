@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import {
   type Loan,
   type LoanCategory,
@@ -645,20 +646,22 @@ export default function LoansScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Loans</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Money borrowed and lent</Text>
-        </View>
-        <Pressable
-          accessibilityLabel="Add loan"
-          testID="loan-add-button"
-          onPress={() => openForm()}
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-        >
-          <Feather name="plus" size={20} color={colors.primaryForeground} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Loans"
+        subtitle="Money borrowed and lent"
+        topInset={topPad}
+        colors={colors}
+        trailing={
+          <Pressable
+            accessibilityLabel="Add loan"
+            testID="loan-add-button"
+            onPress={() => openForm()}
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+          >
+            <Feather name="plus" size={20} color={colors.primaryForeground} />
+          </Pressable>
+        }
+      />
 
       <ScrollView contentContainerStyle={[styles.pageContent, { paddingBottom: 100 + (Platform.OS === "web" ? 34 : 0) }]} showsVerticalScrollIndicator={false}>
         <View style={styles.summaryRow}>
@@ -765,9 +768,6 @@ export default function LoansScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: TYPOGRAPHY.pageTitle, fontFamily: "Inter_700Bold" },
-  headerSubtitle: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", marginTop: 2 },
   addButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   pageContent: { paddingHorizontal: 17, paddingTop: 15, gap: 12 },
   summaryRow: { flexDirection: "row", gap: 8 },

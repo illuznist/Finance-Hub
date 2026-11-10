@@ -1,0 +1,1 @@
+- [FinanceApp visual continuity](financeapp-visual-continuity.md) — preserve the app’s existing blue palette during UI refinement.
