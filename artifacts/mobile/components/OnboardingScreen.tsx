@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -61,7 +62,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const insets = useSafeAreaInsets();
   const finance = useFinance();
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const dotAnim = useRef(new Animated.Value(0)).current;
   const [page, setPage] = useState(0);
   const TOTAL_PAGES = 3;

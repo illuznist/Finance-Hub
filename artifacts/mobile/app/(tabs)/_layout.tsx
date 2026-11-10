@@ -1,7 +1,7 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
@@ -14,24 +14,24 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="expenses">
-        <Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
-        <Label>Expenses</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
+        <NativeTabs.Trigger.Label>Expenses</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="emis">
-        <Icon sf={{ default: "calendar.badge.clock", selected: "calendar.badge.clock" }} />
-        <Label>EMIs</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "calendar.badge.clock", selected: "calendar.badge.clock" }} />
+        <NativeTabs.Trigger.Label>EMIs</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="loans">
-        <Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
-        <Label>Loans</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
+        <NativeTabs.Trigger.Label>Loans</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
-        <Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
-        <Label>More</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
+        <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="analytics" hidden />
       <NativeTabs.Trigger name="wallets" hidden />
@@ -85,60 +85,70 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
+          tabBarIcon: ({ focused }) => {
+            const color = focused ? colors.primary : colors.mutedForeground;
+            return isIOS ? (
               <SymbolView name="house" tintColor={color} size={24} />
             ) : (
               <Feather name="home" size={22} color={color} />
-            ),
+            );
+          },
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
           title: "Expenses",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
+          tabBarIcon: ({ focused }) => {
+            const color = focused ? colors.primary : colors.mutedForeground;
+            return isIOS ? (
               <SymbolView name="list.bullet" tintColor={color} size={22} />
             ) : (
               <Feather name="list" size={22} color={color} />
-            ),
+            );
+          },
         }}
       />
       <Tabs.Screen
         name="emis"
         options={{
           title: "EMIs",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
+          tabBarIcon: ({ focused }) => {
+            const color = focused ? colors.primary : colors.mutedForeground;
+            return isIOS ? (
               <SymbolView name="calendar.badge.clock" tintColor={color} size={22} />
             ) : (
               <Feather name="refresh-cw" size={20} color={color} />
-            ),
+            );
+          },
         }}
       />
       <Tabs.Screen
         name="loans"
         options={{
           title: "Loans",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
+          tabBarIcon: ({ focused }) => {
+            const color = focused ? colors.primary : colors.mutedForeground;
+            return isIOS ? (
               <SymbolView name="dollarsign.circle" tintColor={color} size={22} />
             ) : (
               <Feather name="dollar-sign" size={20} color={color} />
-            ),
+            );
+          },
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: "More",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
+          tabBarIcon: ({ focused }) => {
+            const color = focused ? colors.primary : colors.mutedForeground;
+            return isIOS ? (
               <SymbolView name="ellipsis" tintColor={color} size={22} />
             ) : (
               <Feather name="more-horizontal" size={21} color={color} />
-            ),
+            );
+          },
         }}
       />
       <Tabs.Screen name="analytics" options={{ href: null }} />

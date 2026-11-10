@@ -14,8 +14,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type ScrollViewInstance,
 } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import Swipeable, {
+  type SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -373,7 +376,7 @@ function ExpenseCard({
   onDelete: () => void;
 }) {
   const colors = useColors();
-  const swipeRef = useRef<Swipeable>(null);
+  const swipeRef = useRef<SwipeableMethods | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
 
