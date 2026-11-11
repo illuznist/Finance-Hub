@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { financialAlert as Alert } from "@/utils/financialAlert";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
@@ -360,7 +361,7 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
             <ChoiceChips value={sourceType} options={SOURCES} onChange={setSourceType} />
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
             <ChoiceChips value={category} options={CATEGORIES} onChange={setCategory} />
-            <LoanField label={`Principal amount (${finance.currency})`} value={principal} onChangeText={setPrincipal} placeholder="10000" numeric testID="loan-principal-input" />
+            <LoanField label={`Principal amount (${editing?.currency ?? finance.currency})`} value={principal} onChangeText={setPrincipal} placeholder="10000" numeric testID="loan-principal-input" />
             <LoanField label="Start date (YYYY-MM-DD)" value={startDate} onChangeText={setStartDate} placeholder="2026-01-01" />
             {!editing && <>
               <Pressable onPress={() => setRecordFunding(v => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: recordFunding }}
@@ -389,11 +390,11 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
             </Pressable>
             {showRepaymentDetails && (
               <>
-                <LoanField label={`Total repayment amount (${finance.currency}, optional)`} value={totalRepayment} onChangeText={setTotalRepayment} placeholder={principal || "10000"} numeric />
+                <LoanField label={`Total repayment amount (${editing?.currency ?? finance.currency}, optional)`} value={totalRepayment} onChangeText={setTotalRepayment} placeholder={principal || "10000"} numeric />
                 <LoanField label="Interest rate % (informational only)" value={interestRate} onChangeText={setInterestRate} placeholder="5" numeric />
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Repayment frequency</Text>
                 <ChoiceChips value={frequency} options={FREQUENCIES} onChange={setFrequency} />
-                <LoanField label={`Planned payment (${finance.currency}, optional)`} value={plannedPayment} onChangeText={setPlannedPayment} placeholder="500" numeric />
+                <LoanField label={`Planned payment (${editing?.currency ?? finance.currency}, optional)`} value={plannedPayment} onChangeText={setPlannedPayment} placeholder="500" numeric />
                 <PaymentAccountPicker currency={editing?.currency ?? finance.currency} value={plannedAccount} onChange={setPlannedAccount} />
               </>
             )}
@@ -471,9 +472,9 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
             <Pressable accessibilityLabel="Close payment form" onPress={onClose} hitSlop={10}><Feather name="x" size={21} color={colors.mutedForeground} /></Pressable>
           </View>
           <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-            {editing ? `Update this ${directionVerb}.` : `Outstanding balance: ${fmt(getLoanOutstandingBalance(loan), finance.currency)}`}
+            {editing ? `Update this ${directionVerb}.` : `Outstanding balance: ${fmt(getLoanOutstandingBalance(loan), loan.currency ?? finance.currency)}`}
           </Text>
-          <LoanField label={`Amount (${finance.currency})`} value={amount} onChangeText={setAmount} placeholder="500" numeric testID="loan-payment-amount" />
+          <LoanField label={`Amount (${loan.currency ?? finance.currency})`} value={amount} onChangeText={setAmount} placeholder="500" numeric testID="loan-payment-amount" />
           <LoanField label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder={todayString()} />
           {editing?.legacy
             ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Historical record: corrections do not change account balances. Review balances in Transactions.</Text>
@@ -548,13 +549,13 @@ function LoanDetailModal({ loan, onClose, onEdit, onDelete, onPayment }: {
                   <Text style={[styles.statusText, { color: settled ? colors.success : colors.mutedForeground }]}>{settled ? "Settled" : "Active"}</Text>
                 </View>
               </View>
-              <Text style={[styles.outstandingValue, { color: colors.foreground }]}>{fmt(outstanding, finance.currency)}</Text>
+              <Text style={[styles.outstandingValue, { color: colors.foreground }]}>{fmt(outstanding, loan.currency ?? finance.currency)}</Text>
               <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
                 <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: loan.color ?? colors.primary }]} />
               </View>
               <View style={styles.progressCaptionRow}>
                 <Text style={[styles.progressCaption, { color: colors.mutedForeground }]}>{Math.round(progress * 100)}% repaid</Text>
-                <Text style={[styles.progressCaption, { color: colors.mutedForeground }]}>{fmt(paid, finance.currency)} paid</Text>
+                <Text style={[styles.progressCaption, { color: colors.mutedForeground }]}>{fmt(paid, loan.currency ?? finance.currency)} paid</Text>
               </View>
             </View>
 
@@ -571,14 +572,14 @@ function LoanDetailModal({ loan, onClose, onEdit, onDelete, onPayment }: {
               <InfoRow label="Counterparty" value={loan.counterpartyName} />
               <InfoRow label="Source" value={sourceLabel(loan.sourceType)} />
               <InfoRow label="Category" value={CATEGORIES.find((item) => item.value === loan.category)?.label ?? "Other"} />
-              <InfoRow label="Original principal" value={fmt(loan.principalAmount, finance.currency)} />
-              {loan.totalRepaymentAmount !== undefined && <InfoRow label="Total repayment obligation" value={fmt(totalObligation, finance.currency)} />}
-              <InfoRow label={loan.direction === "borrowed" ? "Total repaid" : "Total received"} value={fmt(paid, finance.currency)} color={colors.success} />
+              <InfoRow label="Original principal" value={fmt(loan.principalAmount, loan.currency ?? finance.currency)} />
+              {loan.totalRepaymentAmount !== undefined && <InfoRow label="Total repayment obligation" value={fmt(totalObligation, loan.currency ?? finance.currency)} />}
+              <InfoRow label={loan.direction === "borrowed" ? "Total repaid" : "Total received"} value={fmt(paid, loan.currency ?? finance.currency)} color={colors.success} />
               <InfoRow label="Start date" value={formatDate(loan.startDate)} />
               <InfoRow label="Expected end date" value={formatDate(loan.expectedEndDate)} />
               {loan.interestRate !== undefined && <InfoRow label="Interest rate (informational)" value={`${loan.interestRate}%`} />}
               <InfoRow label="Repayment frequency" value={frequencyLabel(loan.repaymentFrequency)} />
-              {loan.plannedPaymentAmount !== undefined && <InfoRow label="Planned payment" value={fmt(loan.plannedPaymentAmount, finance.currency)} />}
+              {loan.plannedPaymentAmount !== undefined && <InfoRow label="Planned payment" value={fmt(loan.plannedPaymentAmount, loan.currency ?? finance.currency)} />}
             </View>
 
             {!!loan.notes && (
@@ -602,7 +603,7 @@ function LoanDetailModal({ loan, onClose, onEdit, onDelete, onPayment }: {
                     <Text style={[styles.paymentTitle, { color: colors.foreground }]}>{loan.direction === "borrowed" ? "Repayment" : "Amount received"}</Text>
                     <Text style={[styles.paymentMeta, { color: colors.mutedForeground }]}>{formatDate(payment.date)}{payment.notes ? ` · ${payment.notes}` : ""}</Text>
                   </View>
-                  <Text style={[styles.paymentAmount, { color: colors.foreground }]}>{fmt(payment.amount, finance.currency)}</Text>
+                  <Text style={[styles.paymentAmount, { color: colors.foreground }]}>{fmt(payment.amount, loan.currency ?? finance.currency)}</Text>
                   <Pressable testID={`loan-payment-edit-${payment.id}`} accessibilityLabel="Edit payment" onPress={() => onPayment(payment)} style={styles.paymentControl}>
                     <Feather name="edit-2" size={14} color={colors.primary} />
                   </Pressable>
@@ -646,6 +647,14 @@ export default function LoansScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | undefined>();
   const [selectedLoan, setSelectedLoan] = useState<Loan | undefined>();
+  const params = useLocalSearchParams<{ loanId?: string }>();
+  const router = useRouter();
+  useEffect(() => {
+    if (!params.loanId || !finance.isReady) return;
+    const selected = finance.loans.find(l => l.id === params.loanId);
+    if (selected) setSelectedLoan(selected);
+    router.setParams({ loanId: undefined });
+  }, [params.loanId, finance.loans, finance.isReady, router]);
   const [paymentTarget, setPaymentTarget] = useState<{ loan: Loan; payment?: LoanPayment }>();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -670,7 +679,7 @@ export default function LoansScreen() {
   function confirmDeleteLoan(loan: Loan) {
     Alert.alert(
       "Delete loan?",
-      `Delete "${loan.name}" and all of its payment history? This cannot be undone.`,
+      `Remove "${loan.name}" from your loan records? Its recorded cash transactions will remain in Transactions, but its outstanding obligation will no longer be included in net worth.`,
       [
         { text: "Cancel", style: "cancel" },
         {

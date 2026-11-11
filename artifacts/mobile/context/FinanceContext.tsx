@@ -14,9 +14,12 @@ import * as budgets from "@/finance/budgets";
 import * as recurring from "@/finance/recurring";
 import { getUpcoming as upcomingPayments, recordScheduledPayment as confirmScheduledPayment } from "@/finance/upcoming";
 import type { Transaction } from "@/finance/ledger";
-import { cashFlow, getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits, localDate } from "@/finance/ledger";
+import { getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits, localDate } from "@/finance/ledger";
 import { loadFinanceState, createWriteQueue } from "@/finance/migration";
 import * as ledgerService from "@/finance/service";
+import { captureNetWorthSnapshots } from "@/finance/netWorth";
+import type { NetWorthSnapshot } from "@/finance/analyticsTypes";
+import { buildAnalyticsReport } from "@/finance/analytics";
 
 import {
   canUpdateLoanPayment,
@@ -181,6 +184,8 @@ export interface SecuritySettings {
 }
 
 export interface FinanceState {
+  /** Optional, observed daily positions; never reconstructed from incomplete history. */
+  netWorthSnapshots?: NetWorthSnapshot[];
   userName: string;
   currency: string;
   monthlyBudget: number;
@@ -201,15 +206,6 @@ export interface FinanceState {
   reconciledAccountIds?: string[];
   planning?: PlanningState;
 }
-
-export const EXCHANGE_RATES: Record<string, number> = {
-  SAR: 1,
-  USD: 0.2666,
-  AED: 0.9788,
-  EUR: 0.2451,
-  GBP: 0.2108,
-  INR: 22.34,
-};
 
 export const SUPPORTED_CURRENCIES = [
   { code: "SAR", name: "Saudi Riyal", symbol: "SAR" },
@@ -247,14 +243,12 @@ interface FinanceContextType extends FinanceState {
   contributeToSavings: (input: Parameters<typeof ledgerService.contributeToSavings>[1]) => boolean;
   getAccountBalance: (id: string) => number;
   getTransactionsByDateRange: (from: string, to: string) => Transaction[];
-  addExpense: (e: Omit<Expense, "id">) => void;
+  addExpense: (e: Omit<Expense, "id"> & { id?: string }) => void;
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
-  toggleExpensePaid: (id: string) => void;
   addEMI: (e: Omit<EMI, "id">) => void;
   updateEMI: (id: string, updates: Partial<EMI>) => void;
   deleteEMI: (id: string) => void;
-  markEMIPaid: (id: string) => void;
   recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
   updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
   deleteEMIPayment: (emiId: string, paymentId: string) => void;
@@ -267,11 +261,11 @@ interface FinanceContextType extends FinanceState {
   addAccount: (a: Omit<Account, "id">) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
   deleteAccount: (id: string) => void;
-  addIncome: (i: Omit<Income, "id">) => void;
+  addIncome: (i: Omit<Income, "id"> & { id?: string }) => void;
   updateIncome: (id: string, updates: Partial<Income>) => void;
   deleteIncome: (id: string) => void;
   addSavingsGoal: (g: Omit<SavingsGoal, "id">) => void;
-  updateSavingsGoal: (id: string, updates: Partial<SavingsGoal>) => void;
+  updateSavingsGoal: (id: string, updates: Partial<Omit<SavingsGoal, "id" | "savedAmount" | "currency">>) => void;
   deleteSavingsGoal: (id: string) => void;
   setMonthlyBudget: (amount: number) => void;
   setUserName: (name: string) => void;
@@ -289,7 +283,6 @@ interface FinanceContextType extends FinanceState {
   totalEMIMonthly: number;
   remainingBudget: number;
   totalSavings: number;
-  currencyRate: number;
   totalPrincipalBorrowed: number;
   totalPrincipalLent: number;
   totalRepaidOnBorrowedLoans: number;
@@ -460,6 +453,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       const nowYear = currentYYYY();
       loaded = { ...loaded, lastResetMonth: nowMonth, lastResetYear: nowYear };
       loaded = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(loaded), nowMonth);
+      loaded = captureNetWorthSnapshots(loaded);
 
       await queueWrite(loaded);
       stateRef.current = loaded;
@@ -476,9 +470,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const persist = useCallback((updater: (prev: FinanceState) => FinanceState) => {
     if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before making changes.");
-    const next = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(recurring.synchronizeOccurrences(
+    const next = captureNetWorthSnapshots(budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(recurring.synchronizeOccurrences(
       ledgerService.synchronizeDomain(stateRef.current, updater(stateRef.current))
-    )), localDate().slice(0, 7));
+    )), localDate().slice(0, 7)));
     stateRef.current = next;
     setState(next);
     queueWrite(next).catch(error => {
@@ -518,7 +512,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const refresh = () => {
       if (!readyRef.current) return;
       setCalendarKey(`${localDate()}:${new Date().getTimezoneOffset()}`);
-      const next = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(stateRef.current), localDate().slice(0, 7));
+      const next = captureNetWorthSnapshots(budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(stateRef.current), localDate().slice(0, 7)));
       if (next !== stateRef.current) persist(() => next);
     };
     const sub = AppState.addEventListener("change", state => { if (state === "active") refresh(); });
@@ -540,22 +534,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     attempt(prev => ledgerService.contributeToSavings(prev, input)), [attempt]);
 
   const addExpense = useCallback(
-    (e: Omit<Expense, "id">) =>
-      persist((prev) => ({ ...prev, expenses: [...prev.expenses, { ...e, currency: e.currency ?? prev.currency, id: genId() }] })),
+    (e: Omit<Expense, "id"> & { id?: string }) =>
+      persist(prev => ledgerService.saveExpense(prev, { ...e, id: e.id ?? genId() })),
     [persist]
   );
   const updateExpense = useCallback(
     (id: string, updates: Partial<Expense>) =>
-      persist((prev) => ({ ...prev, expenses: prev.expenses.map((exp) => (exp.id === id ? { ...exp, ...updates } : exp)) })),
+      persist(prev => {
+        const expense = prev.expenses.find(e => e.id === id);
+        if (!expense) throw new Error("Expense no longer exists.");
+        return ledgerService.saveExpense(prev, { ...expense, ...updates, id, paymentId: expense.paymentId, recurringOccurrenceId: expense.recurringOccurrenceId });
+      }),
     [persist]
   );
   const deleteExpense = useCallback(
     (id: string) => persist((prev) => ({ ...prev, expenses: prev.expenses.filter((e) => e.id !== id) })),
-    [persist]
-  );
-  const toggleExpensePaid = useCallback(
-    (id: string) =>
-      persist((prev) => ({ ...prev, expenses: prev.expenses.map((e) => (e.id === id ? { ...e, isPaid: !e.isPaid } : e)) })),
     [persist]
   );
 
@@ -575,36 +568,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const deleteEMI = useCallback(
     (id: string) => persist((prev) => ({ ...prev, emis: prev.emis.filter((e) => e.id !== id) })),
     [persist]
-  );
-  const markEMIPaid = useCallback(
-    (id: string) => {
-      const emi = stateRef.current.emis.find((item) => item.id === id);
-      if (!emi || emi.paidInstallments >= emi.totalInstallments) return;
-      const paymentHistory = emi.paymentHistory ?? [];
-      const hasRemaining = emi.totalInstallments - emi.paidInstallments > 0;
-      if (!hasRemaining) return;
-      persist((prev) => ({
-        ...prev,
-        emis: prev.emis.map((item) => item.id === id
-          ? normalizeEMI({
-            ...item,
-            paymentHistory: [
-              ...(item.paymentHistory ?? []),
-              {
-                id: genId(),
-                amount: item.monthlyEMIAmount ?? item.monthlyAmount,
-                date: formatLocalDate(new Date()),
-                accountId: item.linkedAccountId,
-                paymentType: "monthly_emi",
-                status: "paid",
-              },
-            ],
-            paidInstallments: (item.paidInstallments ?? 0) + 1,
-          })
-          : item),
-      }));
-    },
-    [persist, state.emis]
   );
   const recordEMIPayment = useCallback(
     (id: string, payment: Omit<EMIPayment, "id" | "status">): boolean => {
@@ -758,8 +721,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addIncome = useCallback(
-    (i: Omit<Income, "id">) =>
-      persist((prev) => ({ ...prev, incomes: [...prev.incomes, { ...i, currency: i.currency ?? prev.currency, id: genId() }] })),
+    (i: Omit<Income, "id"> & { id?: string }) =>
+      persist(prev => ledgerService.saveIncome(prev, { ...i, id: i.id ?? genId() })),
     [persist]
   );
   const deleteIncome = useCallback(
@@ -767,9 +730,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const updateIncome = useCallback(
-    (id: string, updates: Partial<Income>) => persist(prev => ({
-      ...prev, incomes: prev.incomes.map(i => i.id === id ? { ...i, ...updates, id } : i),
-    })), [persist]
+    (id: string, updates: Partial<Income>) => persist(prev => {
+      const income = prev.incomes.find(i => i.id === id);
+      if (!income) throw new Error("Income no longer exists.");
+      return ledgerService.saveIncome(prev, { ...income, ...updates, id });
+    }), [persist]
   );
 
   const addSavingsGoal = useCallback(
@@ -778,11 +743,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const updateSavingsGoal = useCallback(
-    (id: string, updates: Partial<SavingsGoal>) =>
-      persist((prev) => ({
-        ...prev,
-        savingsGoals: prev.savingsGoals.map((g) => (g.id === id ? { ...g, ...updates } : g)),
-      })),
+    (id: string, updates: Partial<Omit<SavingsGoal, "id" | "savedAmount" | "currency">>) =>
+      persist((prev) => {
+        if ("savedAmount" in updates || "currency" in updates) throw new Error("Use a recorded savings contribution to change saved money.");
+        return { ...prev, savingsGoals: prev.savingsGoals.map(g => g.id === id ? { ...g, ...updates, id } : g) };
+      }),
     [persist]
   );
   const deleteSavingsGoal = useCallback(
@@ -823,7 +788,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const accounts = useMemo(() => ledgerService.balances(state), [state]);
   const transactions = state.transactions ?? [];
   const range = monthRange();
-  const monthlyCashFlow = cashFlow(getTransactionsByDateRange(transactions, range.from, range.to), state.currency);
+  const actualOverview = useMemo(() => buildAnalyticsReport(state, { ...range, currency: state.currency, includeDebt: true, includeSavings: false }), [state, calendarKey]);
+  const monthlyCashFlow = { moneyIn: actualOverview.totals.income, moneyOut: actualOverview.totals.expenses, net: actualOverview.totals.net };
   const totalBalance = accounts.filter(a => a.currency === state.currency).reduce((s, a) => s + minorUnits(a.balance), 0) / 100;
   const totalMonthlyIncome = state.incomes.filter(i => i.kind !== "received" && (i.currency ?? state.currency) === state.currency).reduce((s, i) => s + i.amount, 0);
   const totalMonthlyExpenses = state.expenses.filter(e => (e.currency ?? state.currency) === state.currency).reduce((s, e) => s + e.amount, 0);
@@ -835,7 +801,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const effectiveBudget = currentBudget.period.limit;
   const remainingBudget = currentBudget.remaining;
   const totalSavings = accounts.filter((a) => a.type === "savings" && a.currency === state.currency).reduce((s, a) => s + minorUnits(a.balance), 0) / 100;
-  const currencyRate = EXCHANGE_RATES[state.currency] ?? 1;
   const currencyLoans = state.loans.filter(l => (l.currency ?? state.currency) === state.currency);
   const totalPrincipalBorrowed = currencyLoans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + loan.principalAmount, 0);
   const totalPrincipalLent = currencyLoans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + loan.principalAmount, 0);
@@ -874,11 +839,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         addExpense,
         updateExpense,
         deleteExpense,
-        toggleExpensePaid,
         addEMI,
         updateEMI,
         deleteEMI,
-        markEMIPaid,
         recordEMIPayment,
         updateEMIPayment,
         deleteEMIPayment,
@@ -913,7 +876,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         totalEMIMonthly,
         remainingBudget,
         totalSavings,
-        currencyRate,
         totalPrincipalBorrowed,
         totalPrincipalLent,
         totalRepaidOnBorrowedLoans,

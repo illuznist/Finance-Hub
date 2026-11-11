@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -30,6 +29,7 @@ import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { localDate, validLocalDate, newId } from "@/finance/ledger";
+import { financialAlert as Alert } from "@/utils/financialAlert";
 import { router } from "expo-router";
 
 function fmt(amount: number, currency: string): string {
@@ -88,10 +88,12 @@ function IncomeRow({
   income,
   currency,
   onDelete,
+  onEdit,
 }: {
   income: Income;
   currency: string;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
   const colors = useColors();
   const icon =
@@ -123,6 +125,14 @@ function IncomeRow({
         +{fmt(income.amount, currency)}
       </Text>
       <TouchableOpacity
+        accessibilityLabel={`Edit income ${income.name}`}
+        onPress={onEdit}
+        style={styles.deleteSmall}
+      >
+        <Feather name="edit-2" size={14} color={colors.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityLabel={`Remove income ${income.name}`}
         onPress={onDelete}
         style={[styles.deleteSmall, { backgroundColor: colors.errorLight }]}
       >
@@ -288,7 +298,7 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
   );
 }
 
-function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClose: () => void; editing?: Income }) {
   const colors = useColors();
   const finance = useFinance();
   const [name, setName] = useState("");
@@ -297,14 +307,31 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
   const [kind, setKind] = useState<"expected" | "received">("expected");
   const [accountId, setAccountId] = useState<string | undefined>();
   const [date, setDate] = useState(localDate());
+  const [category, setCategory] = useState("");
+  const [error, setError] = useState("");
   const submitted = useRef(false);
-  useEffect(() => { if (visible) submitted.current = false; }, [visible]);
+  const submissionId = useRef(newId());
+  const currency = editing?.currency ?? finance.currency;
+  useEffect(() => {
+    if (!visible) return;
+    submitted.current = false; submissionId.current = editing?.id ?? newId(); setError("");
+    setName(editing?.name ?? ""); setAmount(editing ? String(editing.amount) : "");
+    setType(editing?.type ?? "salary"); setKind(editing?.kind ?? "expected");
+    setAccountId(editing?.accountId); setDate(editing?.date ?? localDate()); setCategory(editing?.category ?? "");
+  }, [visible, editing]);
   const INCOME_TYPES = ["salary", "freelance", "other"] as const;
 
   function submit() {
-    if (submitted.current || !name.trim() || !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !validLocalDate(date)) return;
+    if (submitted.current) return;
+    if (!name.trim() || !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || (kind === "received" && !validLocalDate(date))) {
+      setError("Enter a name, positive amount and valid received date."); return;
+    }
     submitted.current = true;
-    finance.addIncome({ name: name.trim(), amount: Number(amount), type, kind, accountId: kind === "received" ? accountId : undefined, date: kind === "received" ? date : undefined, currency: finance.currency, color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" });
+    try {
+      const input = { name: name.trim(), amount: Number(amount), type, kind, category: category.trim() || type, accountId: kind === "received" ? accountId : undefined, date: kind === "received" ? date : undefined, currency, color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" };
+      if (editing) finance.updateIncome(editing.id, input);
+      else finance.addIncome({ ...input, id: submissionId.current });
+    } catch (e) { submitted.current = false; setError(e instanceof Error ? e.message : "Income could not be saved."); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setName(""); setAmount(""); setType("salary");
     onClose();
@@ -315,12 +342,12 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
       <View style={styles.modalOverlay}>
         <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30} style={{ flexGrow: 0, maxHeight: "85%" }} contentContainerStyle={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Income</Text>
+          <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editing ? "Edit Income" : "Add Income"}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-            {(["expected", "received"] as const).map(k => <Pressable key={k} onPress={() => setKind(k)} style={[styles.chip, { backgroundColor: kind === k ? colors.primary : colors.muted }]}><Text style={{ color: kind === k ? colors.primaryForeground : colors.foreground }}>{k === "expected" ? "Expected monthly" : "Received"}</Text></Pressable>)}
+            {(["expected", "received"] as const).map(k => <Pressable key={k} disabled={editing?.kind === "received" && k === "expected"} onPress={() => setKind(k)} style={[styles.chip, { opacity: editing?.kind === "received" && k === "expected" ? 0.4 : 1, backgroundColor: kind === k ? colors.primary : colors.muted }]}><Text style={{ color: kind === k ? colors.primaryForeground : colors.foreground }}>{k === "expected" ? "Expected monthly" : "Received"}</Text></Pressable>)}
           </View>
           {kind === "received" && <>
-            <PaymentAccountPicker value={accountId} onChange={setAccountId} />
+            <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
             <TextInput accessibilityLabel="Income received date" value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
           </>}
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
@@ -333,12 +360,15 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Amount ({finance.currency})</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
+          <TextInput accessibilityLabel="Income category" value={category} onChangeText={setCategory} placeholder={type} placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} />
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Amount ({currency})</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={amount} onChangeText={setAmount} />
           <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
             <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text></Pressable>
-            <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>Add</Text></Pressable>
+            <Pressable testID="income-save" onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{editing ? "Save" : "Add"}</Text></Pressable>
           </View>
+          {!!error && <Text accessibilityRole="alert" style={{ color: colors.destructive, marginTop: 12 }}>{error}</Text>}
         </KeyboardAwareScrollViewCompat>
       </View>
     </Modal>
@@ -417,6 +447,7 @@ export default function WalletsScreen() {
   const toast = useToast();
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddIncome, setShowAddIncome] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<Income | undefined>();
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -549,14 +580,15 @@ export default function WalletsScreen() {
         {/* Income sources */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Income Sources</Text>
-          <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowAddIncome(true); }} style={[styles.addSmallBtn, { backgroundColor: colors.success }]}>
+          <Pressable accessibilityLabel="Add income" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setEditingIncome(undefined); setShowAddIncome(true); }} style={[styles.addSmallBtn, { backgroundColor: colors.success }]}>
             <Feather name="plus" size={16} color="#FFFFFF" />
           </Pressable>
         </View>
         <View style={{ gap: 8 }}>
           {finance.incomes.map((inc) => (
             <IncomeRow key={inc.id} income={inc} currency={inc.currency ?? finance.currency}
-              onDelete={() => Alert.alert("Remove income?", `Remove ${inc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteIncome(inc.id); toast.show("Income source removed"); } }])}
+              onEdit={() => { setEditingIncome(inc); setShowAddIncome(true); }}
+              onDelete={() => Alert.alert("Remove income?", `Remove ${inc.name}?${inc.kind === "received" ? " Its actual transaction and account balance will be retained. Reverse an incorrect payment in Transactions instead." : ""}`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteIncome(inc.id); toast.show("Income source removed"); } }])}
             />
           ))}
           {finance.incomes.length === 0 && (
@@ -588,7 +620,7 @@ export default function WalletsScreen() {
       </ScrollView>
 
       <AddAccountModal visible={showAddAccount} onClose={() => setShowAddAccount(false)} />
-      <AddIncomeModal visible={showAddIncome} onClose={() => setShowAddIncome(false)} />
+      <AddIncomeModal visible={showAddIncome} onClose={() => setShowAddIncome(false)} editing={editingIncome} />
       <AddGoalModal visible={showAddGoal} onClose={() => setShowAddGoal(false)} />
     </View>
   );

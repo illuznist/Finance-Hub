@@ -1,4 +1,4 @@
-import type { Account, Expense, FinanceState, EMIPayment, LoanPayment } from "../context/FinanceContext";
+import type { Account, Expense, Income, FinanceState, EMIPayment, LoanPayment } from "../context/FinanceContext";
 import {
   type Transaction, type TransactionType, type ReferenceType, type LedgerAccount,
   directionFor, getAccountBalance, localDate, newId, positiveMoney,
@@ -36,12 +36,13 @@ export interface MovementInput {
   referenceId?: string;
   paymentId?: string;
   currency?: string;
+  recurringOccurrenceId?: string;
 }
 
 export function movement(state: FinanceState, input: MovementInput): Transaction {
   const account = state.accounts.find(a => a.id === input.accountId);
   const t: Transaction = {
-    ...input, operationId: input.id,
+    ...input, operationId: input.id, originType: input.referenceType,
     amount: positiveMoney(input.amount), currency: input.currency ?? account?.currency ?? state.currency,
     direction: directionFor(input.type), createdAt: new Date().toISOString(),
   };
@@ -62,6 +63,39 @@ export function removeReference(state: FinanceState, referenceType: ReferenceTyp
     transactions: (state.transactions ?? []).filter(t =>
       !(t.referenceType === referenceType && t.referenceId === referenceId && (!paymentId || t.paymentId === paymentId))),
   };
+}
+
+/** Removing a source is not a reversal of money that actually moved. */
+export function detachReference(state: FinanceState, referenceType: ReferenceType, referenceId: string): FinanceState {
+  const occurrenceId = referenceType === "expense" ? state.expenses.find(e => e.id === referenceId)?.recurringOccurrenceId : undefined;
+  return { ...state, transactions: (state.transactions ?? []).map(t =>
+    t.referenceType === referenceType && t.referenceId === referenceId ? {
+      ...t, originType: t.originType ?? referenceType, recurringOccurrenceId: t.recurringOccurrenceId ?? occurrenceId,
+      referenceType: undefined, referenceId: undefined, paymentId: undefined,
+    } : t) };
+}
+
+export function saveIncome(state: FinanceState, income: Income): FinanceState {
+  const before = state.incomes.find(i => i.id === income.id);
+  positiveMoney(income.amount);
+  if (!income.name.trim()) throw new Error("Enter an income name.");
+  if (before?.kind === "received" && income.kind !== "received") throw new Error("A received payment cannot become a plan. Remove the source to retain its history, then add expected income.");
+  if (income.kind === "received" && !validLocalDate(income.date ?? "")) throw new Error("Enter the actual received date.");
+  if (!before && (state.transactions ?? []).some(t => t.id === `income:${income.id}`)) return state;
+  return synchronizeDomain(state, { ...state, incomes: before
+    ? state.incomes.map(i => i.id === income.id ? { ...income, currency: income.currency ?? state.currency } : i)
+    : [...state.incomes, { ...income, currency: income.currency ?? state.currency }] });
+}
+
+export function saveExpense(state: FinanceState, expense: Expense): FinanceState {
+  const before = state.expenses.find(e => e.id === expense.id);
+  positiveMoney(expense.amount);
+  if (!expense.name.trim() || !expense.category.trim()) throw new Error("Enter a name and category.");
+  if (!before && (state.transactions ?? []).some(t => t.id === `expense:${expense.paymentId ?? expense.id}`)) return state;
+  const normalized = { ...expense, currency: expense.currency ?? state.currency,
+    paymentId: before?.isPaid ? before.paymentId : (expense.isPaid ? expense.paymentId ?? expense.id : undefined) };
+  return synchronizeDomain(state, { ...state, expenses: before
+    ? state.expenses.map(e => e.id === expense.id ? normalized : e) : [...state.expenses, normalized] });
 }
 
 export function setExpensePayment(state: FinanceState, id: string, input: {
@@ -87,13 +121,14 @@ export function setExpensePayment(state: FinanceState, id: string, input: {
     date: paid.paidDate!, description: paid.name, category: paid.category,
     accountId: paid.accountId, currency: paid.currency, notes: paid.notes,
     referenceType: "expense", referenceId: id, paymentId: input.operationId,
+    recurringOccurrenceId: paid.recurringOccurrenceId,
   });
   return { ...next, expenses: next.expenses.map(e => e.id === id ? paid : e) };
 }
 
 export function addManualMovement(state: FinanceState, input: Omit<MovementInput, "type"> & { type: "income" | "expense" }): FinanceState {
   if (input.type !== "income" && input.type !== "expense") throw new Error("Record EMI and loan payments through their own payment flow.");
-  if ((state.transactions ?? []).some(t => t.operationId === input.id || t.referenceId === input.id)) return state;
+  if ((state.transactions ?? []).some(t => t.operationId === input.id || t.referenceId === input.id || t.id === `${input.type}:${input.id}`)) return state;
   if (input.type === "expense") {
     const expense: Expense = {
       id: input.id, name: input.description.trim(), category: input.category,
@@ -325,13 +360,17 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
         date: normalized.paidDate, description: e.name, category: e.category,
         accountId: e.accountId, notes: e.notes, currency: normalized.currency,
         referenceType: "expense", referenceId: e.id, paymentId,
+        recurringOccurrenceId: e.recurringOccurrenceId,
       });
     } else if (!e.isPaid && before?.isPaid && before.paymentId) {
       next = { ...next, transactions: (next.transactions ?? []).filter(t => !(t.referenceType === "expense" && t.referenceId === e.id && t.paymentId === before.paymentId)) };
       next = { ...next, expenses: next.expenses.map(x => x.id === e.id ? { ...x, paymentId: undefined, paidDate: undefined } : x) };
     }
   }
-  for (const e of previous.expenses) if (!next.expenses.some(x => x.id === e.id)) next = removeReference(next, "expense", e.id);
+  for (const e of previous.expenses) if (!next.expenses.some(x => x.id === e.id)) {
+    // Source metadata is still available in previous when the paid source is removed.
+    next = { ...next, transactions: detachReference({ ...next, expenses: previous.expenses }, "expense", e.id).transactions };
+  }
   for (const emi of next.emis) {
     const before = previous.emis.find(e => e.id === emi.id);
     for (const p of emi.paymentHistory ?? []) {
@@ -352,7 +391,7 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
       if (!(emi.paymentHistory ?? []).some(x => x.id === p.id)) next = removeReference(next, "emi", emi.id, p.id);
     }
   }
-  for (const e of previous.emis) if (!next.emis.some(x => x.id === e.id)) next = removeReference(next, "emi", e.id);
+  for (const e of previous.emis) if (!next.emis.some(x => x.id === e.id)) next = detachReference(next, "emi", e.id);
   for (const loan of next.loans) {
     const before = previous.loans.find(l => l.id === loan.id);
     for (const p of loan.payments) {
@@ -369,19 +408,23 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
     }
     for (const p of before?.payments ?? []) if (!loan.payments.some(x => x.id === p.id)) next = removeReference(next, "loan", loan.id, p.id);
   }
-  for (const l of previous.loans) if (!next.loans.some(x => x.id === l.id)) next = removeReference(next, "loan", l.id);
+  for (const l of previous.loans) if (!next.loans.some(x => x.id === l.id)) next = detachReference(next, "loan", l.id);
   for (const income of next.incomes) {
     if (income.kind !== "received") {
-      if (previous.incomes.find(i => i.id === income.id)?.kind === "received") next = removeReference(next, "income", income.id);
+      if (previous.incomes.find(i => i.id === income.id)?.kind === "received") throw new Error("Received income cannot be changed into expected income.");
       continue;
     }
-    if (previous.incomes.find(i => i.id === income.id) === income) continue;
+    const oldIncome = previous.incomes.find(i => i.id === income.id);
+    if (oldIncome === income) continue;
+    // Legacy receipts without ledger evidence are not silently replayed.
+    if (oldIncome?.kind === "received" && !(next.transactions ?? []).some(t => t.referenceType === "income" && t.referenceId === income.id)) continue;
     next = putMovement(next, {
       id: `income:${income.id}`, type: "income", amount: income.amount, date: income.date ?? localDate(),
       description: income.name, category: income.category ?? income.type, accountId: income.accountId,
       notes: income.notes, currency: income.currency, referenceType: "income", referenceId: income.id,
     });
   }
-  for (const i of previous.incomes) if (!next.incomes.some(x => x.id === i.id)) next = removeReference(next, "income", i.id);
+  for (const i of previous.incomes) if (!next.incomes.some(x => x.id === i.id)) next = detachReference(next, "income", i.id);
+  for (const g of previous.savingsGoals) if (!next.savingsGoals.some(x => x.id === g.id)) next = detachReference(next, "savings_goal", g.id);
   return next;
 }

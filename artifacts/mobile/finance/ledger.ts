@@ -19,6 +19,9 @@ export interface Transaction {
   notes?: string;
   referenceType?: ReferenceType;
   referenceId?: string;
+  /** Historical provenance, not a foreign-key reference. Retained after source deletion. */
+  originType?: ReferenceType;
+  recurringOccurrenceId?: string;
   paymentId?: string;
   transferGroupId?: string;
   direction: MoneyDirection;

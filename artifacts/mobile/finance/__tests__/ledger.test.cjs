@@ -189,7 +189,8 @@ test("domain edit and delete synchronize income without duplicates", () => {
   let next = { ...s, incomes: s.incomes.map(i => ({ ...i, amount: 200 })) };
   next = S.synchronizeDomain(s, next);
   assert.equal(next.transactions.length, 1); assert.equal(balance(next), 1200);
-  next = S.synchronizeDomain(next, { ...next, incomes: [] }); assert.equal(balance(next), 1000);
+  next = S.synchronizeDomain(next, { ...next, incomes: [] }); assert.equal(balance(next), 1200);
+  assert.equal(next.transactions[0].referenceId, undefined);
 });
 test("recurring expense history survives later occurrence and correction", () => {
   let s = S.addManualMovement(base(), manual("expense"));

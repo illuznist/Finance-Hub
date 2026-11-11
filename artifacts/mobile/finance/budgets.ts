@@ -35,7 +35,7 @@ export function budgetStatus(spent: number, limit: number): "normal" | "approach
 }
 function counted(t: NonNullable<FinanceState["transactions"]>[number], p: BudgetPlan): boolean {
   if (t.currency !== p.currency || t.direction !== "out") return false;
-  if (t.type === "expense") return t.referenceType !== "loan";
+  if (t.type === "expense") return t.referenceType !== "loan" && t.originType !== "loan";
   if (["emi_payment", "balloon_payment"].includes(t.type)) return p.includeEMI;
   if (t.type === "loan_repayment") return p.includeLoans || p.categories.some(c => c.limit > 0 && categoryKey(c.name) === categoryKey(t.category));
   return t.type === "savings_contribution" && p.includeSavings;

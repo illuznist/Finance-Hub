@@ -1,4 +1,5 @@
 import type { FinanceState } from "../context/FinanceContext";
+import { validSnapshot } from "./netWorth";
 import { minorUnits, validateTransaction } from "./ledger";
 import { initialPlanning } from "./budgets";
 import { validateRecurring } from "./recurring";
@@ -7,6 +8,7 @@ export const FINANCE_STORAGE_KEY = "@finance_state_v4";
 export const LEGACY_BACKUP_KEY = "@finance_state_v4_pre_ledger_backup";
 export const COMPATIBILITY_BACKUP_KEY = "@finance_state_v4_compatibility_backup";
 export const PLANNING_BACKUP_KEY = "@finance_state_v4_pre_planning_backup";
+export const ANALYTICS_BACKUP_KEY = "@finance_state_v4_pre_analytics_backup";
 export const SCHEMA_VERSION = 2;
 
 type JsonRecord = Record<string, unknown>;
@@ -124,6 +126,12 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
     if (!o.id || occurrenceIds.has(o.id) || !Number.isFinite(o.amount) || o.amount <= 0) throw new Error("Saved recurring occurrence could not be validated.");
     occurrenceIds.add(o.id);
   }
+  if (state.netWorthSnapshots !== undefined) {
+    if (!Array.isArray(state.netWorthSnapshots) || state.netWorthSnapshots.some(s => !validSnapshot(s)) ||
+      new Set(state.netWorthSnapshots.map(s => `${s.currency}:${s.date}`)).size !== state.netWorthSnapshots.length) {
+      throw new Error("Saved net-worth snapshots could not be validated. Original records are retained.");
+    }
+  }
   for (const t of state.transactions ?? []) {
     validateTransaction(t, accounts as unknown as Parameters<typeof validateTransaction>[1]);
   }
@@ -165,8 +173,12 @@ export async function loadFinanceState(storage: FinanceStorage, empty: FinanceSt
     // Preserve the compatibility backup too when this document needs both repairs.
     if (repairedAccounts && await storage.getItem(COMPATIBILITY_BACKUP_KEY) === null) await storage.setItem(COMPATIBILITY_BACKUP_KEY, raw);
     if (await storage.getItem(backupKey) === null) await storage.setItem(backupKey, raw);
-    await storage.setItem(FINANCE_STORAGE_KEY, JSON.stringify(migrated));
   }
+  // Complete every required backup before changing the primary document.
+  if (raw !== null && original?.netWorthSnapshots === undefined && await storage.getItem(ANALYTICS_BACKUP_KEY) === null) {
+    await storage.setItem(ANALYTICS_BACKUP_KEY, raw);
+  }
+  if (raw !== null && (legacy || repairedAccounts || planningUpgrade)) await storage.setItem(FINANCE_STORAGE_KEY, JSON.stringify(migrated));
   return migrated;
 }
 

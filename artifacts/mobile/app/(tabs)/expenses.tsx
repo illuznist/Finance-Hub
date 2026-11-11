@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Modal,
   Platform,
@@ -23,6 +22,8 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type Expense, useFinance } from "@/context/FinanceContext";
+import { newId } from "@/finance/ledger";
+import { financialAlert as Alert } from "@/utils/financialAlert";
 import { ExpensePaymentModal } from "@/components/ExpensePaymentModal";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonExpenseCard } from "@/components/Skeleton";
@@ -116,11 +117,16 @@ function AddExpenseModal({
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("1");
   const [icon, setIcon] = useState("zap");
+  const submissionId = useRef(newId());
+  const submitted = useRef(false);
+  useEffect(() => { if (visible) { submissionId.current = newId(); submitted.current = false; } }, [visible]);
 
   function submit() {
-    if (!name.trim() || !amount.trim()) return;
+    if (submitted.current || !name.trim() || !amount.trim()) return;
+    submitted.current = true;
     const cat = category as string;
-    finance.addExpense({
+    try { finance.addExpense({
+      id: submissionId.current,
       name: name.trim(),
       category: cat,
       amount: parseFloat(amount) || 0,
@@ -128,7 +134,7 @@ function AddExpenseModal({
       isPaid: false,
       iconName: icon,
       color: CATEGORY_COLORS[cat] || "#8B5CF6",
-    });
+    }); } catch (error) { submitted.current = false; toast.show(error instanceof Error ? error.message : "Expense could not be saved."); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     toast.show("Expense added");
     setName("");
@@ -383,7 +389,7 @@ export default function ExpensesScreen() {
               ]);
             }}
             onDelete={() => {
-              Alert.alert("Delete", `Remove ${exp.name}?`, [
+              Alert.alert("Delete", `Remove ${exp.name}?${exp.isPaid ? " Its recorded payment and account balance will be retained. Mark unpaid or reverse it in Transactions to undo a payment." : ""}`, [
                 { text: "Cancel", style: "cancel" },
                 {
                   text: "Delete",
@@ -451,9 +457,7 @@ function ExpenseCard({
       ? "rd"
       : "th";
 
-  return (
-    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-    <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false} rightThreshold={60}>
+  const card = (
     <View style={[styles.expCard, { backgroundColor: colors.card }]}>
       <View style={[styles.expIconWrap, { backgroundColor: expense.color + "20" }]}>
         <Feather name={expense.iconName as any} size={20} color={expense.color} />
@@ -498,8 +502,19 @@ function ExpenseCard({
           </Text>
         </TouchableOpacity>
       </View>
+      {Platform.OS === "web" && <Pressable accessibilityRole="button" accessibilityLabel={`Delete expense ${expense.name}`}
+        onPress={onDelete} hitSlop={8} style={{ padding: 8 }}>
+        <Feather name="trash-2" size={16} color={colors.mutedForeground} />
+      </Pressable>}
     </View>
-    </Swipeable>
+  );
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {Platform.OS === "web" ? card : (
+        <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false} rightThreshold={60}>
+          {card}
+        </Swipeable>
+      )}
     </Animated.View>
   );
 }

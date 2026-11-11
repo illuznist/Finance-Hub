@@ -430,7 +430,7 @@ export default function SettingsScreen() {
                       {c.code}
                     </Text>
                     <Text style={[styles.currencyChipRate, { color: active ? colors.primaryForeground + "AA" : colors.mutedForeground }]}>
-                      {c.code === "SAR" ? "base" : `×${c.code === "INR" ? "22.3" : (1 / (1 / (c.code === "USD" ? 0.2666 : c.code === "AED" ? 0.9788 : c.code === "EUR" ? 0.2451 : c.code === "GBP" ? 0.2108 : 1))).toFixed(2)}`}
+                      {c.name}
                     </Text>
                   </Pressable>
                 );

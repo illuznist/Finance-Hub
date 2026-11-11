@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
+import { financialAlert as Alert } from "@/utils/financialAlert";
 import {
-  Alert,
   FlatList,
   Modal,
   Platform,
@@ -19,6 +19,9 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useFinance } from "@/context/FinanceContext";
+import { selectAnalyticsTransactions } from "@/finance/analytics";
+import type { AnalyticsDrill } from "@/finance/analyticsTypes";
+import { analyticsCurrencies } from "@/finance/netWorth";
 import {
   cashFlow,
   getTransactionsByDateRange,
@@ -99,15 +102,20 @@ export default function TransactionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const finance = useFinance();
-  const { transactions, accounts, currency } = finance;
+  const { transactions, accounts } = finance;
+  const params = useLocalSearchParams<{ currency?: string; from?: string; to?: string; analytics?: string; categoryKey?: string; sourceKey?: string; includeDebt?: string; includeSavings?: string }>();
+  const [currency, setReportCurrency] = useState(params.currency ?? finance.currency);
+  const [reportDrill, setReportDrill] = useState<AnalyticsDrill | null>(
+    params.analytics === "income" || params.analytics === "expenses" || params.analytics === "movements"
+      ? { type: params.analytics, categoryKey: params.categoryKey, sourceKey: params.sourceKey } : null);
   const isWeb = Platform.OS === "web";
   const topInset = isWeb ? 67 : insets.top;
   const bottomInset = isWeb ? 34 : insets.bottom;
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [range, setRange] = useState<RangeFilter>("this");
-  const [customFrom, setCustomFrom] = useState(monthRange(0).from);
-  const [customTo, setCustomTo] = useState(localDate());
+  const [range, setRange] = useState<RangeFilter>(params.from || params.to ? "custom" : "this");
+  const [customFrom, setCustomFrom] = useState(params.from ?? monthRange(0).from);
+  const [customTo, setCustomTo] = useState(params.to ?? localDate());
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<{ mode: "add" } | { mode: "edit"; id: string } | null>(null);
@@ -116,10 +124,6 @@ export default function TransactionsScreen() {
   const currencyTx = useMemo(() => transactions.filter(t => t.currency === currency), [transactions, currency]);
   const accountName = (id?: string) => (id ? accounts.find(a => a.id === id)?.name ?? "Removed account" : "Unassigned");
 
-  const summary = useMemo(() => {
-    const { from, to } = monthRange(0);
-    return cashFlow(getTransactionsByDateRange(currencyTx, from, to), currency);
-  }, [currencyTx, currency]);
 
   const rangeResult = useMemo((): { from: string; to: string } | { error: string } => {
     if (range === "this") return monthRange(0);
@@ -133,16 +137,25 @@ export default function TransactionsScreen() {
   const visible = useMemo(() => {
     if ("error" in rangeResult) return [];
     const q = query.trim().toLowerCase();
-    return getTransactionsByDateRange(currencyTx, rangeResult.from, rangeResult.to)
+    const source = reportDrill ? selectAnalyticsTransactions(finance, { ...rangeResult, currency,
+      includeDebt: params.includeDebt !== "0", includeSavings: params.includeSavings === "1" }, reportDrill)
+      : getTransactionsByDateRange(currencyTx, rangeResult.from, rangeResult.to);
+    return source
       .filter(t => matchesType(t, typeFilter))
       .filter(t => !q || t.description.toLowerCase().includes(q) || t.category.toLowerCase().includes(q))
       .sort((a, b) => (a.date === b.date ? b.createdAt.localeCompare(a.createdAt) : b.date.localeCompare(a.date)));
-  }, [currencyTx, rangeResult, query, typeFilter]);
+  }, [currencyTx, rangeResult, query, typeFilter, reportDrill, finance, currency, params.includeDebt, params.includeSavings]);
+  const summary = useMemo(() => cashFlow(visible, currency), [visible, currency]);
 
   const selected = selectedId ? transactions.find(t => t.id === selectedId) ?? null : null;
 
   const header = (
     <View>
+      {reportDrill && <View style={[styles.notice, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+        <Text style={[styles.small, { color: colors.foreground }]}>Analytics details · {currency} · {reportDrill.type}{reportDrill.categoryKey ? " · Selected category" : ""}{reportDrill.sourceKey ? " · Selected source" : ""}</Text>
+        <Pressable accessibilityRole="button" onPress={() => setReportDrill(null)}><Text style={[styles.small, { color: colors.primary }]}>Show all transaction types</Text></Pressable>
+      </View>}
+      {analyticsCurrencies(finance).length > 1 && <Chips items={analyticsCurrencies(finance).map(c => ({ key: c, label: c }))} value={currency} onChange={setReportCurrency} colors={colors} prefix="transactions-currency" />}
       {finance.reconciliationRequired ? (
         <View style={[styles.notice, { backgroundColor: colors.warningLight, borderColor: colors.warning }]} testID="reconcile-notice">
           <Feather name="alert-circle" size={18} color={colors.warning} />
@@ -159,7 +172,7 @@ export default function TransactionsScreen() {
       ) : null}
 
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="month-summary">
-        <Text style={[styles.label, { color: colors.mutedForeground }]}>This month</Text>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>{"error" in rangeResult ? "Selected period" : `${rangeResult.from} – ${rangeResult.to}`} · {currency}</Text>
         <View style={styles.summaryRow}>
           <SummaryItem label="Money in" value={money(summary.moneyIn, currency)} color={colors.success} colors={colors} />
           <SummaryItem label="Money out" value={money(summary.moneyOut, currency)} color={colors.destructive} colors={colors} />
@@ -278,6 +291,7 @@ export default function TransactionsScreen() {
         <TransactionForm
           key={form.mode === "edit" ? form.id : "add"}
           editing={form.mode === "edit" ? transactions.find(t => t.id === form.id) ?? null : null}
+          initialCurrency={currency}
           colors={colors}
           topInset={topInset}
           bottomInset={bottomInset}
@@ -497,11 +511,12 @@ function FormShell({ title, colors, topInset, bottomInset, onClose, onSave, save
   );
 }
 
-function TransactionForm({ editing, colors, topInset, bottomInset, onClose }: {
-  editing: Transaction | null; colors: Colors; topInset: number; bottomInset: number; onClose: () => void;
+function TransactionForm({ editing, initialCurrency, colors, topInset, bottomInset, onClose }: {
+  editing: Transaction | null; initialCurrency: string; colors: Colors; topInset: number; bottomInset: number; onClose: () => void;
 }) {
   const finance = useFinance();
-  const { accounts, currency, transactions } = finance;
+  const { accounts, transactions } = finance;
+  const currency = editing?.currency ?? initialCurrency;
   const operationId = useRef(newId()).current;
   const saving = useRef(false);
   const isTransferEdit = editing?.type === "transfer";

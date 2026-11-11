@@ -147,8 +147,7 @@ function DonutChart({ progress, color, bgColor }: { progress: number; color: str
         strokeDasharray={CIRCUMFERENCE}
         strokeDashoffset={offset}
         strokeLinecap="round"
-        rotation="-90"
-        origin={`${CENTER}, ${CENTER}`}
+        transform={`rotate(-90 ${CENTER} ${CENTER})`}
       />
     </Svg>
   );
@@ -195,12 +194,13 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <View style={[styles.emiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Open ${emi.name} details`}
         testID={`emi-card-${emi.id}`}
         onPress={onOpen}
-        style={[styles.emiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={{ gap: 12 }}
       >
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleGroup}>
@@ -271,6 +271,7 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
             Deducts {fmt(monthlyAmount, currency)} from {account.name}
           </Text>
         )}
+      </Pressable>
         {!monthlyComplete && (
           <Pressable
             accessibilityRole="button"
@@ -285,7 +286,7 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
             <Text style={[styles.quickPayText, { color: colors.success }]}>Confirm monthly payment</Text>
           </Pressable>
         )}
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }

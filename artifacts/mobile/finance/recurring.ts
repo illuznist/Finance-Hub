@@ -146,7 +146,13 @@ export function synchronizeOccurrences(state: FinanceState): FinanceState {
   const occurrences = state.planning.occurrences.map(o => {
     if (!o.expenseId || o.status === "skipped") return o;
     const expense = state.expenses.find(e => e.id === o.expenseId);
-    const status: RecurringOccurrence["status"] = expense?.isPaid ? "paid" : "pending";
+    const detached = !expense ? state.transactions?.find(t => t.type === "expense" && t.recurringOccurrenceId === o.id) : undefined;
+    const status: RecurringOccurrence["status"] = expense?.isPaid || detached ? "paid" : "pending";
+    if (detached) {
+      if (o.status === status && o.amount === detached.amount && o.name === detached.description && o.category === detached.category && o.accountId === detached.accountId) return o;
+      changed = true;
+      return { ...o, status, amount: detached.amount, name: detached.description, category: detached.category, accountId: detached.accountId, notes: detached.notes };
+    }
     if (status === o.status && (!expense || (o.amount === expense.amount && o.name === expense.name && o.category === expense.category && o.accountId === expense.accountId))) return o;
     changed = true;
     return { ...o, status, ...(expense ? { amount: expense.amount, name: expense.name, category: expense.category, accountId: expense.accountId, notes: expense.notes } : {}) };
