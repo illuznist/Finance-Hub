@@ -9,8 +9,8 @@ import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
 const MORE_ITEMS = [
-  { title: "Wallets", description: "Accounts, income, and savings goals", icon: "credit-card" as const, route: "/wallets" as const },
-  { title: "Analytics", description: "Spending trends and monthly reports", icon: "bar-chart-2" as const, route: "/analytics" as const },
+  { title: "Wallets", description: "Accounts, income, and savings goals", icon: "credit-card" as const, route: "/(tabs)/wallets" as const },
+  { title: "Analytics", description: "Spending trends and monthly reports", icon: "bar-chart-2" as const, route: "/(tabs)/analytics" as const },
 ];
 
 export default function MoreScreen() {
@@ -27,7 +27,7 @@ export default function MoreScreen() {
             key={item.title}
             accessibilityRole="button"
             testID={`more-${item.title.toLowerCase()}`}
-            onPress={() => router.navigate(item.route)}
+            onPress={() => router.push(item.route)}
             style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
