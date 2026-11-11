@@ -21,6 +21,7 @@ import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { HeaderAction } from "@/components/ScreenHeader";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -347,20 +348,28 @@ export default function DashboardScreen() {
               FinanceApp
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open settings"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/settings");
-            }}
-            style={[
-              styles.settingsButton,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <Feather name="settings" size={18} color={colors.primary} />
-          </Pressable>
+          <View style={styles.brandActions}>
+            <HeaderAction
+              icon="bar-chart-2"
+              label="Open analytics"
+              variant="neutral"
+              testID="home-analytics-button"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/analytics");
+              }}
+            />
+            <HeaderAction
+              icon="settings"
+              label="Open settings"
+              variant="neutral"
+              testID="home-settings-button"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/settings");
+              }}
+            />
+          </View>
         </View>
         {/* Greeting row */}
         <View style={[styles.headerRow, styles.headerRowStacked]}>
@@ -823,14 +832,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.15,
   },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  brandActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   headerRow: {
     flexDirection: "row",
     alignItems: "flex-start",

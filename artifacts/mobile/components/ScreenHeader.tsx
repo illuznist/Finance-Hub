@@ -1,8 +1,51 @@
+import { Feather } from "@expo/vector-icons";
 import React, { type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useColors } from "@/hooks/useColors";
+
+type HeaderActionProps = {
+  icon?: React.ComponentProps<typeof Feather>["name"];
+  label: string;
+  onPress: () => void;
+  testID?: string;
+  variant?: "primary" | "neutral";
+};
+
+export function HeaderAction({
+  icon = "plus",
+  label,
+  onPress,
+  testID,
+  variant = "primary",
+}: HeaderActionProps) {
+  const colors = useColors();
+  const primary = variant === "primary";
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID={testID}
+      onPress={onPress}
+      hitSlop={4}
+      style={({ pressed }) => [
+        styles.action,
+        {
+          backgroundColor: primary ? colors.primary : colors.card,
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      <Feather
+        name={icon}
+        size={20}
+        color={primary ? colors.primaryForeground : colors.primary}
+      />
+    </Pressable>
+  );
+}
 
 type ScreenHeaderProps = {
   title: string;
@@ -70,6 +113,13 @@ export function ScreenHeader({
 }
 
 const styles = StyleSheet.create({
+  action: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   container: {
     paddingHorizontal: 20,
     paddingBottom: 8,

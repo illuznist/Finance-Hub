@@ -32,9 +32,9 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
         <NativeTabs.Trigger.Label>Loans</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="more">
-        <NativeTabs.Trigger.Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
-        <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="wallets">
+        <NativeTabs.Trigger.Icon sf={{ default: "wallet.pass", selected: "wallet.pass.fill" }} />
+        <NativeTabs.Trigger.Label>Wallets</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -89,7 +89,7 @@ function ClassicTabLayout() {
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
+              <SymbolView name="house" tintColor={color} size={22} />
             ) : (
               <Feather name="home" size={22} color={color} />
             );
@@ -133,21 +133,21 @@ function ClassicTabLayout() {
             return isIOS ? (
               <SymbolView name="dollarsign.circle" tintColor={color} size={22} />
             ) : (
-              <Feather name="dollar-sign" size={20} color={color} />
+              <Feather name="dollar-sign" size={22} color={color} />
             );
           },
         }}
       />
       <Tabs.Screen
-        name="more"
+        name="wallets"
         options={{
-          title: "More",
+          title: "Wallets",
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (
-              <SymbolView name="ellipsis" tintColor={color} size={22} />
+              <SymbolView name="wallet.pass" tintColor={color} size={22} />
             ) : (
-              <Feather name="more-horizontal" size={21} color={color} />
+              <Feather name="credit-card" size={22} color={color} />
             );
           },
         }}

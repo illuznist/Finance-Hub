@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useFinance } from "@/context/FinanceContext";
-import { ScreenHeader } from "@/components/ScreenHeader";
+import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { generateMonthlyReportHTML } from "@/utils/generateReport";
@@ -261,15 +261,13 @@ export default function AnalyticsScreen() {
         topInset={topPad}
         colors={colors}
         leading={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to More"
+          <HeaderAction
+            icon="arrow-left"
+            label="Back to Home"
+            variant="neutral"
             testID="analytics-back"
-            onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/more")}
-            style={{ minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center" }}
-          >
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </Pressable>
+            onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")}
+          />
         }
         trailing={
           <View style={{ flexDirection: "row", gap: 8 }}>

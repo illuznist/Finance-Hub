@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type Expense, useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonExpenseCard } from "@/components/Skeleton";
-import { ScreenHeader } from "@/components/ScreenHeader";
+import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
@@ -272,16 +272,14 @@ export default function ExpensesScreen() {
         topInset={topPad}
         colors={colors}
         trailing={
-          <Pressable
-            accessibilityLabel="Add expense"
+          <HeaderAction
+            label="Add expense"
+            testID="expense-add-button"
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowAdd(true);
             }}
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="plus" size={20} color={colors.primaryForeground} />
-          </Pressable>
+          />
         }
       />
 
@@ -474,13 +472,6 @@ function ExpenseCard({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  addBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   catChip: {
     paddingHorizontal: 14,
     paddingVertical: 7,

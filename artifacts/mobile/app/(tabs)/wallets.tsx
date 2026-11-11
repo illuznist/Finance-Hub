@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
@@ -407,21 +406,10 @@ export default function WalletsScreen() {
         title="Wallets"
         topInset={topPad}
         colors={colors}
-        leading={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to More"
-            testID="wallets-back"
-            onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/more")}
-            style={{ minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center" }}
-          >
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </Pressable>
-        }
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 + Math.max(insets.bottom, Platform.OS === "web" ? 34 : 0), gap: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 90 + (Platform.OS === "web" ? 34 : 0), gap: 20 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />

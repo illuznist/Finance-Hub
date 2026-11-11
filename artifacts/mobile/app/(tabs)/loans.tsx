@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { ScreenHeader } from "@/components/ScreenHeader";
+import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import {
   type Loan,
   type LoanCategory,
@@ -648,22 +648,23 @@ export default function LoansScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Loans"
-        subtitle={`${finance.activeLoanCount} active · ${finance.settledLoanCount} settled`}
         topInset={topPad}
         colors={colors}
         trailing={
-          <Pressable
-            accessibilityLabel="Add loan"
+          <HeaderAction
+            label="Add loan"
             testID="loan-add-button"
             onPress={() => openForm()}
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="plus" size={20} color={colors.primaryForeground} />
-          </Pressable>
+          />
         }
       />
 
       <ScrollView contentContainerStyle={[styles.pageContent, { paddingBottom: 100 + (Platform.OS === "web" ? 34 : 0) }]} showsVerticalScrollIndicator={false}>
+        {finance.loans.length > 0 && (
+          <Text style={[styles.countSummary, { color: colors.mutedForeground }]}>
+            {finance.activeLoanCount} active · {finance.settledLoanCount} settled
+          </Text>
+        )}
         <View style={[styles.summaryRow, { backgroundColor: colors.card }]}>
           <SummaryItem title="You Owe" amount={finance.outstandingBorrowedBalance} color={colors.warning} />
           <SummaryItem title="Owed to You" amount={finance.outstandingLentBalance} color={colors.success} />
@@ -761,7 +762,7 @@ export default function LoansScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  addButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  countSummary: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular" },
   pageContent: { paddingHorizontal: 20, paddingTop: 16, gap: 12 },
   summaryRow: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6 },
   summaryCard: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 },

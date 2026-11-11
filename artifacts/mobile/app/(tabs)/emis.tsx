@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { ScreenHeader } from "@/components/ScreenHeader";
+import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { type Account, type EMI, type EMIPayment, useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonEMICard } from "@/components/Skeleton";
@@ -823,14 +823,11 @@ export default function EMIsScreen() {
         topInset={topPad}
         colors={colors}
         trailing={
-          <Pressable
-            accessibilityLabel="Add EMI plan"
+          <HeaderAction
+            label="Add EMI plan"
             testID="emi-add-button"
             onPress={() => openEdit()}
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="plus" size={20} color={colors.primaryForeground} />
-          </Pressable>
+          />
         }
       />
 
@@ -953,7 +950,6 @@ export default function EMIsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT, gap: 13 },
   monthlyHero: { borderRadius: 19, padding: 18, minHeight: 133, justifyContent: "center" },
   heroTop: { flexDirection: "row", alignItems: "center", gap: 9 },
