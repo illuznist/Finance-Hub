@@ -25,6 +25,8 @@ import { useToast } from "@/context/ToastContext";
 import { SkeletonEMICard } from "@/components/Skeleton";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
+import { newId } from "@/finance/ledger";
 
 const TAB_BAR_HEIGHT = 90;
 const DONUT_SIZE = 106;
@@ -88,7 +90,8 @@ function balloonRemaining(emi: EMI): number {
 }
 
 function monthlyPaid(emi: EMI): number {
-  return emiPaidCount(emi) * emiMonthly(emi);
+  return (emi.legacyPaidInstallments ?? 0) * emiMonthly(emi) + (emi.paymentHistory ?? [])
+    .filter(p => p.paymentType === "monthly_emi").reduce((sum, p) => sum + p.amount, 0);
 }
 
 function allPaid(emi: EMI): number {
@@ -536,6 +539,9 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   const finance = useFinance();
   const toast = useToast();
   const due = paymentType === "monthly_emi" ? emiMonthly(emi) : balloonRemaining(emi);
+  const [accountId, setAccountId] = useState(editing ? editing.accountId : emi.linkedAccountId);
+  const operationId = useRef(newId());
+  const submitted = useRef(false);
   const [amount, setAmount] = useState(String(editing?.amount ?? due));
   const [date, setDate] = useState(editing?.date ?? todayString());
   const [notes, setNotes] = useState(editing?.notes ?? "");
@@ -543,17 +549,19 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
 
   function submit() {
     const parsedAmount = Number(amount);
+    if (submitted.current) return;
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return setError("Enter a payment amount greater than zero.");
     if (!isValidDate(date)) return setError("Enter a valid date in YYYY-MM-DD format.");
     if (editing) {
-      const ok = finance.updateEMIPayment(emi.id, editing.id, { amount: parsedAmount, date, notes: notes.trim() || undefined });
+      const ok = finance.updateEMIPayment(emi.id, editing.id, { amount: parsedAmount, date, accountId, notes: notes.trim() || undefined });
       if (!ok) return setError(paymentType === "monthly_emi" ? "Monthly payment must match the scheduled EMI amount." : "Payment exceeds the remaining balloon balance.");
       toast.show("Payment updated");
     } else {
-      const ok = finance.recordEMIPayment(emi.id, { amount: parsedAmount, date, paymentType, notes: notes.trim() || undefined });
+      const ok = finance.recordEMIPayment(emi.id, { amount: parsedAmount, date, paymentType, accountId, operationId: operationId.current, notes: notes.trim() || undefined });
       if (!ok) return setError(paymentType === "monthly_emi" ? "Monthly payment must match the scheduled EMI amount." : "Payment exceeds the remaining balloon balance.");
       toast.show(paymentType === "balloon" ? "Balloon payment recorded" : "Monthly payment confirmed");
     }
+    submitted.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
   }
@@ -561,7 +569,8 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.paymentSheet, { backgroundColor: colors.card }]}>
+        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30}
+          style={{ flexGrow: 0, maxHeight: "90%" }} contentContainerStyle={[styles.paymentSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
@@ -574,6 +583,9 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
           </Text>
           <Field label={`Amount (${finance.currency})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="2026-04-10" />
+          {editing?.legacy || editing?.id.startsWith("imported-")
+            ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Historical record: corrections do not change account balances. Review balances in Transactions.</Text>
+            : <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={emi.currency} />}
           <Field label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Add a note" multiline />
           {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
           <View style={styles.modalActions}>
@@ -584,7 +596,7 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
               <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{editing ? "Save correction" : "Record payment"}</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAwareScrollViewCompat>
       </View>
     </Modal>
   );
@@ -761,15 +773,16 @@ export default function EMIsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const activeEMIs = finance.emis.filter(isPlanActive);
-  const completedEMIs = finance.emis.filter((emi) => !isPlanActive(emi));
+  const currencyEMIs = finance.emis.filter(e => (e.currency ?? finance.currency) === finance.currency);
+  const activeEMIs = currencyEMIs.filter(isPlanActive);
+  const completedEMIs = currencyEMIs.filter((emi) => !isPlanActive(emi));
   const totals = useMemo(() => ({
-    monthly: finance.emis.reduce((sum, emi) => sum + (emiPaidCount(emi) < emiDuration(emi) ? emiMonthly(emi) : 0), 0),
-    paid: finance.emis.reduce((sum, emi) => sum + allPaid(emi), 0),
-    monthlyBalance: finance.emis.reduce((sum, emi) => sum + monthlyRemaining(emi), 0),
-    balloonBalance: finance.emis.reduce((sum, emi) => sum + balloonRemaining(emi), 0),
+    monthly: currencyEMIs.reduce((sum, emi) => sum + (emiPaidCount(emi) < emiDuration(emi) ? emiMonthly(emi) : 0), 0),
+    paid: currencyEMIs.reduce((sum, emi) => sum + allPaid(emi), 0),
+    monthlyBalance: currencyEMIs.reduce((sum, emi) => sum + monthlyRemaining(emi), 0),
+    balloonBalance: currencyEMIs.reduce((sum, emi) => sum + balloonRemaining(emi), 0),
     activeCount: activeEMIs.length,
-  }), [finance.emis, activeEMIs.length]);
+  }), [finance.emis, finance.currency, activeEMIs.length]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setShowSkeleton(false), 350);
@@ -798,17 +811,7 @@ export default function EMIsScreen() {
   }
 
   function quickPay(emi: EMI) {
-    const success = finance.recordEMIPayment(emi.id, {
-      amount: emiMonthly(emi),
-      date: todayString(),
-      paymentType: "monthly_emi",
-    });
-    if (success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.show("Monthly payment confirmed");
-    } else {
-      toast.show("Payment could not be recorded");
-    }
+    setPaymentTarget({ emi, type: "monthly_emi" });
   }
 
   function startPayment(type: EMIPayment["paymentType"], editingPayment?: EMIPayment) {

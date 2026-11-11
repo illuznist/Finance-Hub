@@ -437,7 +437,7 @@ export default function SettingsScreen() {
             </View>
             {finance.currency !== "SAR" && (
               <Text style={[styles.currencyNote, { color: colors.mutedForeground }]}>
-                Amounts shown in {finance.currency} at indicative rates. Rates are approximate.
+                Totals include only records in {finance.currency}. Different currencies are never combined without conversion.
               </Text>
             )}
           </View>
@@ -470,7 +470,7 @@ export default function SettingsScreen() {
             ) : (
               <Pressable onPress={() => { setEditingBudget(true); setBudgetValue(finance.monthlyBudget.toString()); }}>
                 <Text style={[styles.budgetValue, { color: colors.primary }]}>
-                  {finance.currency} {(finance.monthlyBudget * finance.currencyRate).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  {finance.currency} {finance.monthlyBudget.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                 </Text>
               </Pressable>
             )}

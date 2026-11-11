@@ -36,6 +36,7 @@ import {
   PIN_SECURE_KEY,
 } from "@/context/AuthContext";
 import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
+import { FinanceStorageGate } from "@/components/FinanceStorageGate";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { TYPOGRAPHY } from "@/constants/typography";
@@ -333,6 +334,7 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="transactions" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="legal" options={{ headerShown: false, presentation: "card" }} />
@@ -367,11 +369,13 @@ export default function RootLayout() {
                 <ToastProvider>
                 <KeyboardProvider>
                   <AuthGate>
+                    <FinanceStorageGate>
                     <OnboardingGate>
                       <PinGate>
                         <RootLayoutNav />
                       </PinGate>
                     </OnboardingGate>
+                    </FinanceStorageGate>
                   </AuthGate>
                 </KeyboardProvider>
                 </ToastProvider>

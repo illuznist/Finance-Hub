@@ -70,11 +70,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const TOTAL_PAGES = 3;
 
   // Page 2 state
-  const [name, setName] = useState("Manzoor");
+  const [name, setName] = useState("");
   const [currency, setCurrency] = useState("SAR");
 
   // Page 3 state
-  const [budget, setBudget] = useState("7500");
+  const [budget, setBudget] = useState("");
 
   function goTo(next: number) {
     setPage(next);
@@ -86,8 +86,9 @@ export default function OnboardingScreen({ onComplete }: Props) {
   }
 
   async function finish() {
-    const finalName = name.trim() || "Manzoor";
-    const finalBudget = parseFloat(budget) || 7500;
+    const finalName = name.trim();
+    const parsedBudget = Number(budget);
+    const finalBudget = Number.isFinite(parsedBudget) && parsedBudget >= 0 ? parsedBudget : 0;
 
     finance.setUserName(finalName);
     finance.setCurrency(currency);

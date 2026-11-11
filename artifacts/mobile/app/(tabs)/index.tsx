@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Alert,
   Image,
   Platform,
   Pressable,
@@ -17,7 +18,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useFinance } from "@/context/FinanceContext";
+import { type Expense, useFinance } from "@/context/FinanceContext";
+import { ExpensePaymentModal } from "@/components/ExpensePaymentModal";
 import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
@@ -27,9 +29,10 @@ const TAB_BAR_HEIGHT = 90;
 
 function greeting(name: string): string {
   const hour = new Date().getHours();
-  if (hour < 12) return `Good Morning, ${name}`;
-  if (hour < 17) return `Good Afternoon, ${name}`;
-  return `Good Evening, ${name}`;
+  const suffix = name.trim() ? `, ${name}` : "";
+  if (hour < 12) return `Good Morning${suffix}`;
+  if (hour < 17) return `Good Afternoon${suffix}`;
+  return `Good Evening${suffix}`;
 }
 
 function fmt(amount: number, currency: string): string {
@@ -276,6 +279,7 @@ export default function DashboardScreen() {
   const finance = useFinance();
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
+  const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
 
   const onRefresh = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -285,14 +289,12 @@ export default function DashboardScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const totalSpent = finance.totalMonthlyExpenses + finance.totalEMIMonthly;
-  const totalSpentPerc = Math.min(1, totalSpent / finance.monthlyBudget);
+  const totalSpentPerc = finance.monthlyBudget > 0 ? Math.min(1, totalSpent / finance.monthlyBudget) : 0;
   const remaining = Math.max(0, finance.remainingBudget);
-  const remainingPerc = Math.min(1, remaining / finance.monthlyBudget);
+  const remainingPerc = finance.monthlyBudget > 0 ? Math.min(1, remaining / finance.monthlyBudget) : 0;
 
   // Savings: sum of savings-type accounts
-  const totalSavings = finance.accounts
-    .filter((a) => a.type === "savings")
-    .reduce((s, a) => s + a.balance, 0);
+  const totalSavings = finance.totalSavings;
   // Savings goal: e.g. 3x monthly income as target
   const savingsGoal = finance.totalMonthlyIncome * 3;
   const savingsPerc = savingsGoal > 0 ? Math.min(1, totalSavings / savingsGoal) : 0;
@@ -349,6 +351,8 @@ export default function DashboardScreen() {
             </Text>
           </View>
           <View style={styles.brandActions}>
+            <HeaderAction icon="list" label="Open transactions" variant="neutral" testID="home-transactions-button"
+              onPress={() => router.push("/transactions")} />
             <HeaderAction
               icon="bar-chart-2"
               label="Open analytics"
@@ -412,20 +416,20 @@ export default function DashboardScreen() {
             <View style={styles.balanceItem}>
               <View style={styles.balanceItemLabelRow}>
                 <Feather name="arrow-down-left" size={13} color="rgba(255,255,255,0.72)" />
-                <Text style={styles.balanceItemLabel}>Monthly income</Text>
+                <Text style={styles.balanceItemLabel}>Received this month</Text>
               </View>
               <Text style={styles.balanceItemValue}>
-                {fmt(finance.totalMonthlyIncome, finance.currency)}
+                {fmt(finance.actualMonthlyIncome, finance.currency)}
               </Text>
             </View>
             <View style={styles.balanceSep} />
             <View style={styles.balanceItem}>
               <View style={styles.balanceItemLabelRow}>
                 <Feather name="arrow-up-right" size={13} color="rgba(255,255,255,0.72)" />
-                <Text style={styles.balanceItemLabel}>Monthly outflow</Text>
+                <Text style={styles.balanceItemLabel}>Paid this month</Text>
               </View>
               <Text style={styles.balanceItemValue}>
-                {fmt(totalSpent, finance.currency)}
+                {fmt(finance.actualMonthlyOutflow, finance.currency)}
               </Text>
             </View>
           </View>
@@ -508,7 +512,7 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.remainingCapRow}>
             <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
-              Spent {fmt(totalSpent, finance.currency)}
+              Planned {fmt(totalSpent, finance.currency)}
             </Text>
             <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
               Budget {fmt(finance.monthlyBudget, finance.currency)}
@@ -540,7 +544,7 @@ export default function DashboardScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {finance.expenses.map((exp, index) => (
+          {finance.expenses.filter(e => (e.currency ?? finance.currency) === finance.currency).map((exp, index) => (
             <ExpenseRow
               key={exp.id}
               name={exp.name}
@@ -550,7 +554,13 @@ export default function DashboardScreen() {
               isPaid={exp.isPaid}
               iconName={exp.iconName}
               color={exp.color}
-              onToggle={() => finance.toggleExpensePaid(exp.id)}
+              onToggle={() => {
+                if (!exp.isPaid) setPayingExpense(exp);
+                else Alert.alert("Mark unpaid?", "This removes the current payment and restores its account balance.", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Mark unpaid", style: "destructive", onPress: () => finance.setExpensePaid(exp.id, false) },
+                ]);
+              }}
               isLast={index === finance.expenses.length - 1}
             />
           ))}
@@ -778,6 +788,7 @@ export default function DashboardScreen() {
             })}
         </View>
       </View>
+      {payingExpense && <ExpensePaymentModal expense={payingExpense} onClose={() => setPayingExpense(null)} />}
     </ScrollView>
   );
 }

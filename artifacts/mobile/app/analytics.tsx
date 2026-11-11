@@ -24,6 +24,8 @@ import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { generateMonthlyReportHTML } from "@/utils/generateReport";
+import { cashFlow, getTransactionsByDateRange, monthRange } from "@/finance/ledger";
+import type { Transaction } from "@/finance/ledger";
 
 function fmt(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
@@ -31,15 +33,15 @@ function fmt(amount: number, currency: string): string {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function generateMonthlyData(baseIncome: number, baseExpense: number) {
-  // Use seeded values derived from the actual income/expense so they're stable
-  return MONTHS.slice(0, 6).map((month, i) => {
-    const seed = (baseIncome + i * 137) % 100;
-    const seed2 = (baseExpense + i * 97) % 100;
+function generateMonthlyData(transactions: Transaction[], currency: string) {
+  return Array.from({ length: 6 }, (_, i) => {
+    const range = monthRange(i - 5);
+    const flow = cashFlow(getTransactionsByDateRange(transactions, range.from, range.to), currency);
+    const [year, month] = range.from.split("-").map(Number);
     return {
-      month,
-      income: Math.round(baseIncome * (0.88 + (seed / 100) * 0.24)),
-      expense: Math.round(baseExpense * (0.72 + (seed2 / 100) * 0.36)),
+      month: `${MONTHS[month - 1]} ${String(year).slice(-2)}`,
+      income: flow.moneyIn,
+      expense: flow.moneyOut,
     };
   });
 }
@@ -52,7 +54,7 @@ function BarChartSection({
   currency: string;
 }) {
   const colors = useColors();
-  const maxVal = Math.max(...data.flatMap((d) => [d.income, d.expense]));
+  const maxVal = Math.max(1, ...data.flatMap((d) => [d.income, d.expense]));
   const BAR_MAX_H = 80;
 
   return (
@@ -70,8 +72,8 @@ function BarChartSection({
       </View>
       <View style={styles.barsRow}>
         {data.map((item) => {
-          const incH = Math.max(4, (item.income / maxVal) * BAR_MAX_H);
-          const expH = Math.max(4, (item.expense / maxVal) * BAR_MAX_H);
+          const incH = (item.income / maxVal) * BAR_MAX_H;
+          const expH = (item.expense / maxVal) * BAR_MAX_H;
           return (
             <View key={item.month} style={styles.barGroup}>
               <View style={[styles.barsWrap, { height: BAR_MAX_H }]}>
@@ -96,15 +98,19 @@ function CategoryBreakdown() {
   const finance = useFinance();
 
   const byCategory: Record<string, number> = {};
-  for (const exp of finance.expenses) {
-    byCategory[exp.category] = (byCategory[exp.category] || 0) + exp.amount;
+  const range = monthRange();
+  for (const t of finance.getTransactionsByDateRange(range.from, range.to)) {
+    if (t.currency === finance.currency && t.direction === "out" && t.type !== "transfer" && t.type !== "adjustment") {
+      byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+    }
   }
   const total = Object.values(byCategory).reduce((s, v) => s + v, 0);
   const sorted = Object.entries(byCategory).sort(([, a], [, b]) => b - a);
 
   return (
     <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[styles.chartTitle, { color: colors.foreground }]}>Category Breakdown</Text>
+      <Text style={[styles.chartTitle, { color: colors.foreground }]}>Recorded spending this month</Text>
+      {sorted.length === 0 && <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>No recorded spending yet.</Text>}
       <View style={{ gap: 12 }}>
         {sorted.map(([cat, amount], i) => {
           const p = total > 0 ? (amount / total) * 100 : 0;
@@ -137,13 +143,13 @@ export default function AnalyticsScreen() {
   const [exporting, setExporting] = useState(false);
 
   const monthlyData = React.useMemo(
-    () => generateMonthlyData(finance.totalMonthlyIncome, finance.totalMonthlyExpenses + finance.totalEMIMonthly),
-    [finance.totalMonthlyIncome, finance.totalMonthlyExpenses, finance.totalEMIMonthly]
+    () => generateMonthlyData(finance.transactions, finance.currency),
+    [finance.transactions, finance.currency]
   );
 
   const savingsRate =
-    finance.totalMonthlyIncome > 0
-      ? Math.max(0, ((finance.totalMonthlyIncome - finance.totalMonthlyExpenses - finance.totalEMIMonthly) / finance.totalMonthlyIncome) * 100)
+    finance.actualMonthlyIncome > 0
+      ? (finance.actualMonthlyNet / finance.actualMonthlyIncome) * 100
       : 0;
 
   const [exportingCSV, setExportingCSV] = useState(false);
@@ -167,8 +173,8 @@ export default function AnalyticsScreen() {
     setExportingCSV(true);
     try {
       const rows: string[][] = [
-        ["Type", "Name", "Category", "Amount (SAR)", "Recurrence", "Due Date", "Status"],
-        ...finance.expenses.map((e) => [
+        ["Type", "Name", "Category", `Amount (${finance.currency})`, "Recurrence", "Due Date", "Status"],
+        ...finance.expenses.filter(e => (e.currency ?? finance.currency) === finance.currency).map((e) => [
           "Expense",
           e.name,
           e.category,
@@ -178,8 +184,8 @@ export default function AnalyticsScreen() {
           e.isPaid ? "Paid" : "Unpaid",
         ]),
         [],
-        ["Type", "Name", "Total Amount (SAR)", "Monthly Amount (SAR)", "Paid Installments", "Total Installments", "Progress %"],
-        ...finance.emis.map((emi) => [
+        ["Type", "Name", `Total Amount (${finance.currency})`, `Monthly Amount (${finance.currency})`, "Paid Installments", "Total Installments", "Progress %"],
+        ...finance.emis.filter(e => (e.currency ?? finance.currency) === finance.currency).map((emi) => [
           "EMI",
           emi.name,
           emi.totalAmount.toString(),
@@ -189,8 +195,13 @@ export default function AnalyticsScreen() {
           Math.round((emi.paidInstallments / emi.totalInstallments) * 100) + "%",
         ]),
         [],
-        ["Type", "Name", "Balance (SAR)", "Account Type"],
-        ...finance.accounts.map((a) => ["Account", a.name, a.balance.toString(), a.type]),
+        ["Type", "Name", `Balance (${finance.currency})`, "Account Type"],
+        ...finance.accounts.filter(a => a.currency === finance.currency).map((a) => ["Account", a.name, a.balance.toString(), a.type]),
+        [],
+        ["Transaction ID", "Type", "Date", "Description", "Category", "Currency", "Amount", "Direction", "Account ID", "Reference ID", "Transfer Group", "Notes"],
+        ...finance.transactions.filter(t => t.currency === finance.currency).map(t => [
+          t.id, t.type, t.date, t.description, t.category, t.currency, String(t.amount), t.direction, t.accountId ?? "", t.referenceId ?? "", t.transferGroupId ?? "", t.notes ?? "",
+        ]),
       ];
 
       const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -228,11 +239,12 @@ export default function AnalyticsScreen() {
         remainingBudget: finance.remainingBudget,
         totalBalance: finance.totalBalance,
         totalSavings: finance.totalSavings,
-        expenses: finance.expenses,
-        emis: finance.emis,
-        accounts: finance.accounts,
-        incomes: finance.incomes,
-        savingsGoals: finance.savingsGoals,
+        expenses: finance.expenses.filter(e => (e.currency ?? finance.currency) === finance.currency),
+        emis: finance.emis.filter(e => (e.currency ?? finance.currency) === finance.currency),
+        accounts: finance.accounts.filter(a => a.currency === finance.currency),
+        incomes: finance.incomes.filter(i => (i.currency ?? finance.currency) === finance.currency),
+        savingsGoals: finance.savingsGoals.filter(g => (g.currency ?? finance.currency) === finance.currency),
+        transactions: finance.transactions,
       });
 
       const { uri } = await Print.printToFileAsync({ html, base64: false });
@@ -338,14 +350,14 @@ export default function AnalyticsScreen() {
                 end={{ x: 1, y: 1 }}
               >
                 <Feather name="trending-up" size={18} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.kpiLabel}>Savings Rate</Text>
+                <Text style={styles.kpiLabel}>Net cash-flow rate</Text>
                 <Text style={styles.kpiValue}>{savingsRate.toFixed(1)}%</Text>
               </LinearGradient>
               <View style={[styles.kpiCard, { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
                 <Feather name="activity" size={18} color={colors.success} />
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Monthly Save</Text>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Recorded net flow</Text>
                 <Text style={[styles.kpiValue, { color: colors.foreground }]}>
-                  {fmt(Math.max(0, finance.remainingBudget), finance.currency)}
+                  {fmt(finance.actualMonthlyNet, finance.currency)}
                 </Text>
               </View>
             </View>
@@ -413,7 +425,7 @@ export default function AnalyticsScreen() {
                     <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>{item.month}</Text>
                     <View style={{ flex: 1 }}>
                       <View style={[styles.monthBars, { backgroundColor: colors.muted }]}>
-                        <View style={[styles.monthBar, { width: `${Math.min(100, (item.income / (item.income + item.expense)) * 100)}%`, backgroundColor: colors.success }]} />
+                        <View style={[styles.monthBar, { width: `${item.income + item.expense > 0 ? Math.min(100, (item.income / (item.income + item.expense)) * 100) : 0}%`, backgroundColor: colors.success }]} />
                       </View>
                     </View>
                     <Text style={[styles.monthSaved, { color: saved >= 0 ? colors.success : colors.destructive }]}>

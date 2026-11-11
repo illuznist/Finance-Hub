@@ -1,4 +1,5 @@
 import type { Account, EMI, Expense, Income, SavingsGoal } from "@/context/FinanceContext";
+import { cashFlow, getTransactionsByDateRange, monthRange, type Transaction } from "@/finance/ledger";
 
 interface ReportData {
   userName: string;
@@ -15,6 +16,7 @@ interface ReportData {
   accounts: Account[];
   incomes: Income[];
   savingsGoals: SavingsGoal[];
+  transactions?: Transaction[];
 }
 
 function fmt(amount: number, currency: string): string {
@@ -30,6 +32,15 @@ export function generateMonthlyReportHTML(data: ReportData): string {
   const now = new Date();
   const monthName = now.toLocaleString("en-US", { month: "long" });
   const year = now.getFullYear();
+  const range = monthRange();
+  const transactions = getTransactionsByDateRange(data.transactions ?? [], range.from, range.to).filter(t => t.currency === data.currency);
+  const recorded = cashFlow(transactions, data.currency);
+  const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  const transactionRows = transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map(t => `<tr>
+    <td>${escape(t.date)}</td><td>${escape(t.description)}</td><td>${escape(t.category)}</td>
+    <td>${escape(data.accounts.find(a => a.id === t.accountId)?.name ?? "Unassigned")}</td>
+    <td style="text-align:right">${t.direction === "in" ? "+" : "-"}${fmt(t.amount, data.currency)}</td>
+  </tr>`).join("");
   const generatedAt = now.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
   const savingsRate =
@@ -321,7 +332,7 @@ export function generateMonthlyReportHTML(data: ReportData): string {
     <!-- Summary KPIs -->
     <div class="summary-grid">
       <div class="summary-card">
-        <div class="label">Total Income</div>
+        <div class="label">Expected Monthly Income</div>
         <div class="value green">${fmt(data.totalMonthlyIncome, data.currency)}</div>
       </div>
       <div class="summary-card">
@@ -329,7 +340,7 @@ export function generateMonthlyReportHTML(data: ReportData): string {
         <div class="value red">${fmt(data.totalMonthlyExpenses + data.totalEMIMonthly, data.currency)}</div>
       </div>
       <div class="summary-card">
-        <div class="label">Net Savings</div>
+        <div class="label">Budget Remaining</div>
         <div class="value ${data.remainingBudget >= 0 ? "blue" : "red"}">${fmt(data.remainingBudget, data.currency)}</div>
       </div>
       <div class="summary-card">
@@ -337,7 +348,7 @@ export function generateMonthlyReportHTML(data: ReportData): string {
         <div class="value">${fmt(data.monthlyBudget, data.currency)}</div>
       </div>
       <div class="summary-card">
-        <div class="label">Savings Rate</div>
+        <div class="label">Estimated Surplus Rate</div>
         <div class="value blue">${savingsRate.toFixed(1)}%</div>
       </div>
       <div class="summary-card">
@@ -348,7 +359,15 @@ export function generateMonthlyReportHTML(data: ReportData): string {
 
     <!-- Cashflow summary -->
     <div class="section">
-      <div class="section-title">Monthly Cashflow</div>
+      <div class="section-title">Recorded Cash Flow This Month</div>
+      <div class="net-row"><span class="net-label">Money in</span><span class="net-value">${fmt(recorded.moneyIn, data.currency)}</span></div>
+      <div class="net-row"><span class="net-label">Money out</span><span class="net-value">${fmt(recorded.moneyOut, data.currency)}</span></div>
+      <div class="net-row"><span class="net-label">Net cash flow</span><span class="net-value">${fmt(recorded.net, data.currency)}</span></div>
+      <p>Transfers and reconciliation are excluded. Earlier unverified history is not estimated.</p>
+      ${transactions.length ? `<table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Account</th><th>Amount</th></tr></thead><tbody>${transactionRows}</tbody></table>` : "<p>No confirmed transactions this month.</p>"}
+    </div>
+    <div class="section">
+      <div class="section-title">Monthly Plan (Not Confirmed Movements)</div>
       <div class="net-row">
         <span class="net-label">Income</span>
         <span class="net-value" style="color:#10B981">+${fmt(data.totalMonthlyIncome, data.currency)}</span>

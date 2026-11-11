@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Modal,
@@ -24,9 +24,13 @@ import {
   useFinance,
 } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
-import { ScreenHeader } from "@/components/ScreenHeader";
+import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
+import { localDate, validLocalDate, newId } from "@/finance/ledger";
+import { router } from "expo-router";
 
 function fmt(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
@@ -112,7 +116,7 @@ function IncomeRow({
           {income.name}
         </Text>
         <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
-          {income.type.charAt(0).toUpperCase() + income.type.slice(1)} · Monthly
+          {income.kind === "received" ? `Received · ${income.date ?? ""}` : `${income.type.charAt(0).toUpperCase() + income.type.slice(1)} · Expected monthly`}
         </Text>
       </View>
       <Text style={[styles.incomeAmount, { color: colors.success }]}>
@@ -138,20 +142,26 @@ function SavingsGoalRow({
 }: {
   goal: SavingsGoal;
   currency: string;
-  onAddFunds: (amount: number) => void;
+  onAddFunds: (amount: number, accountId?: string, date?: string, operationId?: string) => boolean;
   onDelete: () => void;
 }) {
   const colors = useColors();
   const [showAdd, setShowAdd] = useState(false);
   const [addAmt, setAddAmt] = useState("");
+  const [accountId, setAccountId] = useState<string | undefined>();
+  const [date, setDate] = useState(localDate());
+  const contributionId = useRef(newId());
+  const contributionSubmitted = useRef(false);
   const progress = goal.targetAmount > 0 ? Math.min(1, goal.savedAmount / goal.targetAmount) : 0;
   const isComplete = goal.savedAmount >= goal.targetAmount;
 
   function submitAdd() {
+    if (contributionSubmitted.current) return;
     const n = parseFloat(addAmt);
-    if (n > 0) {
+    if (n > 0 && validLocalDate(date)) {
+      contributionSubmitted.current = true;
+      if (!onAddFunds(n, accountId, date, contributionId.current)) { contributionSubmitted.current = false; return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onAddFunds(n);
     }
     setAddAmt("");
     setShowAdd(false);
@@ -179,7 +189,7 @@ function SavingsGoalRow({
         <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
           {!isComplete && (
             <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAdd(!showAdd); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); contributionId.current = newId(); contributionSubmitted.current = false; setShowAdd(!showAdd); }}
               style={[styles.goalAddBtn, { backgroundColor: colors.primary + "18" }]}
             >
               <Feather name="plus" size={14} color={colors.primary} />
@@ -199,6 +209,10 @@ function SavingsGoalRow({
         </View>
       </View>
       {showAdd && (
+        <View>
+        <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
+        <TextInput accessibilityLabel="Contribution date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD"
+          style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} />
         <View style={[styles.addFundsRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <TextInput
             style={[styles.addFundsInput, { color: colors.foreground }]}
@@ -212,6 +226,7 @@ function SavingsGoalRow({
           <TouchableOpacity onPress={submitAdd} style={[styles.addFundsConfirm, { backgroundColor: goal.color }]}>
             <Feather name="check" size={16} color="#FFFFFF" />
           </TouchableOpacity>
+        </View>
         </View>
       )}
     </View>
@@ -227,9 +242,12 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
   const [balance, setBalance] = useState("");
   const [type, setType] = useState<"bank" | "cash" | "savings">("bank");
   const [colorIdx, setColorIdx] = useState(0);
+  const submitted = useRef(false);
+  useEffect(() => { if (visible) submitted.current = false; }, [visible]);
 
   function submit() {
-    if (!name.trim() || !balance.trim()) return;
+    if (submitted.current || !name.trim() || !balance.trim() || !Number.isFinite(Number(balance))) return;
+    submitted.current = true;
     finance.addAccount({ name: name.trim(), balance: parseFloat(balance) || 0, type, color: PALETTE[colorIdx] });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setName(""); setBalance(""); setType("bank"); setColorIdx(0);
@@ -252,7 +270,7 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Balance ({finance.currency})</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Opening balance ({finance.currency})</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={balance} onChangeText={setBalance} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Color</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
@@ -276,11 +294,17 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"salary" | "freelance" | "other">("salary");
+  const [kind, setKind] = useState<"expected" | "received">("expected");
+  const [accountId, setAccountId] = useState<string | undefined>();
+  const [date, setDate] = useState(localDate());
+  const submitted = useRef(false);
+  useEffect(() => { if (visible) submitted.current = false; }, [visible]);
   const INCOME_TYPES = ["salary", "freelance", "other"] as const;
 
   function submit() {
-    if (!name.trim() || !amount.trim()) return;
-    finance.addIncome({ name: name.trim(), amount: parseFloat(amount) || 0, type, color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" });
+    if (submitted.current || !name.trim() || !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !validLocalDate(date)) return;
+    submitted.current = true;
+    finance.addIncome({ name: name.trim(), amount: Number(amount), type, kind, accountId: kind === "received" ? accountId : undefined, date: kind === "received" ? date : undefined, currency: finance.currency, color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setName(""); setAmount(""); setType("salary");
     onClose();
@@ -289,9 +313,16 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30} style={{ flexGrow: 0, maxHeight: "85%" }} contentContainerStyle={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Income</Text>
+          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+            {(["expected", "received"] as const).map(k => <Pressable key={k} onPress={() => setKind(k)} style={[styles.chip, { backgroundColor: kind === k ? colors.primary : colors.muted }]}><Text style={{ color: kind === k ? colors.primaryForeground : colors.foreground }}>{k === "expected" ? "Expected monthly" : "Received"}</Text></Pressable>)}
+          </View>
+          {kind === "received" && <>
+            <PaymentAccountPicker value={accountId} onChange={setAccountId} />
+            <TextInput accessibilityLabel="Income received date" value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
+          </>}
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Monthly Salary" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Type</Text>
@@ -308,7 +339,7 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
             <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text></Pressable>
             <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>Add</Text></Pressable>
           </View>
-        </View>
+        </KeyboardAwareScrollViewCompat>
       </View>
     </Modal>
   );
@@ -396,8 +427,8 @@ export default function WalletsScreen() {
     setTimeout(() => setRefreshing(false), 600);
   }, []);
 
-  const totalGoalTarget = finance.savingsGoals.reduce((s, g) => s + g.targetAmount, 0);
-  const totalGoalSaved = finance.savingsGoals.reduce((s, g) => s + g.savedAmount, 0);
+  const totalGoalTarget = finance.savingsGoals.filter(g => (g.currency ?? finance.currency) === finance.currency).reduce((s, g) => s + g.targetAmount, 0);
+  const totalGoalSaved = finance.savingsGoals.filter(g => (g.currency ?? finance.currency) === finance.currency).reduce((s, g) => s + g.savedAmount, 0);
   const overallGoalProgress = totalGoalTarget > 0 ? totalGoalSaved / totalGoalTarget : 0;
 
   return (
@@ -406,6 +437,7 @@ export default function WalletsScreen() {
         title="Wallets"
         topInset={topPad}
         colors={colors}
+        trailing={<HeaderAction icon="list" label="Transactions and transfers" variant="neutral" testID="wallet-transactions-button" onPress={() => router.push("/transactions")} />}
       />
 
       <ScrollView
@@ -448,8 +480,11 @@ export default function WalletsScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 4 }}>
           {finance.accounts.map((acc) => (
-            <AccountCard key={acc.id} account={acc} currency={finance.currency}
-              onDelete={() => Alert.alert("Remove account?", `Remove ${acc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteAccount(acc.id); toast.show("Account removed"); } }])}
+            <AccountCard key={acc.id} account={acc} currency={acc.currency ?? finance.currency}
+              onDelete={() => {
+                if (finance.transactions.some(t => t.accountId === acc.id)) return Alert.alert("Account has history", "Accounts with transactions cannot be deleted. Use Transactions to review or correct their history.");
+                Alert.alert("Remove account?", `Remove ${acc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteAccount(acc.id); toast.show("Account removed"); } }]);
+              }}
             />
           ))}
           {finance.accounts.length === 0 && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No accounts added</Text>}
@@ -484,8 +519,12 @@ export default function WalletsScreen() {
               <React.Fragment key={goal.id}>
                 <SavingsGoalRow
                   goal={goal}
-                  currency={finance.currency}
-                  onAddFunds={(amount) => { finance.updateSavingsGoal(goal.id, { savedAmount: goal.savedAmount + amount }); toast.show("Funds added"); }}
+                  currency={goal.currency ?? finance.currency}
+                  onAddFunds={(amount, accountId, date, operationId) => {
+                    const ok = finance.contributeToSavings({ id: operationId ?? newId(), goalId: goal.id, amount, accountId, date: date ?? localDate() });
+                    if (ok) toast.show("Contribution recorded");
+                    return ok;
+                  }}
                   onDelete={() =>
                     Alert.alert("Delete goal?", `Remove "${goal.name}"?`, [
                       { text: "Cancel", style: "cancel" },
@@ -516,7 +555,7 @@ export default function WalletsScreen() {
         </View>
         <View style={{ gap: 8 }}>
           {finance.incomes.map((inc) => (
-            <IncomeRow key={inc.id} income={inc} currency={finance.currency}
+            <IncomeRow key={inc.id} income={inc} currency={inc.currency ?? finance.currency}
               onDelete={() => Alert.alert("Remove income?", `Remove ${inc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteIncome(inc.id); toast.show("Income source removed"); } }])}
             />
           ))}
@@ -530,12 +569,11 @@ export default function WalletsScreen() {
 
         {/* Monthly overview */}
         <View style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 16 }]}>Monthly Overview</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 16 }]}>Recorded This Month</Text>
           {[
-            { icon: "arrow-down-circle", label: "Total Income", value: `+${fmt(finance.totalMonthlyIncome, finance.currency)}`, color: colors.success },
-            { icon: "arrow-up-circle", label: "Expenses", value: `-${fmt(finance.totalMonthlyExpenses, finance.currency)}`, color: colors.destructive },
-            { icon: "refresh-cw", label: "EMIs", value: `-${fmt(finance.totalEMIMonthly, finance.currency)}`, color: colors.warning },
-            { icon: "trending-up", label: "Net Savings", value: fmt(Math.max(0, finance.remainingBudget), finance.currency), color: colors.primary },
+            { icon: "arrow-down-circle", label: "Money in", value: `+${fmt(finance.actualMonthlyIncome, finance.currency)}`, color: colors.success },
+            { icon: "arrow-up-circle", label: "Money out", value: `-${fmt(finance.actualMonthlyOutflow, finance.currency)}`, color: colors.destructive },
+            { icon: "trending-up", label: "Net cash flow", value: fmt(finance.actualMonthlyNet, finance.currency), color: colors.primary },
           ].map((row, i, arr) => (
             <React.Fragment key={row.label}>
               <View style={styles.overviewRow}>

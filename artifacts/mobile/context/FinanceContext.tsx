@@ -4,11 +4,16 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react";
+import type { Transaction } from "@/finance/ledger";
+import { cashFlow, getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits } from "@/finance/ledger";
+import { loadFinanceState, createWriteQueue } from "@/finance/migration";
+import * as ledgerService from "@/finance/service";
 
 import {
-  canRecordLoanPayment,
   canUpdateLoanPayment,
   getLoanOutstandingBalance,
   getLoanPaidAmount,
@@ -27,10 +32,15 @@ export interface Expense {
   color: string;
   notes?: string;
   recurrence?: "none" | "weekly" | "monthly" | "yearly";
+  accountId?: string;
+  paidDate?: string;
+  paymentId?: string;
+  currency?: string;
 }
 
 export interface EMI {
   id: string;
+  currency?: string;
   name: string;
   financeProvider?: string;
   category?: "vehicle" | "personal" | "home" | "other" | string;
@@ -46,6 +56,7 @@ export interface EMI {
   autoDebitEnabled?: boolean;
   notes?: string;
   paymentHistory?: EMIPayment[];
+  legacyPaidInstallments?: number;
   createdAt?: string;
   // Legacy names remain persisted so existing screens and reports keep working.
   totalAmount: number;
@@ -65,6 +76,9 @@ export interface EMIPayment {
   paymentType: "monthly_emi" | "balloon";
   status: "paid";
   notes?: string;
+  accountId?: string;
+  operationId?: string;
+  legacy?: boolean;
 }
 
 export type LoanDirection = "borrowed" | "lent";
@@ -77,10 +91,14 @@ export interface LoanPayment {
   amount: number;
   date: string;
   notes?: string;
+  accountId?: string;
+  operationId?: string;
+  legacy?: boolean;
 }
 
 export interface Loan {
   id: string;
+  currency?: string;
   name: string;
   direction: LoanDirection;
   counterpartyName: string;
@@ -98,6 +116,7 @@ export interface Loan {
   iconName?: string;
   payments: LoanPayment[];
   createdAt: string;
+  funding?: { transactionId: string; amount: number; date: string; accountId?: string; notes?: string };
 }
 
 export interface Account {
@@ -106,6 +125,8 @@ export interface Account {
   balance: number;
   type: "bank" | "cash" | "savings";
   color: string;
+  openingBalance?: number;
+  currency?: string;
 }
 
 export interface Income {
@@ -114,6 +135,12 @@ export interface Income {
   amount: number;
   type: "salary" | "freelance" | "other";
   color: string;
+  kind?: "expected" | "received";
+  date?: string;
+  accountId?: string;
+  currency?: string;
+  category?: string;
+  notes?: string;
 }
 
 export interface SavingsGoal {
@@ -124,6 +151,7 @@ export interface SavingsGoal {
   color: string;
   iconName: string;
   deadline?: string;
+  currency?: string;
 }
 
 export interface NotificationSettings {
@@ -140,10 +168,11 @@ export interface SecuritySettings {
   autoLockMinutes: number;
 }
 
-interface FinanceState {
+export interface FinanceState {
   userName: string;
   currency: string;
   monthlyBudget: number;
+  budgetCurrency?: string;
   expenses: Expense[];
   emis: EMI[];
   loans: Loan[];
@@ -154,6 +183,10 @@ interface FinanceState {
   securitySettings: SecuritySettings;
   lastResetMonth: string;
   lastResetYear: string;
+  schemaVersion?: number;
+  transactions?: Transaction[];
+  reconciliationRequired?: boolean;
+  reconciledAccountIds?: string[];
 }
 
 export const EXCHANGE_RATES: Record<string, number> = {
@@ -177,6 +210,19 @@ export const SUPPORTED_CURRENCIES = [
 export const PIN_STORAGE_KEY = "@finance_pin_v1";
 
 interface FinanceContextType extends FinanceState {
+  transactions: Transaction[];
+  storageError: string | null;
+  isReady: boolean;
+  retryStorage: () => void;
+  setExpensePaid: (id: string, paid: boolean, accountId?: string, date?: string) => boolean;
+  addTransaction: (input: Parameters<typeof ledgerService.addManualMovement>[1]) => boolean;
+  deleteTransaction: (id: string) => boolean;
+  updateTransaction: (id: string, changes: ledgerService.TransactionCorrection) => boolean;
+  recordTransfer: (input: Parameters<typeof ledgerService.recordTransfer>[1]) => boolean;
+  reconcileAccountBalance: (input: Parameters<typeof ledgerService.reconcileAccountBalance>[1]) => boolean;
+  contributeToSavings: (input: Parameters<typeof ledgerService.contributeToSavings>[1]) => boolean;
+  getAccountBalance: (id: string) => number;
+  getTransactionsByDateRange: (from: string, to: string) => Transaction[];
   addExpense: (e: Omit<Expense, "id">) => void;
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
@@ -186,18 +232,19 @@ interface FinanceContextType extends FinanceState {
   deleteEMI: (id: string) => void;
   markEMIPaid: (id: string) => void;
   recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
-  updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes">>) => boolean;
+  updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
   deleteEMIPayment: (emiId: string, paymentId: string) => void;
-  addLoan: (loan: Omit<Loan, "id">) => void;
+  addLoan: (loan: Omit<Loan, "id">, funding?: { id: string; accountId?: string; date: string }) => boolean;
   updateLoan: (id: string, updates: Partial<Loan>) => boolean;
   deleteLoan: (id: string) => void;
   recordLoanPayment: (id: string, payment: Omit<LoanPayment, "id">) => boolean;
-  updateLoanPayment: (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes">>) => boolean;
+  updateLoanPayment: (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
   deleteLoanPayment: (loanId: string, paymentId: string) => void;
   addAccount: (a: Omit<Account, "id">) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
   deleteAccount: (id: string) => void;
   addIncome: (i: Omit<Income, "id">) => void;
+  updateIncome: (id: string, updates: Partial<Income>) => void;
   deleteIncome: (id: string) => void;
   addSavingsGoal: (g: Omit<SavingsGoal, "id">) => void;
   updateSavingsGoal: (id: string, updates: Partial<SavingsGoal>) => void;
@@ -210,6 +257,9 @@ interface FinanceContextType extends FinanceState {
   monthResetInfo: { count: number; month: string } | null;
   dismissResetInfo: () => void;
   totalBalance: number;
+  actualMonthlyIncome: number;
+  actualMonthlyOutflow: number;
+  actualMonthlyNet: number;
   totalMonthlyIncome: number;
   totalMonthlyExpenses: number;
   totalEMIMonthly: number;
@@ -241,47 +291,23 @@ const defaultSecuritySettings: SecuritySettings = {
 };
 
 const defaultState: FinanceState = {
-  userName: "Manzoor",
+  userName: "",
   currency: "SAR",
-  monthlyBudget: 7500,
-  expenses: [
-    { id: "exp1", name: "Rent", category: "Housing", amount: 2000, dueDate: 1, isPaid: true, iconName: "home", color: "#0D9488", recurrence: "monthly" },
-    { id: "exp2", name: "Netflix", category: "Entertainment", amount: 55, dueDate: 5, isPaid: false, iconName: "tv", color: "#E50914", recurrence: "monthly" },
-    { id: "exp3", name: "Spotify", category: "Entertainment", amount: 22, dueDate: 8, isPaid: false, iconName: "music", color: "#1DB954", recurrence: "monthly" },
-    { id: "exp4", name: "STC Internet", category: "Bills", amount: 180, dueDate: 10, isPaid: true, iconName: "wifi", color: "#0891B2", recurrence: "monthly" },
-    { id: "exp5", name: "Electricity", category: "Bills", amount: 280, dueDate: 12, isPaid: false, iconName: "zap", color: "#F59E0B", recurrence: "monthly" },
-    { id: "exp6", name: "Gym Membership", category: "Health", amount: 120, dueDate: 15, isPaid: true, iconName: "activity", color: "#EF4444", recurrence: "monthly" },
-    { id: "exp7", name: "Car Insurance", category: "Transport", amount: 350, dueDate: 20, isPaid: false, iconName: "shield", color: "#3B82F6", recurrence: "yearly" },
-    { id: "exp8", name: "Amazon Prime", category: "Entertainment", amount: 40, dueDate: 25, isPaid: false, iconName: "package", color: "#FF9900", recurrence: "monthly" },
-  ],
-  emis: [
-    { id: "emi1", name: "iPhone 15 Pro", totalAmount: 4000, monthlyAmount: 500, totalInstallments: 8, paidInstallments: 1, startMonth: "2025-01", dueDayOfMonth: 7, color: "#0D9488", iconName: "smartphone" },
-    { id: "emi2", name: "MacBook Pro", totalAmount: 5600, monthlyAmount: 700, totalInstallments: 8, paidInstallments: 3, startMonth: "2024-11", dueDayOfMonth: 7, color: "#0891B2", iconName: "monitor" },
-    { id: "emi3", name: "Toyota Corolla", totalAmount: 120000, monthlyAmount: 2000, totalInstallments: 60, paidInstallments: 12, startMonth: "2024-02", dueDayOfMonth: 1, color: "#10B981", iconName: "truck" },
-  ],
+  monthlyBudget: 0,
+  expenses: [],
+  emis: [],
   loans: [],
-  accounts: [
-    { id: "acc1", name: "Al Rajhi Bank", balance: 12500, type: "bank", color: "#0D9488" },
-    { id: "acc2", name: "SNB Account", balance: 5200, type: "bank", color: "#0891B2" },
-    { id: "acc3", name: "Cash Wallet", balance: 800, type: "cash", color: "#F59E0B" },
-    { id: "acc4", name: "Savings Account", balance: 18000, type: "savings", color: "#10B981" },
-  ],
-  incomes: [
-    { id: "inc1", name: "Monthly Salary", amount: 15000, type: "salary", color: "#0D9488" },
-    { id: "inc2", name: "Freelance Design", amount: 3000, type: "freelance", color: "#10B981" },
-  ],
-  savingsGoals: [
-    { id: "sg1", name: "Emergency Fund", targetAmount: 45000, savedAmount: 18000, color: "#0D9488", iconName: "shield", deadline: "2026-06" },
-    { id: "sg2", name: "Vacation", targetAmount: 10000, savedAmount: 3500, color: "#0891B2", iconName: "map", deadline: "2025-12" },
-    { id: "sg3", name: "New Car", targetAmount: 60000, savedAmount: 12000, color: "#F59E0B", iconName: "truck" },
-  ],
+  accounts: [],
+  incomes: [],
+  savingsGoals: [],
   notificationSettings: defaultNotificationSettings,
   securitySettings: defaultSecuritySettings,
   lastResetMonth: "",
   lastResetYear: "",
+  schemaVersion: 1,
+  transactions: [],
+  reconciliationRequired: false,
 };
-
-const STORAGE_KEY = "@finance_state_v4";
 
 const FinanceContext = createContext<FinanceContextType | null>(null);
 
@@ -315,13 +341,7 @@ function isStoredDateValid(value: string): boolean {
 
 function normalizeLoan(loan: Loan): Loan {
   const payments = Array.isArray(loan.payments)
-    ? loan.payments.filter((payment) =>
-      payment &&
-      typeof payment.id === "string" &&
-      Number.isFinite(Number(payment.amount)) &&
-      Number(payment.amount) > 0 &&
-      isStoredDateValid(payment.date)
-    ).map((payment) => ({ ...payment, amount: Number(payment.amount) }))
+    ? loan.payments
     : [];
   return {
     ...loan,
@@ -351,27 +371,11 @@ function normalizeEMI(emi: EMI): EMI {
   const startDate = emi.startDate || `${emi.startMonth || currentYYYYMM()}-01`;
   const firstPaymentDate = emi.firstPaymentDate || dateAtMonthOffset(startDate, 0, dueDay);
   let paymentHistory = Array.isArray(emi.paymentHistory)
-    ? emi.paymentHistory.filter((payment) =>
-      payment &&
-      typeof payment.id === "string" &&
-      Number.isFinite(Number(payment.amount)) &&
-      Number(payment.amount) >= 0 &&
-      (payment.paymentType === "monthly_emi" || payment.paymentType === "balloon")
-    )
+    ? emi.paymentHistory
     : [];
 
-  // Older records stored only a paid-installment count. Preserve it as dated
-  // history entries so future corrections/deletions remain fully trackable.
-  if (!Array.isArray(emi.paymentHistory) && paidCount > 0) {
-    paymentHistory = Array.from({ length: paidCount }, (_, index) => ({
-      id: `imported-${emi.id}-${index + 1}`,
-      amount: monthlyAmount,
-      date: dateAtMonthOffset(firstPaymentDate, index, dueDay),
-      paymentType: "monthly_emi" as const,
-      status: "paid" as const,
-      notes: "Imported from previous installment count",
-    }));
-  }
+  // A count is not evidence of actual dates or account movements.
+  const legacyPaidInstallments = emi.legacyPaidInstallments ?? (!Array.isArray(emi.paymentHistory) ? paidCount : 0);
 
   const monthlyPaidCount = paymentHistory.filter((payment) => payment.paymentType === "monthly_emi").length;
   const financedAmount = Number(emi.financedAmount ?? emi.totalAmount) || 0;
@@ -390,11 +394,12 @@ function normalizeEMI(emi: EMI): EMI {
     autoDebitEnabled: Boolean(emi.autoDebitEnabled),
     notes: emi.notes || "",
     paymentHistory,
+    legacyPaidInstallments,
     createdAt: emi.createdAt || new Date().toISOString(),
     totalAmount: financedAmount,
     monthlyAmount,
     totalInstallments,
-    paidInstallments: Math.min(totalInstallments, monthlyPaidCount || (paymentHistory.length === 0 ? paidCount : 0)),
+    paidInstallments: Math.min(totalInstallments, monthlyPaidCount + legacyPaidInstallments),
     startMonth: startDate.slice(0, 7),
     dueDayOfMonth: dueDay,
   };
@@ -408,35 +413,26 @@ function monthLabel(yyyymm: string): string {
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<FinanceState>(defaultState);
   const [monthResetInfo, setMonthResetInfo] = useState<{ count: number; month: string } | null>(null);
+  const stateRef = useRef(state);
+  const loadingRef = useRef(false);
+  const readyRef = useRef(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const queueWrite = useMemo(() => createWriteQueue(AsyncStorage), []);
 
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      let loaded: FinanceState = defaultState;
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as Partial<FinanceState>;
-          loaded = {
-            ...defaultState,
-            ...parsed,
-            emis: (Array.isArray(parsed.emis) ? parsed.emis : defaultState.emis).map(normalizeEMI),
-            loans: (Array.isArray(parsed.loans) ? parsed.loans : defaultState.loans).map(normalizeLoan),
-            notificationSettings: { ...defaultNotificationSettings, ...(parsed.notificationSettings ?? {}) },
-            securitySettings: { ...defaultSecuritySettings, ...(parsed.securitySettings ?? {}) },
-            lastResetMonth: parsed.lastResetMonth ?? "",
-            lastResetYear: parsed.lastResetYear ?? "",
-          };
-        } catch {
-          // ignore parse errors, keep defaults
-        }
-      }
+  const load = useCallback(() => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    loadFinanceState(AsyncStorage, defaultState).then(async (initial) => {
+      let loaded = initial;
       loaded = { ...loaded, emis: loaded.emis.map(normalizeEMI) };
       loaded = { ...loaded, loans: loaded.loans.map(normalizeLoan) };
 
       // ── Recurring reset engine ──
       const nowMonth = currentYYYYMM();
       const nowYear = currentYYYY();
-      const isNewMonth = loaded.lastResetMonth !== nowMonth;
-      const isNewYear = loaded.lastResetYear !== nowYear;
+      const isNewMonth = Boolean(loaded.lastResetMonth) && loaded.lastResetMonth !== nowMonth;
+      const isNewYear = Boolean(loaded.lastResetYear) && loaded.lastResetYear !== nowYear;
 
       if (isNewMonth || isNewYear) {
         let resetCount = 0;
@@ -448,7 +444,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             (rec === "yearly" && isNewYear);
           if (shouldReset) {
             resetCount++;
-            return { ...e, isPaid: false };
+            return { ...e, isPaid: false, paymentId: undefined, paidDate: undefined };
           }
           return e;
         });
@@ -464,23 +460,60 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           setMonthResetInfo({ count: resetCount, month: monthLabel(nowMonth) });
         }
       }
+      loaded = { ...loaded, lastResetMonth: nowMonth, lastResetYear: nowYear };
 
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loaded)).catch(() => {});
+      await queueWrite(loaded);
+      stateRef.current = loaded;
+      readyRef.current = true;
+      setIsReady(true);
+      setStorageError(null);
       setState(loaded);
-    });
-  }, []);
+    }).catch(error => {
+      readyRef.current = false;
+      setStorageError(error instanceof Error ? error.message : "Saved data could not be loaded. No records have been reset.");
+    }).finally(() => { loadingRef.current = false; });
+  }, [queueWrite]);
+  useEffect(load, [load]);
 
   const persist = useCallback((updater: (prev: FinanceState) => FinanceState) => {
-    setState((prev) => {
-      const next = updater(prev);
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
+    if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before making changes.");
+    const next = ledgerService.synchronizeDomain(stateRef.current, updater(stateRef.current));
+    stateRef.current = next;
+    setState(next);
+    queueWrite(next).catch(error => {
+      readyRef.current = false;
+      setStorageError(`Changes could not be saved: ${error instanceof Error ? error.message : "storage unavailable"}. Keep the app open and retry.`);
     });
-  }, []);
+  }, [queueWrite]);
+
+  const retryStorage = useCallback(() => {
+    if (!readyRef.current && stateRef.current === defaultState) { load(); return; }
+    queueWrite(stateRef.current).then(() => {
+      readyRef.current = true; setStorageError(null);
+    }).catch(error => setStorageError(String(error)));
+  }, [load, queueWrite]);
+
+  const attempt = useCallback((updater: (prev: FinanceState) => FinanceState): boolean => {
+    try { persist(updater); return true; }
+    catch { return false; }
+  }, [persist]);
+  const setExpensePaid = useCallback((id: string, paid: boolean, accountId?: string, date?: string) =>
+    attempt(prev => ledgerService.setExpensePayment(prev, id, { paid, accountId, date, operationId: newId() })), [attempt]);
+  const addTransaction = useCallback((input: Parameters<typeof ledgerService.addManualMovement>[1]) =>
+    attempt(prev => ledgerService.addManualMovement(prev, input)), [attempt]);
+  const deleteTransaction = useCallback((id: string) => attempt(prev => ledgerService.deleteTransaction(prev, id)), [attempt]);
+  const updateTransaction = useCallback((id: string, changes: ledgerService.TransactionCorrection) =>
+    attempt(prev => ledgerService.updateTransaction(prev, id, changes)), [attempt]);
+  const recordTransfer = useCallback((input: Parameters<typeof ledgerService.recordTransfer>[1]) =>
+    attempt(prev => ledgerService.recordTransfer(prev, input)), [attempt]);
+  const reconcileAccountBalance = useCallback((input: Parameters<typeof ledgerService.reconcileAccountBalance>[1]) =>
+    attempt(prev => ledgerService.reconcileAccountBalance(prev, input)), [attempt]);
+  const contributeToSavings = useCallback((input: Parameters<typeof ledgerService.contributeToSavings>[1]) =>
+    attempt(prev => ledgerService.contributeToSavings(prev, input)), [attempt]);
 
   const addExpense = useCallback(
     (e: Omit<Expense, "id">) =>
-      persist((prev) => ({ ...prev, expenses: [...prev.expenses, { ...e, id: genId() }] })),
+      persist((prev) => ({ ...prev, expenses: [...prev.expenses, { ...e, currency: e.currency ?? prev.currency, id: genId() }] })),
     [persist]
   );
   const updateExpense = useCallback(
@@ -500,7 +533,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addEMI = useCallback(
     (e: Omit<EMI, "id">) =>
-      persist((prev) => ({ ...prev, emis: [...prev.emis, normalizeEMI({ ...e, id: genId() })] })),
+      persist((prev) => ({ ...prev, emis: [...prev.emis, normalizeEMI({ ...e, currency: e.currency ?? prev.currency, id: genId() })] })),
     [persist]
   );
   const updateEMI = useCallback(
@@ -517,7 +550,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
   const markEMIPaid = useCallback(
     (id: string) => {
-      const emi = state.emis.find((item) => item.id === id);
+      const emi = stateRef.current.emis.find((item) => item.id === id);
       if (!emi || emi.paidInstallments >= emi.totalInstallments) return;
       const paymentHistory = emi.paymentHistory ?? [];
       const hasRemaining = emi.totalInstallments - emi.paidInstallments > 0;
@@ -533,6 +566,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
                 id: genId(),
                 amount: item.monthlyEMIAmount ?? item.monthlyAmount,
                 date: formatLocalDate(new Date()),
+                accountId: item.linkedAccountId,
                 paymentType: "monthly_emi",
                 status: "paid",
               },
@@ -546,44 +580,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
   const recordEMIPayment = useCallback(
     (id: string, payment: Omit<EMIPayment, "id" | "status">): boolean => {
-      const emi = state.emis.find((item) => item.id === id);
-      if (!emi || !Number.isFinite(payment.amount) || payment.amount <= 0 || !isStoredDateValid(payment.date)) return false;
-      if (payment.paymentType === "monthly_emi") {
-        const scheduled = emi.monthlyEMIAmount ?? emi.monthlyAmount;
-        if (emi.paidInstallments >= emi.totalInstallments || Math.abs(payment.amount - scheduled) > 0.01) return false;
-      } else {
-        const balloonTotal = emi.balloonPaymentAmount ?? 0;
-        const balloonPaid = (emi.paymentHistory ?? [])
-          .filter((item) => item.paymentType === "balloon")
-          .reduce((sum, item) => sum + item.amount, 0);
-        if (balloonTotal <= 0 || payment.amount > balloonTotal - balloonPaid + 0.01) return false;
-      }
-      persist((prev) => ({
-        ...prev,
-        emis: prev.emis.map((item) => {
-          if (item.id !== id) return item;
-          const nextPayments = [
-            ...(item.paymentHistory ?? []),
-            { ...payment, id: genId(), status: "paid" as const },
-          ];
-          const count = nextPayments.filter((entry) => entry.paymentType === "monthly_emi").length;
-          return normalizeEMI({ ...item, paymentHistory: nextPayments, paidInstallments: count });
-        }),
-      }));
-      return true;
+      try { return attempt(prev => ledgerService.confirmEMIPayment(prev, id, payment)); }
+      catch { return false; }
     },
-    [persist, state.emis]
+    [attempt]
   );
   const updateEMIPayment = useCallback(
-    (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes">>): boolean => {
-      const emi = state.emis.find((item) => item.id === emiId);
+    (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>): boolean => {
+      const emi = stateRef.current.emis.find((item) => item.id === emiId);
       const payment = emi?.paymentHistory?.find((item) => item.id === paymentId);
       if (!emi || !payment) return false;
       const nextAmount = updates.amount ?? payment.amount;
       const nextDate = updates.date ?? payment.date;
       if (!Number.isFinite(nextAmount) || nextAmount <= 0 || !isStoredDateValid(nextDate)) return false;
       const history = emi.paymentHistory ?? [];
-      if (payment.paymentType === "monthly_emi" && Math.abs(nextAmount - (emi.monthlyEMIAmount ?? emi.monthlyAmount)) > 0.01) return false;
       if (payment.paymentType === "balloon") {
         const otherBalloonPayments = history
           .filter((item) => item.paymentType === "balloon" && item.id !== paymentId)
@@ -626,14 +636,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addLoan = useCallback(
-    (loan: Omit<Loan, "id">) =>
-      persist((prev) => ({ ...prev, loans: [...prev.loans, normalizeLoan({ ...loan, id: genId() })] })),
-    [persist]
+    (loan: Omit<Loan, "id">, funding?: { id: string; accountId?: string; date: string }) =>
+      attempt((prev) => {
+        const id = funding?.id ?? genId();
+        if (prev.loans.some(l => l.id === id)) return prev;
+        const next = { ...prev, loans: [...prev.loans, normalizeLoan({ ...loan, currency: loan.currency ?? prev.currency, id })] };
+        return funding ? ledgerService.recordLoanFunding(next, id, funding) : next;
+      }),
+    [attempt]
   );
   const updateLoan = useCallback(
     (id: string, updates: Partial<Loan>): boolean => {
-      const existing = state.loans.find((loan) => loan.id === id);
+      const existing = stateRef.current.loans.find((loan) => loan.id === id);
       if (!existing) return false;
+      if ((existing.payments.length > 0 || existing.funding) && updates.direction && updates.direction !== existing.direction) return false;
       const updated = normalizeLoan({ ...existing, ...updates, id, payments: existing.payments });
       if (wouldLoanBeOverpaid(updated)) return false;
       persist((prev) => ({ ...prev, loans: prev.loans.map((loan) => loan.id === id ? updated : loan) }));
@@ -647,22 +663,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
   const recordLoanPayment = useCallback(
     (id: string, payment: Omit<LoanPayment, "id">): boolean => {
-      const loan = state.loans.find((item) => item.id === id);
-      if (!loan || !Number.isFinite(payment.amount) || payment.amount <= 0 || !isStoredDateValid(payment.date)) return false;
-      if (!canRecordLoanPayment(loan, payment.amount)) return false;
-      persist((prev) => ({
-        ...prev,
-        loans: prev.loans.map((item) => item.id === id
-          ? normalizeLoan({ ...item, payments: [...item.payments, { ...payment, id: genId() }] })
-          : item),
-      }));
-      return true;
+      try { return attempt(prev => ledgerService.confirmLoanPayment(prev, id, payment)); }
+      catch { return false; }
     },
-    [persist, state.loans]
+    [attempt]
   );
   const updateLoanPayment = useCallback(
-    (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes">>): boolean => {
-      const loan = state.loans.find((item) => item.id === loanId);
+    (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>): boolean => {
+      const loan = stateRef.current.loans.find((item) => item.id === loanId);
       const existing = loan?.payments.find((payment) => payment.id === paymentId);
       if (!loan || !existing) return false;
       const amount = updates.amount ?? existing.amount;
@@ -697,36 +705,48 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addAccount = useCallback(
     (a: Omit<Account, "id">) =>
-      persist((prev) => ({ ...prev, accounts: [...prev.accounts, { ...a, id: genId() }] })),
+      persist((prev) => ({ ...prev, accounts: [...prev.accounts, { ...a, id: genId(), openingBalance: a.openingBalance ?? a.balance, currency: a.currency ?? prev.currency }] })),
     [persist]
   );
   const updateAccount = useCallback(
     (id: string, updates: Partial<Account>) =>
-      persist((prev) => ({ ...prev, accounts: prev.accounts.map((acc) => (acc.id === id ? { ...acc, ...updates } : acc)) })),
+      persist((prev) => {
+        if (updates.currency || updates.balance !== undefined || updates.openingBalance !== undefined) {
+          throw new Error("Use balance reconciliation to correct an existing account. Opening balances and currency are protected.");
+        }
+        return { ...prev, accounts: prev.accounts.map((acc) => (acc.id === id ? { ...acc, ...updates, id } : acc)) };
+      }),
     [persist]
   );
   const deleteAccount = useCallback(
-    (id: string) => persist((prev) => ({
+    (id: string) => persist((prev) => {
+      if ((prev.transactions ?? []).some(t => t.accountId === id)) throw new Error("This account has transactions. Keep it to preserve financial history.");
+      return ({
       ...prev,
       accounts: prev.accounts.filter((a) => a.id !== id),
       emis: prev.emis.map((emi) => emi.linkedAccountId === id ? { ...emi, linkedAccountId: undefined } : emi),
-    })),
+    }); }),
     [persist]
   );
 
   const addIncome = useCallback(
     (i: Omit<Income, "id">) =>
-      persist((prev) => ({ ...prev, incomes: [...prev.incomes, { ...i, id: genId() }] })),
+      persist((prev) => ({ ...prev, incomes: [...prev.incomes, { ...i, currency: i.currency ?? prev.currency, id: genId() }] })),
     [persist]
   );
   const deleteIncome = useCallback(
     (id: string) => persist((prev) => ({ ...prev, incomes: prev.incomes.filter((i) => i.id !== id) })),
     [persist]
   );
+  const updateIncome = useCallback(
+    (id: string, updates: Partial<Income>) => persist(prev => ({
+      ...prev, incomes: prev.incomes.map(i => i.id === id ? { ...i, ...updates, id } : i),
+    })), [persist]
+  );
 
   const addSavingsGoal = useCallback(
     (g: Omit<SavingsGoal, "id">) =>
-      persist((prev) => ({ ...prev, savingsGoals: [...prev.savingsGoals, { ...g, id: genId() }] })),
+      persist((prev) => ({ ...prev, savingsGoals: [...prev.savingsGoals, { ...g, currency: g.currency ?? prev.currency, id: genId() }] })),
     [persist]
   );
   const updateSavingsGoal = useCallback(
@@ -743,7 +763,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setMonthlyBudget = useCallback(
-    (amount: number) => persist((prev) => ({ ...prev, monthlyBudget: amount })),
+    (amount: number) => persist((prev) => ({ ...prev, monthlyBudget: amount, budgetCurrency: prev.currency })),
     [persist]
   );
   const setUserName = useCallback(
@@ -771,29 +791,53 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const dismissResetInfo = useCallback(() => setMonthResetInfo(null), []);
 
-  const totalBalance = state.accounts.reduce((s, a) => s + a.balance, 0);
-  const totalMonthlyIncome = state.incomes.reduce((s, i) => s + i.amount, 0);
-  const totalMonthlyExpenses = state.expenses.reduce((s, e) => s + e.amount, 0);
+  const accounts = useMemo(() => ledgerService.balances(state), [state]);
+  const transactions = state.transactions ?? [];
+  const range = monthRange();
+  const monthlyCashFlow = cashFlow(getTransactionsByDateRange(transactions, range.from, range.to), state.currency);
+  const totalBalance = accounts.filter(a => a.currency === state.currency).reduce((s, a) => s + minorUnits(a.balance), 0) / 100;
+  const totalMonthlyIncome = state.incomes.filter(i => i.kind !== "received" && (i.currency ?? state.currency) === state.currency).reduce((s, i) => s + i.amount, 0);
+  const totalMonthlyExpenses = state.expenses.filter(e => (e.currency ?? state.currency) === state.currency).reduce((s, e) => s + e.amount, 0);
   const totalEMIMonthly = state.emis.reduce(
-    (s, e) => (e.paidInstallments < e.totalInstallments ? s + (e.monthlyEMIAmount ?? e.monthlyAmount) : s),
+    (s, e) => ((e.currency ?? state.currency) === state.currency && e.paidInstallments < e.totalInstallments ? s + (e.monthlyEMIAmount ?? e.monthlyAmount) : s),
     0
   );
-  const remainingBudget = state.monthlyBudget - totalMonthlyExpenses - totalEMIMonthly;
-  const totalSavings = state.accounts.filter((a) => a.type === "savings").reduce((s, a) => s + a.balance, 0);
+  const effectiveBudget = (state.budgetCurrency ?? state.currency) === state.currency ? state.monthlyBudget : 0;
+  const remainingBudget = effectiveBudget - totalMonthlyExpenses - totalEMIMonthly;
+  const totalSavings = accounts.filter((a) => a.type === "savings" && a.currency === state.currency).reduce((s, a) => s + minorUnits(a.balance), 0) / 100;
   const currencyRate = EXCHANGE_RATES[state.currency] ?? 1;
-  const totalPrincipalBorrowed = state.loans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + loan.principalAmount, 0);
-  const totalPrincipalLent = state.loans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + loan.principalAmount, 0);
-  const totalRepaidOnBorrowedLoans = state.loans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + getLoanPaidAmount(loan), 0);
-  const totalReceivedOnLentLoans = state.loans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + getLoanPaidAmount(loan), 0);
-  const outstandingBorrowedBalance = state.loans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + getLoanOutstandingBalance(loan), 0);
-  const outstandingLentBalance = state.loans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + getLoanOutstandingBalance(loan), 0);
-  const activeLoanCount = state.loans.filter((loan) => !isLoanSettled(loan)).length;
-  const settledLoanCount = state.loans.length - activeLoanCount;
+  const currencyLoans = state.loans.filter(l => (l.currency ?? state.currency) === state.currency);
+  const totalPrincipalBorrowed = currencyLoans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + loan.principalAmount, 0);
+  const totalPrincipalLent = currencyLoans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + loan.principalAmount, 0);
+  const totalRepaidOnBorrowedLoans = currencyLoans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + getLoanPaidAmount(loan), 0);
+  const totalReceivedOnLentLoans = currencyLoans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + getLoanPaidAmount(loan), 0);
+  const outstandingBorrowedBalance = currencyLoans.filter((loan) => loan.direction === "borrowed").reduce((sum, loan) => sum + getLoanOutstandingBalance(loan), 0);
+  const outstandingLentBalance = currencyLoans.filter((loan) => loan.direction === "lent").reduce((sum, loan) => sum + getLoanOutstandingBalance(loan), 0);
+  const activeLoanCount = currencyLoans.filter((loan) => !isLoanSettled(loan)).length;
+  const settledLoanCount = currencyLoans.length - activeLoanCount;
 
   return (
     <FinanceContext.Provider
       value={{
         ...state,
+        monthlyBudget: effectiveBudget,
+        accounts,
+        transactions,
+        storageError,
+        isReady,
+        retryStorage,
+        setExpensePaid,
+        addTransaction,
+        deleteTransaction,
+        updateTransaction,
+        recordTransfer,
+        reconcileAccountBalance,
+        contributeToSavings,
+        getAccountBalance: (id) => {
+          const account = ledgerService.ledgerAccounts(state).find(a => a.id === id);
+          return account ? getAccountBalance(account, transactions) : 0;
+        },
+        getTransactionsByDateRange: (from, to) => getTransactionsByDateRange(transactions, from, to),
         addExpense,
         updateExpense,
         deleteExpense,
@@ -815,6 +859,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         updateAccount,
         deleteAccount,
         addIncome,
+        updateIncome,
         deleteIncome,
         addSavingsGoal,
         updateSavingsGoal,
@@ -827,6 +872,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         monthResetInfo,
         dismissResetInfo,
         totalBalance,
+        actualMonthlyIncome: monthlyCashFlow.moneyIn,
+        actualMonthlyOutflow: monthlyCashFlow.moneyOut,
+        actualMonthlyNet: monthlyCashFlow.net,
         totalMonthlyIncome,
         totalMonthlyExpenses,
         totalEMIMonthly,

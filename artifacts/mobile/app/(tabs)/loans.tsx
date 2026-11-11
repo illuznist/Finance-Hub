@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
   Modal,
@@ -28,6 +28,8 @@ import {
 import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
+import { newId } from "@/finance/ledger";
 import {
   getLoanObligation,
   getLoanOutstandingBalance,
@@ -244,10 +246,16 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [initialAmount, setInitialAmount] = useState("");
   const [initialDate, setInitialDate] = useState(todayString());
+  const [recordFunding, setRecordFunding] = useState(false);
+  const [fundingAccount, setFundingAccount] = useState<string | undefined>();
+  const [fundingDate, setFundingDate] = useState(todayString());
+  const fundingOperationId = useRef(newId());
+  const formSubmitted = useRef(false);
   const [showRepaymentDetails, setShowRepaymentDetails] = useState(Boolean(editing?.totalRepaymentAmount || editing?.interestRate || editing?.plannedPaymentAmount));
   const [error, setError] = useState("");
 
   function submit() {
+    if (formSubmitted.current) return;
     const parsedPrincipal = Number(principal);
     const parsedTotal = totalRepayment.trim() ? Number(totalRepayment) : undefined;
     const parsedRate = interestRate.trim() ? Number(interestRate) : undefined;
@@ -269,6 +277,7 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
       return setError("Initial payment must be zero or within the repayment obligation.");
     }
     if (!editing && initial > 0 && !validDate(initialDate)) return setError("Enter a valid initial payment date.");
+    if (recordFunding && !validDate(fundingDate)) return setError("Enter a valid principal movement date.");
     if (editing) {
       const alreadyPaid = getLoanPaidAmount(editing);
       if (alreadyPaid > obligation + 0.005) return setError("Repayment obligation cannot be less than payments already recorded.");
@@ -299,9 +308,13 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
       const payments: LoanPayment[] = initial > 0
         ? [{ id: idForPayment(), amount: initial, date: initialDate, notes: "Initial amount recorded" }]
         : [];
-      finance.addLoan({ ...loanData, payments, createdAt: new Date().toISOString() });
+      const ok = finance.addLoan({ ...loanData, payments, createdAt: new Date().toISOString() }, recordFunding ? {
+        id: fundingOperationId.current, accountId: fundingAccount, date: fundingDate,
+      } : undefined);
+      if (!ok) return setError("Loan could not be saved. Check the account and amounts.");
       toast.show("Loan added");
     }
+    formSubmitted.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
   }
@@ -343,6 +356,18 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
             <ChoiceChips value={category} options={CATEGORIES} onChange={setCategory} />
             <LoanField label={`Principal amount (${finance.currency})`} value={principal} onChangeText={setPrincipal} placeholder="10000" numeric testID="loan-principal-input" />
             <LoanField label="Start date (YYYY-MM-DD)" value={startDate} onChangeText={setStartDate} placeholder="2026-01-01" />
+            {!editing && <>
+              <Pressable onPress={() => setRecordFunding(v => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: recordFunding }}
+                style={{ flexDirection: "row", gap: 10, paddingVertical: 14, alignItems: "center" }}>
+                <Feather name={recordFunding ? "check-square" : "square"} size={20} color={colors.primary} />
+                <Text style={{ color: colors.foreground, flex: 1, fontFamily: "Inter_500Medium", fontSize: 14 }}>Record principal {direction === "borrowed" ? "received" : "lent"}</Text>
+              </Pressable>
+              <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Leave off if this money was already included in your account's opening balance.</Text>
+              {recordFunding && <>
+                <PaymentAccountPicker value={fundingAccount} onChange={setFundingAccount} />
+                <LoanField label="Principal movement date" value={fundingDate} onChangeText={setFundingDate} />
+              </>}
+            </>}
             <LoanField label="Expected end date (optional)" value={expectedEndDate} onChangeText={setExpectedEndDate} placeholder="2026-12-31" />
 
             <Pressable
@@ -406,16 +431,21 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
   const [date, setDate] = useState(editing?.date ?? todayString());
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState("");
+  const [accountId, setAccountId] = useState(editing?.accountId);
+  const operationId = useRef(newId());
+  const submitted = useRef(false);
   const directionVerb = loan.direction === "borrowed" ? "repayment" : "amount received";
 
   function submit() {
+    if (submitted.current) return;
     const parsedAmount = Number(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return setError("Amount must be greater than zero.");
     if (!validDate(date)) return setError("Enter a valid date in YYYY-MM-DD format.");
     const success = editing
-      ? finance.updateLoanPayment(loan.id, editing.id, { amount: parsedAmount, date, notes: notes.trim() || undefined })
-      : finance.recordLoanPayment(loan.id, { amount: parsedAmount, date, notes: notes.trim() || undefined });
+      ? finance.updateLoanPayment(loan.id, editing.id, { amount: parsedAmount, date, accountId, notes: notes.trim() || undefined })
+      : finance.recordLoanPayment(loan.id, { amount: parsedAmount, date, accountId, operationId: operationId.current, notes: notes.trim() || undefined });
     if (!success) return setError("This amount cannot exceed the outstanding balance.");
+    submitted.current = true;
     toast.show(editing ? "Payment updated" : loan.direction === "borrowed" ? "Repayment recorded" : "Amount received recorded");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
@@ -424,7 +454,8 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.paymentSheet, { backgroundColor: colors.card }]}>
+        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30}
+          style={{ flexGrow: 0, maxHeight: "90%" }} contentContainerStyle={[styles.paymentSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editing ? "Edit payment" : loan.direction === "borrowed" ? "Record repayment" : "Record amount received"}</Text>
@@ -435,6 +466,9 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
           </Text>
           <LoanField label={`Amount (${finance.currency})`} value={amount} onChangeText={setAmount} placeholder="500" numeric testID="loan-payment-amount" />
           <LoanField label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder={todayString()} />
+          {editing?.legacy
+            ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Historical record: corrections do not change account balances. Review balances in Transactions.</Text>
+            : <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={loan.currency} />}
           <LoanField label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Add a note" multiline />
           {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
           <View style={styles.modalActions}>
@@ -445,7 +479,7 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
               <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{editing ? "Save changes" : loan.direction === "borrowed" ? "Record repayment" : "Record amount received"}</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAwareScrollViewCompat>
       </View>
     </Modal>
   );
@@ -607,10 +641,11 @@ export default function LoansScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const visibleLoans = useMemo(() => finance.loans.filter((loan) => {
+    if ((loan.currency ?? finance.currency) !== finance.currency) return false;
     if (filter === "borrowed" || filter === "lent") return loan.direction === filter;
     if (filter === "settled") return isLoanSettled(loan);
     return true;
-  }), [finance.loans, filter]);
+  }), [finance.loans, filter, finance.currency]);
 
   function openForm(loan?: Loan) {
     setSelectedLoan(undefined);

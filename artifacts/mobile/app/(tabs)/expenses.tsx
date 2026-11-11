@@ -22,6 +22,7 @@ import Swipeable, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type Expense, useFinance } from "@/context/FinanceContext";
+import { ExpensePaymentModal } from "@/components/ExpensePaymentModal";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonExpenseCard } from "@/components/Skeleton";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
@@ -243,6 +244,7 @@ export default function ExpensesScreen() {
   const toast = useToast();
   const [selectedCat, setSelectedCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
+  const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
@@ -260,6 +262,7 @@ export default function ExpensesScreen() {
   }, []);
 
   const filtered = finance.expenses
+    .filter(e => (e.currency ?? finance.currency) === finance.currency)
     .filter((e) => selectedCat === "All" || e.category === selectedCat)
     .filter((e) => !search.trim() || e.name.toLowerCase().includes(search.trim().toLowerCase()));
 
@@ -351,8 +354,11 @@ export default function ExpensesScreen() {
             expense={exp}
             currency={finance.currency}
             onToggle={() => {
-              finance.toggleExpensePaid(exp.id);
-              toast.show(exp.isPaid ? "Marked as due" : "Marked as paid", "info");
+              if (!exp.isPaid) setPayingExpense(exp);
+              else Alert.alert("Mark unpaid?", "This removes the current payment and restores its account balance.", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Mark unpaid", style: "destructive", onPress: () => finance.setExpensePaid(exp.id, false) },
+              ]);
             }}
             onDelete={() => {
               Alert.alert("Delete", `Remove ${exp.name}?`, [
@@ -370,6 +376,7 @@ export default function ExpensesScreen() {
       )}
 
       <AddExpenseModal visible={showAdd} onClose={() => setShowAdd(false)} />
+      {payingExpense && <ExpensePaymentModal expense={payingExpense} onClose={() => setPayingExpense(null)} />}
     </View>
   );
 }
