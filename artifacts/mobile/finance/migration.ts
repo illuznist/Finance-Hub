@@ -3,6 +3,7 @@ import { minorUnits, validateTransaction } from "./ledger";
 
 export const FINANCE_STORAGE_KEY = "@finance_state_v4";
 export const LEGACY_BACKUP_KEY = "@finance_state_v4_pre_ledger_backup";
+export const COMPATIBILITY_BACKUP_KEY = "@finance_state_v4_compatibility_backup";
 export const SCHEMA_VERSION = 1;
 
 type JsonRecord = Record<string, unknown>;
@@ -60,7 +61,14 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
   const accounts = records(parsed.accounts, "accounts").map(a => {
     if (typeof a.balance !== "number") throw new Error("An account has an unreadable balance. Reconciliation is required.");
     minorUnits(a.balance);
-    const openingBalance = legacy ? a.balance : a.openingBalance;
+    // An intermediate app revision saved schemaVersion before all accounts
+    // acquired openingBalance. The saved balance is the starting snapshot:
+    // schema 1 never mutates this field when
+    // posting ledger entries (current balances are derived in the service).
+    // Use that same compatibility rule even when ledger entries already exist.
+    const openingBalance = legacy || a.openingBalance === undefined
+      ? a.balance
+      : a.openingBalance;
     if (typeof openingBalance !== "number") throw new Error("An account is missing its opening balance.");
     minorUnits(openingBalance);
     return { ...a, openingBalance, currency: typeof a.currency === "string" ? a.currency : currency };
@@ -127,8 +135,12 @@ export interface FinanceStorage {
 export async function loadFinanceState(storage: FinanceStorage, empty: FinanceState): Promise<FinanceState> {
   const raw = await storage.getItem(FINANCE_STORAGE_KEY);
   const migrated = migrateFinanceState(raw, empty);
-  if (raw !== null && (JSON.parse(raw) as { schemaVersion?: number }).schemaVersion !== SCHEMA_VERSION) {
-    if (await storage.getItem(LEGACY_BACKUP_KEY) === null) await storage.setItem(LEGACY_BACKUP_KEY, raw);
+  const original = raw === null ? null : JSON.parse(raw) as Partial<FinanceState>;
+  const legacy = original !== null && original.schemaVersion !== SCHEMA_VERSION;
+  const repairedAccounts = original?.accounts?.some(a => a.openingBalance === undefined) ?? false;
+  if (raw !== null && (legacy || repairedAccounts)) {
+    const backupKey = legacy ? LEGACY_BACKUP_KEY : COMPATIBILITY_BACKUP_KEY;
+    if (await storage.getItem(backupKey) === null) await storage.setItem(backupKey, raw);
     await storage.setItem(FINANCE_STORAGE_KEY, JSON.stringify(migrated));
   }
   return migrated;

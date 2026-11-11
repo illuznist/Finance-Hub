@@ -103,3 +103,9 @@ Physical-phone persistence, native navigation, native keyboard behavior, native 
 - A failed device storage write cannot guarantee durability until retry succeeds; the app explicitly warns and retains pending in-memory state.
 - Existing notifications remain schedules/reminders, never payment confirmations.
 - Report sharing/PDF and notifications have native-only capabilities; browser verification does not establish their physical-device behavior.
+
+## Startup compatibility correction
+
+Some intermediate schema-1 documents were saved before accounts acquired their explicit `openingBalance` field. Loading them previously displayed the protection screen. The compatibility migration now supplies the missing field from the retained starting-balance snapshot, matching the existing service's balance ownership, without clearing accounts or ledger entries. It backs up the exact pre-repair document separately. New account forms default to zero.
+
+Verification: **47 unit tests passed**, mobile TypeScript and whitespace checks passed. A signed-in browser regression removed only the missing field from a disposable test account, reloaded successfully, confirmed its balance and existing transactions were preserved, checked the exact backup, reloaded again, and created a new account at the untouched zero default. This does not establish physical-device persistence.

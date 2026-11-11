@@ -338,3 +338,29 @@ test("migration rejects inconsistent transfer pairs without discarding data", ()
 test("manual API rejects orphan EMI and loan payments", () => {
   assert.throws(() => S.addManualMovement(base(), { ...manual(), type: "emi_payment" }), /own payment flow/);
 });
+test("intermediate schema accounts missing opening balances load without losing saved balances", async () => {
+  const intermediate = base();
+  delete intermediate.accounts[0].openingBalance;
+  delete intermediate.accounts[1].openingBalance;
+  const raw = JSON.stringify(intermediate);
+  const data = new Map([[M.FINANCE_STORAGE_KEY, raw]]);
+  const storage = { getItem: async k => data.get(k) ?? null, setItem: async (k, v) => { data.set(k, v); } };
+  const loaded = await M.loadFinanceState(storage, empty());
+  assert.equal(balance(loaded), 1000); assert.equal(balance(loaded, "b"), 100);
+  assert.equal(data.get(M.COMPATIBILITY_BACKUP_KEY), raw);
+  assert.deepEqual(await M.loadFinanceState(storage, empty()), loaded);
+});
+test("zero-balance accounts missing opening balances recover as zero", () => {
+  const state = base(); state.accounts.forEach(a => { a.balance = 0; delete a.openingBalance; });
+  const loaded = M.migrateFinanceState(JSON.stringify(state), empty());
+  assert.ok(loaded.accounts.every(a => a.openingBalance === 0));
+  assert.equal(balance(loaded), 0); assert.equal(loaded.transactions.length, 0);
+});
+test("schema 1 opening repair preserves existing ledger impact exactly once", () => {
+  const state = S.addManualMovement(base(), manual());
+  delete state.accounts[0].openingBalance;
+  const loaded = M.migrateFinanceState(JSON.stringify(state), empty());
+  assert.equal(loaded.accounts[0].openingBalance, 1000);
+  assert.equal(balance(loaded), 1150);
+  assert.deepEqual(loaded.transactions, state.transactions);
+});

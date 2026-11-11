@@ -239,18 +239,18 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
   const colors = useColors();
   const finance = useFinance();
   const [name, setName] = useState("");
-  const [balance, setBalance] = useState("");
+  const [balance, setBalance] = useState("0");
   const [type, setType] = useState<"bank" | "cash" | "savings">("bank");
   const [colorIdx, setColorIdx] = useState(0);
   const submitted = useRef(false);
   useEffect(() => { if (visible) submitted.current = false; }, [visible]);
 
   function submit() {
-    if (submitted.current || !name.trim() || !balance.trim() || !Number.isFinite(Number(balance))) return;
+    if (submitted.current || !name.trim() || !Number.isFinite(Number(balance))) return;
     submitted.current = true;
     finance.addAccount({ name: name.trim(), balance: parseFloat(balance) || 0, type, color: PALETTE[colorIdx] });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setName(""); setBalance(""); setType("bank"); setColorIdx(0);
+    setName(""); setBalance("0"); setType("bank"); setColorIdx(0);
     onClose();
   }
 
