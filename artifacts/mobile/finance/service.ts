@@ -71,8 +71,66 @@ export function detachReference(state: FinanceState, referenceType: ReferenceTyp
   return { ...state, transactions: (state.transactions ?? []).map(t =>
     t.referenceType === referenceType && t.referenceId === referenceId ? {
       ...t, originType: t.originType ?? referenceType, recurringOccurrenceId: t.recurringOccurrenceId ?? occurrenceId,
-      referenceType: undefined, referenceId: undefined, paymentId: undefined,
+      referenceType: undefined, referenceId: undefined,
     } : t) };
+}
+
+type DomainSourceType = "expense" | "income" | "emi" | "loan" | "savings_goal";
+
+/** Remove a domain record while keeping its actual ledger history and stable payment identity. */
+export function deleteDomainSource(state: FinanceState, type: DomainSourceType, id: string): FinanceState {
+  if (type === "expense") {
+    if (!state.expenses.some(x => x.id === id)) return state;
+    const next = detachReference(state, type, id);
+    return { ...next, expenses: next.expenses.filter(x => x.id !== id) };
+  }
+  if (type === "income") {
+    if (!state.incomes.some(x => x.id === id)) return state;
+    const next = detachReference(state, type, id);
+    return { ...next, incomes: next.incomes.filter(x => x.id !== id) };
+  }
+  if (type === "emi") {
+    if (!state.emis.some(x => x.id === id)) return state;
+    const next = detachReference(state, type, id);
+    return { ...next, emis: next.emis.filter(x => x.id !== id) };
+  }
+  if (type === "loan") {
+    if (!state.loans.some(x => x.id === id)) return state;
+    const next = detachReference(state, type, id);
+    return { ...next, loans: next.loans.filter(x => x.id !== id) };
+  }
+  if (!state.savingsGoals.some(x => x.id === id)) return state;
+  const next = detachReference(state, type, id);
+  return { ...next, savingsGoals: next.savingsGoals.filter(x => x.id !== id) };
+}
+
+/** Delete an account only when no confirmed or historical payment points to it. */
+export function deleteAccount(state: FinanceState, accountId: string): FinanceState {
+  if (!state.accounts.some(a => a.id === accountId)) return state;
+  const legacyOrphans =
+    state.expenses.some(e => e.accountId === accountId && (e.isPaid || !!e.paymentId || !!e.paidDate)) ||
+    state.incomes.some(i => i.accountId === accountId && i.kind !== "expected") ||
+    state.emis.some(e => (e.paymentHistory ?? []).some(p => p.accountId === accountId)) ||
+    state.loans.some(l => l.funding?.accountId === accountId || l.payments.some(p => p.accountId === accountId)) ||
+    (state.planning?.occurrences ?? []).some(o => o.status === "paid" && o.accountId === accountId);
+  if ((state.transactions ?? []).some(t => t.accountId === accountId) || legacyOrphans) {
+    throw new Error("This account is referenced by transactions or payment history. Keep it to preserve financial history.");
+  }
+  const planning = state.planning ? {
+    ...state.planning,
+    recurring: state.planning.recurring.map(r => r.accountId === accountId ? { ...r, accountId: undefined } : r),
+    occurrences: state.planning.occurrences.map(o =>
+      o.status !== "paid" && o.accountId === accountId ? { ...o, accountId: undefined } : o),
+  } : undefined;
+  return {
+    ...state,
+    accounts: state.accounts.filter(a => a.id !== accountId),
+    expenses: state.expenses.map(e => !e.isPaid && !e.paymentId && !e.paidDate && e.accountId === accountId ? { ...e, accountId: undefined } : e),
+    incomes: state.incomes.map(i => i.kind === "expected" && i.accountId === accountId ? { ...i, accountId: undefined } : i),
+    emis: state.emis.map(e => e.linkedAccountId === accountId ? { ...e, linkedAccountId: undefined } : e),
+    loans: state.loans.map(l => l.linkedAccountId === accountId ? { ...l, linkedAccountId: undefined } : l),
+    planning,
+  };
 }
 
 export function saveIncome(state: FinanceState, income: Income): FinanceState {
@@ -191,6 +249,100 @@ export function deleteTransaction(state: FinanceState, id: string): FinanceState
 }
 
 export type TransactionCorrection = Pick<Transaction, "amount" | "date" | "description" | "category" | "accountId" | "notes">;
+
+function paymentCorrection<T extends { amount: number; date: string; notes?: string; accountId?: string }>(
+  payment: T,
+  changes: Partial<Pick<T, "amount" | "date" | "notes" | "accountId">>
+): Pick<T, "amount" | "date" | "notes" | "accountId"> {
+  return {
+    amount: changes.amount ?? payment.amount,
+    date: changes.date ?? payment.date,
+    notes: "notes" in changes ? changes.notes : payment.notes,
+    accountId: "accountId" in changes ? changes.accountId : payment.accountId,
+  };
+}
+
+function validateLegacyPayment(state: FinanceState, amount: number, date: string, accountId: string | undefined, currency: string): void {
+  positiveMoney(amount);
+  if (!validLocalDate(date)) throw new Error("Enter a valid payment date.");
+  if (accountId === undefined) return;
+  const account = state.accounts.find(a => a.id === accountId);
+  if (!account) throw new Error("The selected account no longer exists.");
+  if ((account.currency ?? state.currency) !== currency) throw new Error("Select an account in the payment currency.");
+}
+
+/** A legacy record without a ledger event may be corrected as history only; it never creates cash. */
+export function updateEMIPayment(state: FinanceState, emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>): FinanceState {
+  const emi = state.emis.find(e => e.id === emiId);
+  const payment = emi?.paymentHistory?.find(p => p.id === paymentId);
+  if (!emi || !payment) throw new Error("EMI payment no longer exists.");
+  const corrected = paymentCorrection(payment, updates);
+  validateLegacyPayment(state, corrected.amount, corrected.date, corrected.accountId, emi.currency ?? state.currency);
+  const history = emi.paymentHistory ?? [];
+  if (payment.paymentType === "balloon") {
+    const other = history.filter(p => p.paymentType === "balloon" && p.id !== paymentId)
+      .reduce((sum, p) => sum + minorUnits(p.amount), 0);
+    if (other + minorUnits(corrected.amount) > minorUnits(emi.balloonPaymentAmount ?? 0)) throw new Error("Amount exceeds the remaining balloon balance.");
+  }
+  const transaction = (state.transactions ?? []).find(t =>
+    t.referenceType === "emi" && t.referenceId === emiId && t.paymentId === paymentId);
+  if (transaction) {
+    if (payment.paymentType === "monthly_emi" && minorUnits(corrected.amount) !== minorUnits(emi.monthlyEMIAmount ?? emi.monthlyAmount)) {
+      throw new Error("Monthly payment must match the scheduled EMI amount.");
+    }
+    if (transaction.type !== (payment.paymentType === "balloon" ? "balloon_payment" : "emi_payment")) throw new Error("The linked EMI transaction has the wrong type.");
+    return updateTransaction(state, transaction.id, {
+      ...corrected, description: transaction.description, category: transaction.category,
+    });
+  }
+  if (!payment.legacy && !payment.id.startsWith("imported-")) throw new Error("No linked EMI transaction exists. Payment history was preserved.");
+  return { ...state, emis: state.emis.map(e => e.id === emiId ? {
+    ...e, paymentHistory: history.map(p => p.id === paymentId ? { ...p, ...corrected } : p),
+  } : e) };
+}
+
+export function updateLoanPayment(state: FinanceState, loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>): FinanceState {
+  const loan = state.loans.find(l => l.id === loanId);
+  const payment = loan?.payments.find(p => p.id === paymentId);
+  if (!loan || !payment) throw new Error("Loan payment no longer exists.");
+  const corrected = paymentCorrection(payment, updates);
+  validateLegacyPayment(state, corrected.amount, corrected.date, corrected.accountId, loan.currency ?? state.currency);
+  const newTotal = loan.payments.filter(p => p.id !== paymentId).reduce((sum, p) => sum + minorUnits(p.amount), minorUnits(corrected.amount));
+  if (newTotal > minorUnits(loan.totalRepaymentAmount ?? loan.principalAmount)) throw new Error("Amount exceeds the remaining loan balance.");
+  const transaction = (state.transactions ?? []).find(t =>
+    t.referenceType === "loan" && t.referenceId === loanId && t.paymentId === paymentId);
+  if (transaction) {
+    if (transaction.type !== (loan.direction === "borrowed" ? "loan_repayment" : "loan_received")) throw new Error("The linked loan transaction has the wrong type.");
+    return updateTransaction(state, transaction.id, {
+      ...corrected, description: transaction.description, category: transaction.category,
+    });
+  }
+  if (!payment.legacy) throw new Error("No linked loan transaction exists. Payment history was preserved.");
+  return { ...state, loans: state.loans.map(l => l.id === loanId ? {
+    ...l, payments: l.payments.map(p => p.id === paymentId ? { ...p, ...corrected } : p),
+  } : l) };
+}
+
+export function reverseEMIPayment(state: FinanceState, emiId: string, paymentId: string): FinanceState {
+  const payment = state.emis.find(e => e.id === emiId)?.paymentHistory?.find(p => p.id === paymentId);
+  if (!payment) throw new Error("EMI payment no longer exists.");
+  const transaction = (state.transactions ?? []).find(t =>
+    t.referenceType === "emi" && t.referenceId === emiId && t.paymentId === paymentId);
+  if (!transaction) throw new Error("No linked transaction exists; the historical EMI record was kept.");
+  if (transaction.type !== (payment.paymentType === "balloon" ? "balloon_payment" : "emi_payment")) throw new Error("The linked EMI transaction has the wrong type.");
+  return deleteTransaction(state, transaction.id);
+}
+
+export function reverseLoanPayment(state: FinanceState, loanId: string, paymentId: string): FinanceState {
+  const loan = state.loans.find(l => l.id === loanId);
+  if (!loan?.payments.some(p => p.id === paymentId)) throw new Error("Loan payment no longer exists.");
+  const transaction = (state.transactions ?? []).find(t =>
+    t.referenceType === "loan" && t.referenceId === loanId && t.paymentId === paymentId);
+  if (!transaction) throw new Error("No linked transaction exists; the historical loan record was kept.");
+  if (transaction.type !== (loan.direction === "borrowed" ? "loan_repayment" : "loan_received")) throw new Error("The linked loan transaction has the wrong type.");
+  return deleteTransaction(state, transaction.id);
+}
+
 export function updateTransaction(state: FinanceState, id: string, changes: TransactionCorrection): FinanceState {
   const t = (state.transactions ?? []).find(entry => entry.id === id);
   if (!t) throw new Error("Transaction no longer exists.");
@@ -223,6 +375,10 @@ export function updateTransaction(state: FinanceState, id: string, changes: Tran
   } else if (t.referenceType === "emi") {
     const emi = next.emis.find(e => e.id === t.referenceId);
     if (!emi?.paymentHistory?.some(p => p.id === t.paymentId)) throw new Error("The linked EMI payment is missing.");
+    const payment = emi.paymentHistory.find(p => p.id === t.paymentId)!;
+    if (payment.paymentType === "monthly_emi" && minorUnits(changes.amount) !== minorUnits(emi.monthlyEMIAmount ?? emi.monthlyAmount)) {
+      throw new Error("Monthly payment must match the scheduled EMI amount.");
+    }
     if (t.type === "balloon_payment") {
       const other = emi.paymentHistory.filter(p => p.paymentType === "balloon" && p.id !== t.paymentId).reduce((sum, p) => sum + minorUnits(p.amount), 0);
       if (other + minorUnits(changes.amount) > minorUnits(emi.balloonPaymentAmount ?? 0)) throw new Error("Amount exceeds the remaining balloon balance.");

@@ -513,8 +513,13 @@ export default function WalletsScreen() {
           {finance.accounts.map((acc) => (
             <AccountCard key={acc.id} account={acc} currency={acc.currency ?? finance.currency}
               onDelete={() => {
-                if (finance.transactions.some(t => t.accountId === acc.id)) return Alert.alert("Account has history", "Accounts with transactions cannot be deleted. Use Transactions to review or correct their history.");
-                Alert.alert("Remove account?", `Remove ${acc.name}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteAccount(acc.id); toast.show("Account removed"); } }]);
+                Alert.alert("Remove account?", `Remove ${acc.name}? Its opening balance will leave FinanceApp totals. Existing transactions and payment-history records keep an account from being removed. This does not close or change your actual bank account.`, [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Remove account", style: "destructive", onPress: () => {
+                    if (finance.deleteAccount(acc.id)) toast.show("Account removed");
+                    else toast.show("Account kept because it is referenced by financial history");
+                  } },
+                ]);
               }}
             />
           ))}
@@ -557,7 +562,7 @@ export default function WalletsScreen() {
                     return ok;
                   }}
                   onDelete={() =>
-                    Alert.alert("Delete goal?", `Remove "${goal.name}"?`, [
+                    Alert.alert("Delete goal?", `Remove "${goal.name}"? Its recorded contributions and account balances will remain unchanged.`, [
                       { text: "Cancel", style: "cancel" },
                       { text: "Delete", style: "destructive", onPress: () => { finance.deleteSavingsGoal(goal.id); toast.show("Goal removed"); } },
                     ])

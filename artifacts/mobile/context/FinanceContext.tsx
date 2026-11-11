@@ -22,7 +22,6 @@ import type { NetWorthSnapshot } from "@/finance/analyticsTypes";
 import { buildAnalyticsReport } from "@/finance/analytics";
 
 import {
-  canUpdateLoanPayment,
   getLoanOutstandingBalance,
   getLoanPaidAmount,
   isLoanSettled,
@@ -251,16 +250,16 @@ interface FinanceContextType extends FinanceState {
   deleteEMI: (id: string) => void;
   recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
   updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
-  deleteEMIPayment: (emiId: string, paymentId: string) => void;
+  deleteEMIPayment: (emiId: string, paymentId: string) => boolean;
   addLoan: (loan: Omit<Loan, "id">, funding?: { id: string; accountId?: string; date: string }) => boolean;
   updateLoan: (id: string, updates: Partial<Loan>) => boolean;
   deleteLoan: (id: string) => void;
   recordLoanPayment: (id: string, payment: Omit<LoanPayment, "id">) => boolean;
   updateLoanPayment: (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
-  deleteLoanPayment: (loanId: string, paymentId: string) => void;
+  deleteLoanPayment: (loanId: string, paymentId: string) => boolean;
   addAccount: (a: Omit<Account, "id">) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
-  deleteAccount: (id: string) => void;
+  deleteAccount: (id: string) => boolean;
   addIncome: (i: Omit<Income, "id"> & { id?: string }) => void;
   updateIncome: (id: string, updates: Partial<Income>) => void;
   deleteIncome: (id: string) => void;
@@ -349,13 +348,6 @@ function currentYYYY(): string {
 
 function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function isStoredDateValid(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
 function normalizeLoan(loan: Loan): Loan {
@@ -548,7 +540,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const deleteExpense = useCallback(
-    (id: string) => persist((prev) => ({ ...prev, expenses: prev.expenses.filter((e) => e.id !== id) })),
+    (id: string) => persist(prev => ledgerService.deleteDomainSource(prev, "expense", id)),
     [persist]
   );
 
@@ -566,7 +558,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const deleteEMI = useCallback(
-    (id: string) => persist((prev) => ({ ...prev, emis: prev.emis.filter((e) => e.id !== id) })),
+    (id: string) => persist(prev => ledgerService.deleteDomainSource(prev, "emi", id)),
     [persist]
   );
   const recordEMIPayment = useCallback(
@@ -577,53 +569,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [attempt]
   );
   const updateEMIPayment = useCallback(
-    (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>): boolean => {
-      const emi = stateRef.current.emis.find((item) => item.id === emiId);
-      const payment = emi?.paymentHistory?.find((item) => item.id === paymentId);
-      if (!emi || !payment) return false;
-      const nextAmount = updates.amount ?? payment.amount;
-      const nextDate = updates.date ?? payment.date;
-      if (!Number.isFinite(nextAmount) || nextAmount <= 0 || !isStoredDateValid(nextDate)) return false;
-      const history = emi.paymentHistory ?? [];
-      if (payment.paymentType === "balloon") {
-        const otherBalloonPayments = history
-          .filter((item) => item.paymentType === "balloon" && item.id !== paymentId)
-          .reduce((sum, item) => sum + item.amount, 0);
-        if (nextAmount + otherBalloonPayments > (emi.balloonPaymentAmount ?? 0) + 0.01) return false;
-      }
-      persist((prev) => ({
-        ...prev,
-        emis: prev.emis.map((item) => {
-          if (item.id !== emiId) return item;
-          const nextPayments = (item.paymentHistory ?? []).map((entry) =>
-            entry.id === paymentId ? { ...entry, ...updates } : entry
-          );
-          return normalizeEMI({
-            ...item,
-            paymentHistory: nextPayments,
-            paidInstallments: nextPayments.filter((entry) => entry.paymentType === "monthly_emi").length,
-          });
-        }),
-      }));
-      return true;
-    },
-    [persist, state.emis]
+    (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>): boolean =>
+      attempt(prev => ledgerService.updateEMIPayment(prev, emiId, paymentId, updates)),
+    [attempt]
   );
   const deleteEMIPayment = useCallback(
-    (emiId: string, paymentId: string) =>
-      persist((prev) => ({
-        ...prev,
-        emis: prev.emis.map((item) => {
-          if (item.id !== emiId) return item;
-          const paymentHistory = (item.paymentHistory ?? []).filter((entry) => entry.id !== paymentId);
-          return normalizeEMI({
-            ...item,
-            paymentHistory,
-            paidInstallments: paymentHistory.filter((entry) => entry.paymentType === "monthly_emi").length,
-          });
-        }),
-      })),
-    [persist]
+    (emiId: string, paymentId: string): boolean =>
+      attempt(prev => ledgerService.reverseEMIPayment(prev, emiId, paymentId)),
+    [attempt]
   );
 
   const addLoan = useCallback(
@@ -649,7 +602,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist, state.loans]
   );
   const deleteLoan = useCallback(
-    (id: string) => persist((prev) => ({ ...prev, loans: prev.loans.filter((loan) => loan.id !== id) })),
+    (id: string) => persist(prev => ledgerService.deleteDomainSource(prev, "loan", id)),
     [persist]
   );
   const recordLoanPayment = useCallback(
@@ -660,38 +613,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [attempt]
   );
   const updateLoanPayment = useCallback(
-    (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>): boolean => {
-      const loan = stateRef.current.loans.find((item) => item.id === loanId);
-      const existing = loan?.payments.find((payment) => payment.id === paymentId);
-      if (!loan || !existing) return false;
-      const amount = updates.amount ?? existing.amount;
-      const date = updates.date ?? existing.date;
-      if (!Number.isFinite(amount) || amount <= 0 || !isStoredDateValid(date)) return false;
-      if (!canUpdateLoanPayment(loan, paymentId, amount)) return false;
-      persist((prev) => ({
-        ...prev,
-        loans: prev.loans.map((item) => item.id === loanId
-          ? normalizeLoan({
-            ...item,
-            payments: item.payments.map((payment) =>
-              payment.id === paymentId ? { ...payment, ...updates } : payment
-            ),
-          })
-          : item),
-      }));
-      return true;
-    },
-    [persist, state.loans]
+    (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>): boolean =>
+      attempt(prev => ledgerService.updateLoanPayment(prev, loanId, paymentId, updates)),
+    [attempt]
   );
   const deleteLoanPayment = useCallback(
-    (loanId: string, paymentId: string) =>
-      persist((prev) => ({
-        ...prev,
-        loans: prev.loans.map((loan) => loan.id === loanId
-          ? normalizeLoan({ ...loan, payments: loan.payments.filter((payment) => payment.id !== paymentId) })
-          : loan),
-      })),
-    [persist]
+    (loanId: string, paymentId: string): boolean =>
+      attempt(prev => ledgerService.reverseLoanPayment(prev, loanId, paymentId)),
+    [attempt]
   );
 
   const addAccount = useCallback(
@@ -710,14 +639,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const deleteAccount = useCallback(
-    (id: string) => persist((prev) => {
-      if ((prev.transactions ?? []).some(t => t.accountId === id)) throw new Error("This account has transactions. Keep it to preserve financial history.");
-      return ({
-      ...prev,
-      accounts: prev.accounts.filter((a) => a.id !== id),
-      emis: prev.emis.map((emi) => emi.linkedAccountId === id ? { ...emi, linkedAccountId: undefined } : emi),
-    }); }),
-    [persist]
+    (id: string): boolean => attempt(prev => ledgerService.deleteAccount(prev, id)),
+    [attempt]
   );
 
   const addIncome = useCallback(
@@ -726,7 +649,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const deleteIncome = useCallback(
-    (id: string) => persist((prev) => ({ ...prev, incomes: prev.incomes.filter((i) => i.id !== id) })),
+    (id: string) => persist(prev => ledgerService.deleteDomainSource(prev, "income", id)),
     [persist]
   );
   const updateIncome = useCallback(
@@ -751,7 +674,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const deleteSavingsGoal = useCallback(
-    (id: string) => persist((prev) => ({ ...prev, savingsGoals: prev.savingsGoals.filter((g) => g.id !== id) })),
+    (id: string) => persist(prev => ledgerService.deleteDomainSource(prev, "savings_goal", id)),
     [persist]
   );
 

@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { newId } from "@/finance/ledger";
+import { financialAlert as Alert } from "@/utils/financialAlert";
 
 const TAB_BAR_HEIGHT = 90;
 const DONUT_SIZE = 106;
@@ -623,6 +623,7 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
 }) {
   const colors = useColors();
   const finance = useFinance();
+  const toast = useToast();
   const payments = emi.paymentHistory ?? [];
   const account = getLinkedAccount(emi, finance.accounts);
   const scheduledMonthly = emiMonthly(emi) * emiDuration(emi);
@@ -632,13 +633,19 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
   const monthlyPayments = payments.filter((payment) => payment.paymentType === "monthly_emi").length;
 
   function confirmPaymentDelete(payment: EMIPayment) {
-    Alert.alert("Delete payment?", "This will recalculate the outstanding balance.", [
+    const linked = finance.transactions.some(t => t.referenceType === "emi" && t.referenceId === emi.id && t.paymentId === payment.id);
+    if (!linked) {
+      Alert.alert("Historical payment kept", "No linked ledger transaction exists. This history was preserved and the account balance was not changed.");
+      return;
+    }
+    Alert.alert("Reverse recorded EMI payment?", "This removes the linked transaction and updates your FinanceApp account balance. It does not reverse any payment with your bank.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Delete",
+        text: "Reverse payment",
         style: "destructive",
         onPress: () => {
-          finance.deleteEMIPayment(emi.id, payment.id);
+          if (finance.deleteEMIPayment(emi.id, payment.id)) toast.show("Payment reversed; account balance updated");
+          else toast.show("Payment was kept; no linked transaction could be reversed");
         },
       },
     ]);
@@ -797,7 +804,7 @@ export default function EMIsScreen() {
   }
 
   function confirmDelete(emi: EMI) {
-    Alert.alert("Delete EMI plan?", `Remove ${emi.name} and its payment history?`, [
+    Alert.alert("Delete EMI plan?", `Remove ${emi.name} and its payment-history details? Every confirmed payment will remain in Transactions and account balances will not change.`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
