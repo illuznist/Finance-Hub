@@ -4,5 +4,6 @@ export const modules: ModuleMap = {
   "./components/mockups/dashboard/LedgerDashboard.tsx": () => import("../components/mockups/dashboard/LedgerDashboard.tsx"),
   "./components/mockups/dashboard/LedgerFlow.tsx": () => import("../components/mockups/dashboard/LedgerFlow.tsx"),
   "./components/mockups/financeapp-home/Current.tsx": () => import("../components/mockups/financeapp-home/Current.tsx"),
-  "./components/mockups/financeapp-home/Refined.tsx": () => import("../components/mockups/financeapp-home/Refined.tsx")
+  "./components/mockups/financeapp-home/Refined.tsx": () => import("../components/mockups/financeapp-home/Refined.tsx"),
+  "./components/mockups/financeapp-polished/FinanceHomePolished.tsx": () => import("../components/mockups/financeapp-polished/FinanceHomePolished.tsx")
 };
