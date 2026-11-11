@@ -454,7 +454,7 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
     const success = editing
       ? finance.updateLoanPayment(loan.id, editing.id, { amount: parsedAmount, date, accountId, notes: notes.trim() || undefined })
       : finance.recordLoanPayment(loan.id, { amount: parsedAmount, date, accountId, operationId: operationId.current, notes: notes.trim() || undefined });
-    if (!success) return setError("This amount cannot exceed the outstanding balance.");
+    if (!success) return setError("Payment was not changed. Check the recorded date, currency, account and remaining repayment limit.");
     submitted.current = true;
     toast.show(editing ? "Payment updated" : loan.direction === "borrowed" ? "Repayment recorded" : "Amount received recorded");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -514,6 +514,7 @@ function LoanDetailModal({ loan, onClose, onEdit, onDelete, onPayment }: {
 }) {
   const colors = useColors();
   const finance = useFinance();
+  const toast = useToast();
   const settled = isLoanSettled(loan);
   const progress = getLoanProgress(loan);
   const paid = getLoanPaidAmount(loan);
@@ -521,9 +522,17 @@ function LoanDetailModal({ loan, onClose, onEdit, onDelete, onPayment }: {
   const totalObligation = getLoanObligation(loan);
 
   function confirmDeletePayment(payment: LoanPayment) {
-    Alert.alert("Delete payment?", "The outstanding balance and repayment progress will be recalculated.", [
+    const linked = finance.transactions.some(t => t.referenceType === "loan" && t.referenceId === loan.id && t.paymentId === payment.id);
+    if (!linked) {
+      Alert.alert("Historical payment kept", "No linked ledger transaction exists. This history was preserved and the account balance was not changed.");
+      return;
+    }
+    Alert.alert("Reverse recorded loan payment?", "This removes the linked transaction and updates your FinanceApp account balance. It does not reverse any payment with your bank.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => finance.deleteLoanPayment(loan.id, payment.id) },
+      { text: "Reverse payment", style: "destructive", onPress: () => {
+        if (finance.deleteLoanPayment(loan.id, payment.id)) toast.show("Payment reversed; account balance updated");
+        else toast.show("Payment was kept; no linked transaction could be reversed");
+      } },
     ]);
   }
 

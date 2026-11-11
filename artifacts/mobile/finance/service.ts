@@ -57,14 +57,6 @@ export function putMovement(state: FinanceState, input: MovementInput): FinanceS
   return { ...state, transactions: upsertTransaction(state.transactions ?? [], t) };
 }
 
-export function removeReference(state: FinanceState, referenceType: ReferenceType, referenceId: string, paymentId?: string): FinanceState {
-  return {
-    ...state,
-    transactions: (state.transactions ?? []).filter(t =>
-      !(t.referenceType === referenceType && t.referenceId === referenceId && (!paymentId || t.paymentId === paymentId))),
-  };
-}
-
 /** Removing a source is not a reversal of money that actually moved. */
 export function detachReference(state: FinanceState, referenceType: ReferenceType, referenceId: string): FinanceState {
   const occurrenceId = referenceType === "expense" ? state.expenses.find(e => e.id === referenceId)?.recurringOccurrenceId : undefined;
@@ -164,10 +156,12 @@ export function setExpensePayment(state: FinanceState, id: string, input: {
   // Explicit desired status, never a read-then-toggle race.
   if (expense.isPaid === input.paid) return state;
   if (!input.paid) {
-    const next = expense.paymentId ? {
-      ...state, transactions: (state.transactions ?? []).filter(t => !(t.referenceType === "expense" && t.referenceId === id && t.paymentId === expense.paymentId)),
-    } : state;
-    return { ...next, expenses: next.expenses.map(e => e.id === id ? { ...e, isPaid: false, paymentId: undefined, paidDate: undefined } : e) };
+    const payment = expense.paymentId && (state.transactions ?? []).find(t =>
+      t.referenceType === "expense" && t.referenceId === id && t.paymentId === expense.paymentId);
+    if (payment) return deleteTransaction(state, payment.id);
+    return { ...state, expenses: state.expenses.map(e => e.id === id
+      ? { ...e, isPaid: false, paymentId: undefined, paidDate: undefined }
+      : e) };
   }
   const paid: Expense = {
     ...expense, isPaid: true, paymentId: input.operationId,
@@ -519,7 +513,9 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
         recurringOccurrenceId: e.recurringOccurrenceId,
       });
     } else if (!e.isPaid && before?.isPaid && before.paymentId) {
-      next = { ...next, transactions: (next.transactions ?? []).filter(t => !(t.referenceType === "expense" && t.referenceId === e.id && t.paymentId === before.paymentId)) };
+      if ((next.transactions ?? []).some(t => t.referenceType === "expense" && t.referenceId === e.id && t.paymentId === before.paymentId)) {
+        throw new Error("Reverse the linked expense transaction before marking the expense unpaid.");
+      }
       next = { ...next, expenses: next.expenses.map(x => x.id === e.id ? { ...x, paymentId: undefined, paidDate: undefined } : x) };
     }
   }
@@ -544,7 +540,13 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
       });
     }
     for (const p of before?.paymentHistory ?? []) {
-      if (!(emi.paymentHistory ?? []).some(x => x.id === p.id)) next = removeReference(next, "emi", emi.id, p.id);
+      if ((emi.paymentHistory ?? []).some(x => x.id === p.id)) continue;
+      if ((next.transactions ?? []).some(t => t.referenceType === "emi" && t.referenceId === emi.id && t.paymentId === p.id)) {
+        throw new Error("Reverse the linked EMI transaction before removing its payment history.");
+      }
+      if (!(previous.transactions ?? []).some(t => t.referenceType === "emi" && t.referenceId === emi.id && t.paymentId === p.id)) {
+        throw new Error("Legacy EMI payment history must be preserved.");
+      }
     }
   }
   for (const e of previous.emis) if (!next.emis.some(x => x.id === e.id)) next = detachReference(next, "emi", e.id);
@@ -562,7 +564,15 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
         accountId: p.accountId, notes: p.notes, currency: loan.currency ?? next.currency, referenceType: "loan", referenceId: loan.id, paymentId: p.id,
       });
     }
-    for (const p of before?.payments ?? []) if (!loan.payments.some(x => x.id === p.id)) next = removeReference(next, "loan", loan.id, p.id);
+    for (const p of before?.payments ?? []) {
+      if (loan.payments.some(x => x.id === p.id)) continue;
+      if ((next.transactions ?? []).some(t => t.referenceType === "loan" && t.referenceId === loan.id && t.paymentId === p.id)) {
+        throw new Error("Reverse the linked loan transaction before removing its payment history.");
+      }
+      if (!(previous.transactions ?? []).some(t => t.referenceType === "loan" && t.referenceId === loan.id && t.paymentId === p.id)) {
+        throw new Error("Legacy loan payment history must be preserved.");
+      }
+    }
   }
   for (const l of previous.loans) if (!next.loans.some(x => x.id === l.id)) next = detachReference(next, "loan", l.id);
   for (const income of next.incomes) {

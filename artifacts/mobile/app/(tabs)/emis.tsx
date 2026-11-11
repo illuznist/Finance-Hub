@@ -555,7 +555,7 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
     if (!isValidDate(date)) return setError("Enter a valid date in YYYY-MM-DD format.");
     if (editing) {
       const ok = finance.updateEMIPayment(emi.id, editing.id, { amount: parsedAmount, date, accountId, notes: notes.trim() || undefined });
-      if (!ok) return setError(paymentType === "monthly_emi" ? "Monthly payment must match the scheduled EMI amount." : "Payment exceeds the remaining balloon balance.");
+      if (!ok) return setError("Payment was not changed. Check the scheduled amount, payment date, account currency and remaining balance.");
       toast.show("Payment updated");
     } else {
       const ok = finance.recordEMIPayment(emi.id, { amount: parsedAmount, date, paymentType, accountId, operationId: operationId.current, notes: notes.trim() || undefined });

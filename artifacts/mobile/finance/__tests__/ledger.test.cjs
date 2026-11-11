@@ -100,8 +100,9 @@ test("balloon partial payments remain separate and reject overpayment", () => {
 test("editing an EMI payment updates its ledger and history", () => {
   let s = S.confirmEMIPayment({ ...base(), emis: [emi()] }, "emi", monthly());
   const t = s.transactions[0];
-  s = S.updateTransaction(s, t.id, { ...correction(t), amount: 90, date: "2026-11-12" });
-  assert.equal(balance(s), 910); assert.equal(s.emis[0].paymentHistory[0].amount, 90);
+  assert.throws(() => S.updateTransaction(s, t.id, { ...correction(t), amount: 90 }), /scheduled EMI amount/);
+  s = S.updateTransaction(s, t.id, { ...correction(t), amount: 100, date: "2026-11-12" });
+  assert.equal(balance(s), 900); assert.equal(s.emis[0].paymentHistory[0].amount, 100);
   assert.equal(s.emis[0].paymentHistory[0].date, "2026-11-12");
   assert.equal(s.transactions.length, 1);
 });
@@ -298,10 +299,10 @@ test("context synchronization preserves corrected EMI details and account", () =
   const before = S.confirmEMIPayment({ ...base(), emis: [emi()] }, "emi", monthly());
   const t = before.transactions[0];
   const next = S.synchronizeDomain(before, S.updateTransaction(before, t.id, {
-    ...correction(t), amount: 80, accountId: "b", description: "Corrected payment", notes: "Correction",
+    ...correction(t), amount: 100, accountId: "b", description: "Corrected payment", notes: "Correction",
   }));
   assert.equal(next.transactions.length, 1); assert.equal(next.transactions[0].description, "Corrected payment");
-  assert.equal(next.emis[0].paymentHistory[0].accountId, "b"); assert.equal(balance(next), 1000); assert.equal(balance(next, "b"), 20);
+  assert.equal(next.emis[0].paymentHistory[0].accountId, "b"); assert.equal(balance(next), 1000); assert.equal(balance(next, "b"), 0);
 });
 test("changing EMI linked account does not silently move historical payments", () => {
   const before = S.confirmEMIPayment({ ...base(), emis: [emi()] }, "emi", monthly());

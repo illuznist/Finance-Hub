@@ -198,7 +198,7 @@ test("editing a linked loan repayment replaces its ledger movement atomically", 
   assert.equal(balance(corrected), 100); assert.equal(balance(corrected, "b"), 55);
   assert.equal(corrected.loans[0].payments[0].amount, 45); assert.equal(corrected.loans[0].payments[0].accountId, "b");
   assert.throws(() => S.updateLoanPayment(corrected, "l", "loan-edit", { amount: 121 }), /remaining loan balance/);
-  assert.throws(() => S.updateLoanPayment(corrected, "l", "loan-edit", { date: "2026-02-30" }), /valid date/);
+  assert.throws(() => S.updateLoanPayment(corrected, "l", "loan-edit", { date: "2026-02-30" }), /valid payment date/);
 });
 
 test("history-only legacy payments remain editable but cannot be reversed or replayed", () => {
@@ -313,4 +313,36 @@ test("editing and reversing explicit payments stays idempotent after repeated sa
   s = commit(s, reverse);
   assert.equal(balance(s, "b"), 100); assert.equal(s.transactions.length, 0);
   assert.equal(s.loans[0].payments.length, 0);
+});
+
+test("domain synchronization cannot silently erase linked or legacy payment records", () => {
+  let state = commit(base(), s => ({ ...s, emis: [emi()], loans: [loan()], expenses: [expense()] }));
+  state = commit(state, s => S.confirmEMIPayment(s, "m", { amount: 50, paymentType: "monthly_emi", date: today, accountId: "a", operationId: "protected-emi" }));
+  state = commit(state, s => S.confirmLoanPayment(s, "l", { amount: 25, date: today, accountId: "a", operationId: "protected-loan" }));
+  state = commit(state, s => S.setExpensePayment(s, "e", { paid: true, operationId: "protected-expense", accountId: "a", date: today }));
+  assert.throws(() => S.synchronizeDomain(state, {
+    ...state,
+    emis: state.emis.map(e => ({ ...e, paymentHistory: [] })),
+  }), /Reverse the linked EMI transaction/);
+  assert.throws(() => S.synchronizeDomain(state, {
+    ...state,
+    loans: state.loans.map(l => ({ ...l, payments: [] })),
+  }), /Reverse the linked loan transaction/);
+  assert.throws(() => S.synchronizeDomain(state, {
+    ...state,
+    expenses: state.expenses.map(e => ({ ...e, isPaid: false })),
+  }), /Reverse the linked expense transaction/);
+
+  const legacy = commit(base(), s => ({ ...s, emis: [{
+    ...emi(), paymentHistory: [{ id: "legacy-protected", amount: 25, date: today, paymentType: "monthly_emi", status: "paid", legacy: true }],
+  }] }));
+  assert.throws(() => S.synchronizeDomain(legacy, {
+    ...legacy,
+    emis: legacy.emis.map(e => ({ ...e, paymentHistory: [] })),
+  }), /Legacy EMI payment history must be preserved/);
+  assert.equal(legacy.transactions.length, 0); assert.equal(legacy.emis[0].paymentHistory.length, 1);
+  assert.equal(balance(legacy), 100);
+  const reversed = commit(state, s => S.setExpensePayment(s, "e", { paid: false, operationId: "explicit-expense-reversal" }));
+  assert.equal(reversed.transactions.some(t => t.paymentId === "protected-expense"), false);
+  assert.equal(reversed.expenses[0].isPaid, false); assert.equal(balance(reversed), balance(state) + 20);
 });

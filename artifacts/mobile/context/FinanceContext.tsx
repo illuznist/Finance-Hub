@@ -246,7 +246,7 @@ interface FinanceContextType extends FinanceState {
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
   addEMI: (e: Omit<EMI, "id">) => void;
-  updateEMI: (id: string, updates: Partial<EMI>) => void;
+  updateEMI: (id: string, updates: Partial<Omit<EMI, "id" | "paymentHistory" | "paidInstallments" | "legacyPaidInstallments">>) => void;
   deleteEMI: (id: string) => void;
   recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
   updateEMIPayment: (emiId: string, paymentId: string, updates: Partial<Pick<EMIPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
@@ -550,10 +550,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const updateEMI = useCallback(
-    (id: string, updates: Partial<EMI>) =>
+    (id: string, updates: Partial<Omit<EMI, "id" | "paymentHistory" | "paidInstallments" | "legacyPaidInstallments">>) =>
       persist((prev) => ({
         ...prev,
-        emis: prev.emis.map((emi) => (emi.id === id ? normalizeEMI({ ...emi, ...updates }) : emi)),
+        emis: prev.emis.map((emi) => (emi.id === id ? normalizeEMI({
+          ...emi,
+          ...updates,
+          // Payment history is changed only by the ledger-backed payment methods.
+          paymentHistory: emi.paymentHistory,
+          paidInstallments: emi.paidInstallments,
+          legacyPaidInstallments: emi.legacyPaidInstallments,
+        }) : emi)),
       })),
     [persist]
   );

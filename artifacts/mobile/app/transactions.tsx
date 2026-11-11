@@ -269,18 +269,21 @@ export default function TransactionsScreen() {
           onClose={() => setSelectedId(null)}
           onEdit={() => { setSelectedId(null); setForm({ mode: "edit", id: selected.id }); }}
           onDelete={() => {
+            const balanceImpact = selected.accountId
+              ? "This removes the FinanceApp record and recalculates the tracked account balance; it does not change your actual bank account."
+              : "This removes an unassigned FinanceApp record and does not change any account balance.";
             const linked = selected.transferGroupId
               ? "Both sides of this transfer will be removed."
               : selected.referenceType
-                ? "The linked payment record will also be updated."
-                : "This cannot be undone.";
+                ? "Its linked payment history will also be updated."
+                : "The original transaction record will be removed.";
             const run = () => { if (finance.deleteTransaction(selected.id)) setSelectedId(null); };
             if (Platform.OS === "web") {
-              if (typeof window !== "undefined" && window.confirm(`Delete this transaction? ${linked}`)) run();
+              if (typeof window !== "undefined" && window.confirm(`Reverse this recorded transaction?\n\n${balanceImpact} ${linked}`)) run();
             } else {
-              Alert.alert("Delete transaction?", linked, [
+              Alert.alert("Reverse recorded transaction?", `${balanceImpact} ${linked}`, [
                 { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: run },
+                { text: "Reverse transaction", style: "destructive", onPress: run },
               ]);
             }
           }}
