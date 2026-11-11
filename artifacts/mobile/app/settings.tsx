@@ -290,10 +290,11 @@ export default function SettingsScreen() {
     same: "Same day",
     "1day": "1 day before",
     "3days": "3 days before",
+    "7days": "7 days before",
   };
 
   function cycleTimimg() {
-    const options: NotificationSettings["timing"][] = ["same", "1day", "3days"];
+    const options: NotificationSettings["timing"][] = ["same", "1day", "3days", "7days"];
     const next = options[(options.indexOf(notif.timing) + 1) % options.length];
     updateNotif({ timing: next });
   }
@@ -551,6 +552,20 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {notif.enabled && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {(["balloonEnabled", "loanEnabled"] as const).map(key => (
+              <View key={key} style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{key === "balloonEnabled" ? "Balloon reminders" : "Loan reminders"}</Text>
+                <View style={{ flex: 1 }} />
+                <Switch testID={`notification-${key}`} value={notif[key] ?? true}
+                  onValueChange={value => updateNotif({ [key]: value })}
+                  trackColor={{ true: colors.primary, false: colors.muted }} />
+              </View>
+            ))}
+            <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting }}>Local reminders require device permission. Web previews do not send notifications. Category thresholds are configured in Budget.</Text>
+          </View>
+        )}
         {/* Security */}
         <SectionHeader title="SECURITY" />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>

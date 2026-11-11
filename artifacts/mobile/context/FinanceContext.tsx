@@ -8,8 +8,13 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { AppState } from "react-native";
+import type { BudgetPlan, PlanningState, RecurringExpense, UpcomingPayment } from "@/finance/planningTypes";
+import * as budgets from "@/finance/budgets";
+import * as recurring from "@/finance/recurring";
+import { getUpcoming as upcomingPayments, recordScheduledPayment as confirmScheduledPayment } from "@/finance/upcoming";
 import type { Transaction } from "@/finance/ledger";
-import { cashFlow, getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits } from "@/finance/ledger";
+import { cashFlow, getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits, localDate } from "@/finance/ledger";
 import { loadFinanceState, createWriteQueue } from "@/finance/migration";
 import * as ledgerService from "@/finance/service";
 
@@ -36,6 +41,7 @@ export interface Expense {
   paidDate?: string;
   paymentId?: string;
   currency?: string;
+  recurringOccurrenceId?: string;
 }
 
 export interface EMI {
@@ -79,6 +85,7 @@ export interface EMIPayment {
   accountId?: string;
   operationId?: string;
   legacy?: boolean;
+  scheduledDueDate?: string;
 }
 
 export type LoanDirection = "borrowed" | "lent";
@@ -94,6 +101,7 @@ export interface LoanPayment {
   accountId?: string;
   operationId?: string;
   legacy?: boolean;
+  scheduledDueDate?: string;
 }
 
 export interface Loan {
@@ -117,6 +125,8 @@ export interface Loan {
   payments: LoanPayment[];
   createdAt: string;
   funding?: { transactionId: string; amount: number; date: string; accountId?: string; notes?: string };
+  repaymentStartDate?: string;
+  linkedAccountId?: string;
 }
 
 export interface Account {
@@ -156,10 +166,12 @@ export interface SavingsGoal {
 
 export interface NotificationSettings {
   enabled: boolean;
-  timing: "same" | "1day" | "3days";
+  timing: "same" | "1day" | "3days" | "7days";
   emiEnabled: boolean;
   expenseEnabled: boolean;
   budgetEnabled: boolean;
+  balloonEnabled?: boolean;
+  loanEnabled?: boolean;
 }
 
 export interface SecuritySettings {
@@ -187,6 +199,7 @@ export interface FinanceState {
   transactions?: Transaction[];
   reconciliationRequired?: boolean;
   reconciledAccountIds?: string[];
+  planning?: PlanningState;
 }
 
 export const EXCHANGE_RATES: Record<string, number> = {
@@ -210,6 +223,17 @@ export const SUPPORTED_CURRENCIES = [
 export const PIN_STORAGE_KEY = "@finance_pin_v1";
 
 interface FinanceContextType extends FinanceState {
+  calendarKey: string;
+  getBudget: (month: string, currency?: string) => ReturnType<typeof budgets.getBudgetView>;
+  ensureBudgetPeriod: (month: string) => void;
+  saveBudget: (month: string, input: BudgetPlan) => boolean;
+  saveRecurring: (input: RecurringExpense, scope: "future" | "pending") => boolean;
+  setRecurringActive: (id: string, active: boolean) => boolean;
+  deleteRecurring: (id: string) => boolean;
+  payRecurring: (id: string, dueDate: string, input: { accountId?: string; date: string }) => boolean;
+  skipRecurring: (id: string, dueDate: string, pause?: boolean) => boolean;
+  getUpcoming: (from: string, to: string) => UpcomingPayment[];
+  recordScheduledPayment: (item: UpcomingPayment, accountId: string | undefined, date: string, amount?: number, operationId?: string) => boolean;
   transactions: Transaction[];
   storageError: string | null;
   isReady: boolean;
@@ -282,6 +306,8 @@ const defaultNotificationSettings: NotificationSettings = {
   emiEnabled: true,
   expenseEnabled: true,
   budgetEnabled: true,
+  balloonEnabled: true,
+  loanEnabled: true,
 };
 
 const defaultSecuritySettings: SecuritySettings = {
@@ -304,7 +330,7 @@ const defaultState: FinanceState = {
   securitySettings: defaultSecuritySettings,
   lastResetMonth: "",
   lastResetYear: "",
-  schemaVersion: 1,
+  schemaVersion: 2,
   transactions: [],
   reconciliationRequired: false,
 };
@@ -412,6 +438,7 @@ function monthLabel(yyyymm: string): string {
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<FinanceState>(defaultState);
+  const [calendarKey, setCalendarKey] = useState(() => `${localDate()}:${new Date().getTimezoneOffset()}`);
   const [monthResetInfo, setMonthResetInfo] = useState<{ count: number; month: string } | null>(null);
   const stateRef = useRef(state);
   const loadingRef = useRef(false);
@@ -428,39 +455,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       loaded = { ...loaded, emis: loaded.emis.map(normalizeEMI) };
       loaded = { ...loaded, loans: loaded.loans.map(normalizeLoan) };
 
-      // ── Recurring reset engine ──
+      // Legacy paid flags are historical records, not recurring occurrences.
       const nowMonth = currentYYYYMM();
       const nowYear = currentYYYY();
-      const isNewMonth = Boolean(loaded.lastResetMonth) && loaded.lastResetMonth !== nowMonth;
-      const isNewYear = Boolean(loaded.lastResetYear) && loaded.lastResetYear !== nowYear;
-
-      if (isNewMonth || isNewYear) {
-        let resetCount = 0;
-        const updatedExpenses = loaded.expenses.map((e) => {
-          const rec = e.recurrence ?? "none";
-          const shouldReset =
-            (rec === "monthly" && isNewMonth) ||
-            (rec === "weekly" && isNewMonth) ||
-            (rec === "yearly" && isNewYear);
-          if (shouldReset) {
-            resetCount++;
-            return { ...e, isPaid: false, paymentId: undefined, paidDate: undefined };
-          }
-          return e;
-        });
-
-        loaded = {
-          ...loaded,
-          expenses: updatedExpenses,
-          lastResetMonth: isNewMonth ? nowMonth : loaded.lastResetMonth,
-          lastResetYear: isNewYear ? nowYear : loaded.lastResetYear,
-        };
-
-        if (resetCount > 0) {
-          setMonthResetInfo({ count: resetCount, month: monthLabel(nowMonth) });
-        }
-      }
       loaded = { ...loaded, lastResetMonth: nowMonth, lastResetYear: nowYear };
+      loaded = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(loaded), nowMonth);
 
       await queueWrite(loaded);
       stateRef.current = loaded;
@@ -477,7 +476,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const persist = useCallback((updater: (prev: FinanceState) => FinanceState) => {
     if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before making changes.");
-    const next = ledgerService.synchronizeDomain(stateRef.current, updater(stateRef.current));
+    const next = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(recurring.synchronizeOccurrences(
+      ledgerService.synchronizeDomain(stateRef.current, updater(stateRef.current))
+    )), localDate().slice(0, 7));
     stateRef.current = next;
     setState(next);
     queueWrite(next).catch(error => {
@@ -496,6 +497,33 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const attempt = useCallback((updater: (prev: FinanceState) => FinanceState): boolean => {
     try { persist(updater); return true; }
     catch { return false; }
+  }, [persist]);
+  const getBudget = useCallback((month: string, currency?: string) => budgets.getBudgetView(stateRef.current, month, currency), [calendarKey]);
+  const ensureBudgetPeriod = useCallback((month: string) => {
+    if (!readyRef.current) return;
+    const next = budgets.ensureBudgetPeriod(stateRef.current, month);
+    if (next !== stateRef.current) persist(() => next);
+  }, [persist]);
+  const saveBudget = useCallback((month: string, input: BudgetPlan) => attempt(s => budgets.saveBudget(s, month, input)), [attempt]);
+  const saveRecurring = useCallback((input: RecurringExpense, scope: "future" | "pending") => attempt(s => recurring.saveRecurring(s, input, scope)), [attempt]);
+  const setRecurringActive = useCallback((id: string, active: boolean) => attempt(s => recurring.setRecurringActive(s, id, active)), [attempt]);
+  const deleteRecurring = useCallback((id: string) => attempt(s => recurring.deleteRecurring(s, id)), [attempt]);
+  const payRecurring = useCallback((id: string, due: string, input: { accountId?: string; date: string }) => attempt(s => recurring.payRecurring(s, id, due, input)), [attempt]);
+  const skipRecurring = useCallback((id: string, due: string, pause?: boolean) => attempt(s => recurring.skipRecurring(s, id, due, pause)), [attempt]);
+  const getUpcoming = useCallback((from: string, to: string) => upcomingPayments(stateRef.current, from, to), [calendarKey]);
+  const recordScheduledPayment = useCallback((item: UpcomingPayment, accountId: string | undefined, date: string, amount?: number, submissionId?: string) =>
+    attempt(s => confirmScheduledPayment(s, item, accountId, date, amount, submissionId)), [attempt]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (!readyRef.current) return;
+      setCalendarKey(`${localDate()}:${new Date().getTimezoneOffset()}`);
+      const next = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(stateRef.current), localDate().slice(0, 7));
+      if (next !== stateRef.current) persist(() => next);
+    };
+    const sub = AppState.addEventListener("change", state => { if (state === "active") refresh(); });
+    const timer = setInterval(refresh, 60000);
+    return () => { sub.remove(); clearInterval(timer); };
   }, [persist]);
   const setExpensePaid = useCallback((id: string, paid: boolean, accountId?: string, date?: string) =>
     attempt(prev => ledgerService.setExpensePayment(prev, id, { paid, accountId, date, operationId: newId() })), [attempt]);
@@ -763,7 +791,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setMonthlyBudget = useCallback(
-    (amount: number) => persist((prev) => ({ ...prev, monthlyBudget: amount, budgetCurrency: prev.currency })),
+    (amount: number) => persist(prev => budgets.saveBudget(prev, localDate().slice(0, 7),
+      { ...budgets.getBudgetView(prev).period, limit: amount })),
     [persist]
   );
   const setUserName = useCallback(
@@ -802,8 +831,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     (s, e) => ((e.currency ?? state.currency) === state.currency && e.paidInstallments < e.totalInstallments ? s + (e.monthlyEMIAmount ?? e.monthlyAmount) : s),
     0
   );
-  const effectiveBudget = (state.budgetCurrency ?? state.currency) === state.currency ? state.monthlyBudget : 0;
-  const remainingBudget = effectiveBudget - totalMonthlyExpenses - totalEMIMonthly;
+  const currentBudget = budgets.getBudgetView(state);
+  const effectiveBudget = currentBudget.period.limit;
+  const remainingBudget = currentBudget.remaining;
   const totalSavings = accounts.filter((a) => a.type === "savings" && a.currency === state.currency).reduce((s, a) => s + minorUnits(a.balance), 0) / 100;
   const currencyRate = EXCHANGE_RATES[state.currency] ?? 1;
   const currencyLoans = state.loans.filter(l => (l.currency ?? state.currency) === state.currency);
@@ -820,6 +850,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     <FinanceContext.Provider
       value={{
         ...state,
+        calendarKey,
+        getBudget, ensureBudgetPeriod, saveBudget, saveRecurring, setRecurringActive,
+        deleteRecurring, payRecurring, skipRecurring, getUpcoming, recordScheduledPayment,
         monthlyBudget: effectiveBudget,
         accounts,
         transactions,

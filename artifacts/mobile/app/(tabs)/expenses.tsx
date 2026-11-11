@@ -19,6 +19,7 @@ import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type Expense, useFinance } from "@/context/FinanceContext";
@@ -109,6 +110,7 @@ function AddExpenseModal({
   const colors = useColors();
   const finance = useFinance();
   const toast = useToast();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Bills");
   const [amount, setAmount] = useState("");
@@ -217,6 +219,19 @@ function AddExpenseModal({
             ))}
           </ScrollView>
 
+          <Pressable
+            testID="add-expense-recurring-link"
+            accessibilityRole="link"
+            onPress={() => { onClose(); router.push("/recurring?new=1"); }}
+            style={[styles.recurringHint, { backgroundColor: colors.secondary }]}
+          >
+            <Feather name="repeat" size={16} color={colors.primary} />
+            <Text style={[styles.recurringHintText, { color: colors.foreground }]}>
+              Repeats every month or week? Set it up as a recurring expense instead.
+            </Text>
+            <Feather name="chevron-right" size={16} color={colors.primary} />
+          </Pressable>
+
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Pressable
               onPress={onClose}
@@ -242,6 +257,7 @@ export default function ExpensesScreen() {
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
+  const router = useRouter();
   const [selectedCat, setSelectedCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
   const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
@@ -275,6 +291,11 @@ export default function ExpensesScreen() {
         topInset={topPad}
         colors={colors}
         trailing={
+          <View style={{ flexDirection: "row", gap: 8 }}>
+          <HeaderAction icon="calendar" label="Open upcoming payments" variant="neutral" testID="expense-upcoming-button"
+            onPress={() => router.push("/upcoming")} />
+          <HeaderAction icon="repeat" label="Open recurring expenses" variant="neutral" testID="expense-recurring-button"
+            onPress={() => router.push("/recurring")} />
           <HeaderAction
             label="Add expense"
             testID="expense-add-button"
@@ -283,6 +304,7 @@ export default function ExpensesScreen() {
               setShowAdd(true);
             }}
           />
+          </View>
         }
       />
 
@@ -443,6 +465,11 @@ function ExpenseCard({
         <Text style={[styles.expMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
           {expense.category} · Due {expense.dueDate}{suffix}
         </Text>
+        {expense.recurrence && expense.recurrence !== "none" ? (
+          <Text style={[styles.expMeta, { color: colors.mutedForeground }]} numberOfLines={2} testID={`legacy-recurrence-${expense.id}`}>
+            Older {expense.recurrence} flag kept as is. No schedule is inferred; add it in Recurring to track due dates.
+          </Text>
+        ) : null}
       </View>
       <View style={styles.expRight}>
         <Text style={[styles.expAmount, { color: expense.isPaid ? colors.mutedForeground : colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
@@ -584,6 +611,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
+  recurringHint: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, marginBottom: 18 },
+  recurringHintText: { flex: 1, fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium" },
   swipeDelete: {
     backgroundColor: "#EF4444",
     justifyContent: "center",

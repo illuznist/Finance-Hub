@@ -5,7 +5,6 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Alert,
   Image,
   Platform,
   Pressable,
@@ -18,12 +17,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { type Expense, useFinance } from "@/context/FinanceContext";
-import { ExpensePaymentModal } from "@/components/ExpensePaymentModal";
+import { useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { HeaderAction } from "@/components/ScreenHeader";
+import { addDays } from "@/finance/calendar";
+import { localDate } from "@/finance/ledger";
+import type { UpcomingPayment } from "@/finance/planningTypes";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -39,78 +40,6 @@ function fmt(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
 }
 
-
-function ExpenseRow({
-  name,
-  amount,
-  currency,
-  dueDate,
-  isPaid,
-  iconName,
-  color,
-  onToggle,
-  isLast,
-}: {
-  name: string;
-  amount: number;
-  currency: string;
-  dueDate: number;
-  isPaid: boolean;
-  iconName: string;
-  color: string;
-  onToggle: () => void;
-  isLast: boolean;
-}) {
-  const colors = useColors();
-  const suffix =
-    dueDate === 1 ? "st" : dueDate === 2 ? "nd" : dueDate === 3 ? "rd" : "th";
-  return (
-    <View
-      style={[
-        styles.expenseRow,
-        { borderBottomColor: colors.border },
-        !isLast && styles.expenseRowSeparator,
-      ]}
-    >
-      <View style={[styles.expenseIcon, { backgroundColor: color + "20" }]}>
-        <Feather name={iconName as any} size={18} color={color} />
-      </View>
-      <View style={styles.expenseInfo}>
-        <Text style={[styles.expenseName, { color: colors.foreground }]}>
-          {name}
-        </Text>
-        <Text style={[styles.expenseDue, { color: colors.mutedForeground }]}>
-          Due {dueDate}
-          {suffix}
-        </Text>
-      </View>
-      <Text style={[styles.expenseAmount, { color: colors.foreground }]}>
-        {fmt(amount, currency)}
-      </Text>
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onToggle();
-        }}
-        style={[
-          styles.paidBadge,
-          {
-            backgroundColor: isPaid ? colors.successLight : colors.errorLight,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            styles.paidBadgeText,
-            { color: isPaid ? colors.success : colors.destructive },
-          ]}
-        >
-          {isPaid ? "Paid" : "Due"}
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
 
 function todayKey(): string {
   const d = new Date();
@@ -136,9 +65,9 @@ function BudgetAlertBanner({
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   const level: AlertLevel =
-    spentPerc >= 1 ? "exceeded" : spentPerc >= 0.95 ? "danger" : "warning";
+    spentPerc >= 1 ? "exceeded" : spentPerc >= 0.9 ? "danger" : "warning";
 
-  const isVisible = spentPerc >= 0.8 && dismissedDay !== todayKey();
+  const isVisible = spentPerc >= 0.75 && dismissedDay !== todayKey();
 
   useEffect(() => {
     if (isVisible) {
@@ -166,10 +95,10 @@ function BudgetAlertBanner({
       body: `You've used ${Math.round(spentPerc * 100)}% of your monthly budget`,
     },
     danger: {
-      bg: colors.errorLight,
-      border: colors.destructive,
+      bg: colors.warningLight,
+      border: colors.warning,
       icon: "alert-circle" as const,
-      color: colors.destructive,
+      color: colors.warning,
       title: "Low budget",
       body: `Only ${currency} ${remaining.toLocaleString()} left this month`,
     },
@@ -279,7 +208,6 @@ export default function DashboardScreen() {
   const finance = useFinance();
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
-  const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
 
   const onRefresh = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -288,10 +216,19 @@ export default function DashboardScreen() {
   }, []);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const totalSpent = finance.totalMonthlyExpenses + finance.totalEMIMonthly;
-  const totalSpentPerc = finance.monthlyBudget > 0 ? Math.min(1, totalSpent / finance.monthlyBudget) : 0;
-  const remaining = Math.max(0, finance.remainingBudget);
-  const remainingPerc = finance.monthlyBudget > 0 ? Math.min(1, remaining / finance.monthlyBudget) : 0;
+  const thisMonth = localDate().slice(0, 7);
+  const budgetView = finance.getBudget(thisMonth);
+  const nextUp: UpcomingPayment[] = finance.getUpcoming("1970-01-01", addDays(localDate(), 60))
+      .filter(i => i.status !== "paid" && i.status !== "skipped")
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 3);
+  const budgetLimit = budgetView?.period.limit ?? finance.monthlyBudget;
+  const budgetCurrency = budgetView?.period.currency ?? finance.currency;
+  // Actual confirmed spending from the ledger, not planned amounts.
+  const totalSpent = budgetView?.spent ?? 0;
+  const budgetStatusKey = budgetView?.status ?? "unset";
+  const totalSpentPerc = budgetLimit > 0 ? Math.min(1, totalSpent / budgetLimit) : 0;
+  const remaining = budgetView.remaining;
+  const remainingPerc = budgetLimit > 0 ? Math.max(0, Math.min(1, remaining / budgetLimit)) : 0;
 
   // Savings: sum of savings-type accounts
   const totalSavings = finance.totalSavings;
@@ -301,17 +238,18 @@ export default function DashboardScreen() {
   // Monthly savings contribution
   const monthlySavings = Math.max(
     0,
-    finance.totalMonthlyIncome - totalSpent
+    finance.actualMonthlyIncome - finance.actualMonthlyOutflow
   );
   const monthlySavingsRate =
-    finance.totalMonthlyIncome > 0
-      ? Math.round((monthlySavings / finance.totalMonthlyIncome) * 100)
+    finance.actualMonthlyIncome > 0
+      ? Math.round((monthlySavings / finance.actualMonthlyIncome) * 100)
       : 0;
 
+  // Shared thresholds: <75 normal, 75 approaching, 90 near, 100 exceeded.
   const remainingColor =
-    totalSpentPerc > 0.85
+    budgetStatusKey === "exceeded"
       ? colors.destructive
-      : totalSpentPerc > 0.65
+      : budgetStatusKey === "near" || budgetStatusKey === "approaching"
       ? colors.warning
       : colors.success;
 
@@ -452,12 +390,12 @@ export default function DashboardScreen() {
               <Text
                 style={[styles.remainingLabel, { color: colors.mutedForeground }]}
               >
-                Remaining this month
+                {budgetLimit === 0 ? "Set a monthly budget" : remaining < 0 ? "Over budget this month" : "Remaining this month"}
               </Text>
               <Text
                 style={[styles.remainingAmount, { color: remainingColor }]}
               >
-                {fmt(remaining, finance.currency)}
+                {fmt(budgetLimit === 0 ? 0 : Math.abs(remaining), budgetCurrency)}
               </Text>
               <Text
                 style={[
@@ -465,7 +403,7 @@ export default function DashboardScreen() {
                   { color: colors.mutedForeground },
                 ]}
               >
-                of {fmt(finance.monthlyBudget, finance.currency)} budget
+                of {fmt(budgetLimit, budgetCurrency)} budget
               </Text>
             </View>
             <View
@@ -476,9 +414,9 @@ export default function DashboardScreen() {
             >
               <Feather
                 name={
-                  totalSpentPerc > 0.85
+                  budgetStatusKey === "exceeded" || budgetStatusKey === "near"
                     ? "alert-triangle"
-                    : totalSpentPerc > 0.65
+                    : budgetStatusKey === "approaching"
                     ? "clock"
                     : "check-circle"
                 }
@@ -512,11 +450,13 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.remainingCapRow}>
             <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
-              Planned {fmt(totalSpent, finance.currency)}
+              Spent {fmt(totalSpent, budgetCurrency)}
             </Text>
-            <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
-              Budget {fmt(finance.monthlyBudget, finance.currency)}
-            </Text>
+            <Pressable onPress={() => router.push("/budget")} testID="home-open-budget" accessibilityRole="link" hitSlop={8}>
+              <Text style={[styles.remainingCap, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+                Budget details
+              </Text>
+            </Pressable>
           </View>
         </View>
 
@@ -525,8 +465,8 @@ export default function DashboardScreen() {
         <BudgetAlertBanner
           spentPerc={totalSpentPerc}
           remaining={remaining}
-          overspend={Math.max(0, totalSpent - finance.monthlyBudget)}
-          currency={finance.currency}
+          overspend={Math.max(0, totalSpent - budgetLimit)}
+          currency={budgetCurrency}
         />
 
         {/* ── Upcoming payments ── */}
@@ -534,9 +474,11 @@ export default function DashboardScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
             Coming up
           </Text>
-          <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>
-            {finance.expenses.filter((e) => !e.isPaid).length} pending
-          </Text>
+          <Pressable onPress={() => router.push("/upcoming")} testID="home-view-upcoming" accessibilityRole="link" hitSlop={8}>
+            <Text style={[styles.sectionCount, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+              View all
+            </Text>
+          </Pressable>
         </View>
         <View
           style={[
@@ -544,25 +486,43 @@ export default function DashboardScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {finance.expenses.filter(e => (e.currency ?? finance.currency) === finance.currency).map((exp, index) => (
-            <ExpenseRow
-              key={exp.id}
-              name={exp.name}
-              amount={exp.amount}
-              currency={finance.currency}
-              dueDate={exp.dueDate}
-              isPaid={exp.isPaid}
-              iconName={exp.iconName}
-              color={exp.color}
-              onToggle={() => {
-                if (!exp.isPaid) setPayingExpense(exp);
-                else Alert.alert("Mark unpaid?", "This removes the current payment and restores its account balance.", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Mark unpaid", style: "destructive", onPress: () => finance.setExpensePaid(exp.id, false) },
-                ]);
-              }}
-              isLast={index === finance.expenses.length - 1}
-            />
+          {nextUp.length === 0 ? (
+            <View style={[styles.expenseRow, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.expenseDue, { color: colors.mutedForeground, flex: 1 }]}>
+                No upcoming commitments. Recurring expenses, EMIs and loan schedules appear here.
+              </Text>
+            </View>
+          ) : nextUp.map((item, index) => (
+            <Pressable
+              key={item.id}
+              testID={`home-upcoming-${item.id}`}
+              onPress={() => router.push("/upcoming")}
+              style={[
+                styles.expenseRow,
+                { borderBottomColor: colors.border },
+                index < nextUp.length - 1 && styles.expenseRowSeparator,
+              ]}
+            >
+              <View style={[styles.expenseIcon, { backgroundColor: colors.secondary }]}>
+                <Feather
+                  name={item.type === "expense" ? "repeat" : item.type === "loan" ? "users" : "credit-card"}
+                  size={18}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={styles.expenseInfo}>
+                <Text style={[styles.expenseName, { color: colors.foreground }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.expenseDue, { color: item.status === "overdue" ? colors.destructive : colors.mutedForeground }]}>
+                  {item.status === "overdue" ? "Overdue · " : item.status === "due_today" ? "Due today · " : ""}
+                  {new Date(Number(item.dueDate.slice(0, 4)), Number(item.dueDate.slice(5, 7)) - 1, Number(item.dueDate.slice(8))).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                </Text>
+              </View>
+              <Text style={[styles.expenseAmount, { color: colors.foreground }]}>
+                {fmt(item.amount, item.currency)}
+              </Text>
+            </Pressable>
           ))}
         </View>
 
@@ -788,7 +748,6 @@ export default function DashboardScreen() {
             })}
         </View>
       </View>
-      {payingExpense && <ExpensePaymentModal expense={payingExpense} onClose={() => setPayingExpense(null)} />}
     </ScrollView>
   );
 }

@@ -241,8 +241,10 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
   const [interestRate, setInterestRate] = useState(String(editing?.interestRate ?? ""));
   const [startDate, setStartDate] = useState(editing?.startDate ?? todayString());
   const [expectedEndDate, setExpectedEndDate] = useState(editing?.expectedEndDate ?? "");
+  const [repaymentStartDate, setRepaymentStartDate] = useState(editing?.repaymentStartDate ?? "");
   const [frequency, setFrequency] = useState<LoanRepaymentFrequency>(editing?.repaymentFrequency ?? "one-time");
   const [plannedPayment, setPlannedPayment] = useState(String(editing?.plannedPaymentAmount ?? ""));
+  const [plannedAccount, setPlannedAccount] = useState(editing?.linkedAccountId);
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [initialAmount, setInitialAmount] = useState("");
   const [initialDate, setInitialDate] = useState(todayString());
@@ -266,6 +268,8 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
     if (!Number.isFinite(parsedPrincipal) || parsedPrincipal <= 0) return setError("Principal must be greater than zero.");
     if (!validDate(startDate)) return setError("Enter a valid start date in YYYY-MM-DD format.");
     if (expectedEndDate && !validDate(expectedEndDate)) return setError("Enter a valid expected end date.");
+    if (repaymentStartDate && (!validDate(repaymentStartDate) || repaymentStartDate < startDate ||
+      (expectedEndDate && repaymentStartDate > expectedEndDate))) return setError("The first repayment due date must be within the loan dates.");
     if (expectedEndDate && expectedEndDate < startDate) return setError("Expected end date cannot be before the start date.");
     if (parsedTotal !== undefined && (!Number.isFinite(parsedTotal) || parsedTotal < parsedPrincipal)) {
       return setError("Total repayment must be at least the principal amount.");
@@ -294,8 +298,10 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
       interestRate: parsedRate,
       startDate,
       expectedEndDate: expectedEndDate || undefined,
+      repaymentStartDate: repaymentStartDate || undefined,
       repaymentFrequency: frequency,
       plannedPaymentAmount: parsedPlanned,
+      linkedAccountId: plannedAccount,
       notes: notes.trim(),
       color: editing?.color ?? colors.primary,
       iconName: editing?.iconName ?? (category === "vehicle" ? "truck" : category === "home" ? "home" : "dollar-sign"),
@@ -369,6 +375,8 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
               </>}
             </>}
             <LoanField label="Expected end date (optional)" value={expectedEndDate} onChangeText={setExpectedEndDate} placeholder="2026-12-31" />
+            <LoanField label="First repayment due (optional)" value={repaymentStartDate} onChangeText={setRepaymentStartDate} placeholder="YYYY-MM-DD" />
+            <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting }}>Set this date and a planned payment to show recurring loan reminders in Upcoming. The loan start date is not assumed to be a payment date.</Text>
 
             <Pressable
               accessibilityRole="button"
@@ -386,6 +394,7 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Repayment frequency</Text>
                 <ChoiceChips value={frequency} options={FREQUENCIES} onChange={setFrequency} />
                 <LoanField label={`Planned payment (${finance.currency}, optional)`} value={plannedPayment} onChangeText={setPlannedPayment} placeholder="500" numeric />
+                <PaymentAccountPicker currency={editing?.currency ?? finance.currency} value={plannedAccount} onChange={setPlannedAccount} />
               </>
             )}
 
@@ -431,7 +440,7 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
   const [date, setDate] = useState(editing?.date ?? todayString());
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState("");
-  const [accountId, setAccountId] = useState(editing?.accountId);
+  const [accountId, setAccountId] = useState(editing?.accountId ?? loan.linkedAccountId);
   const operationId = useRef(newId());
   const submitted = useRef(false);
   const directionVerb = loan.direction === "borrowed" ? "repayment" : "amount received";

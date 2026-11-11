@@ -41,7 +41,6 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { TYPOGRAPHY } from "@/constants/typography";
 import {
-  cancelAllScheduledNotifications,
   scheduleAllNotifications,
   setupNotificationHandler,
 } from "@/utils/notifications";
@@ -298,24 +297,18 @@ function NotificationScheduler() {
   const finance = useFinance();
 
   useEffect(() => {
-    const s = finance.notificationSettings;
-    if (!s.enabled) {
-      cancelAllScheduledNotifications().catch(() => {});
-      return;
-    }
-    scheduleAllNotifications({
-      expenses: finance.expenses,
-      emis: finance.emis,
-      settings: s,
-      currency: finance.currency,
-      monthlyBudget: finance.monthlyBudget,
-      totalMonthlyExpenses: finance.totalMonthlyExpenses,
-      totalEMIMonthly: finance.totalEMIMonthly,
-    }).catch(() => {});
+    if (!finance.isReady || finance.storageError) return;
+    scheduleAllNotifications(finance).catch(error => console.warn("Payment reminders could not be updated:", error));
   }, [
+    finance.isReady,
+    finance.storageError,
+    finance.calendarKey,
     finance.notificationSettings,
     finance.expenses,
     finance.emis,
+    finance.loans,
+    finance.planning,
+    finance.transactions,
     finance.currency,
     finance.monthlyBudget,
     finance.totalMonthlyExpenses,
@@ -335,6 +328,9 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="transactions" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="budget" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="recurring" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="upcoming" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="legal" options={{ headerShown: false, presentation: "card" }} />

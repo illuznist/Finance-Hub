@@ -1,10 +1,13 @@
 import type { FinanceState } from "../context/FinanceContext";
 import { minorUnits, validateTransaction } from "./ledger";
+import { initialPlanning } from "./budgets";
+import { validateRecurring } from "./recurring";
 
 export const FINANCE_STORAGE_KEY = "@finance_state_v4";
 export const LEGACY_BACKUP_KEY = "@finance_state_v4_pre_ledger_backup";
 export const COMPATIBILITY_BACKUP_KEY = "@finance_state_v4_compatibility_backup";
-export const SCHEMA_VERSION = 1;
+export const PLANNING_BACKUP_KEY = "@finance_state_v4_pre_planning_backup";
+export const SCHEMA_VERSION = 2;
 
 type JsonRecord = Record<string, unknown>;
 function object(value: unknown, label: string): JsonRecord {
@@ -25,7 +28,7 @@ function records(value: unknown, name: string): JsonRecord[] {
 
 /** Pure, idempotent migration. Never guesses historic dates, accounts or cash flows. */
 export function migrateFinanceState(raw: string | null, empty: FinanceState): FinanceState {
-  if (raw === null) return { ...empty, schemaVersion: SCHEMA_VERSION, transactions: [], reconciliationRequired: false };
+  if (raw === null) return { ...empty, schemaVersion: SCHEMA_VERSION, transactions: [], reconciliationRequired: false, planning: initialPlanning(empty) };
   const parsed = object(JSON.parse(raw), "Saved finance data");
   if (parsed.schemaVersion !== undefined && (typeof parsed.schemaVersion !== "number" || parsed.schemaVersion > SCHEMA_VERSION)) {
     throw new Error("This data was saved by a newer app version. Update the app; the original data is unchanged.");
@@ -56,7 +59,8 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
       }
     }
   }
-  const legacy = parsed.schemaVersion !== SCHEMA_VERSION;
+  // Schema 1 already owns a ledger. Upgrading it must NEVER replay or discard it.
+  const legacy = parsed.schemaVersion === undefined || parsed.schemaVersion === 0;
   const currency = typeof parsed.currency === "string" && parsed.currency ? parsed.currency : empty.currency;
   const accounts = records(parsed.accounts, "accounts").map(a => {
     if (typeof a.balance !== "number") throw new Error("An account has an unreadable balance. Reconciliation is required.");
@@ -103,6 +107,23 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
     schemaVersion: SCHEMA_VERSION,
     reconciliationRequired: legacy ? accounts.length > 0 || emis.length > 0 || loans.length > 0 || records(parsed.expenses, "expenses").some(e => e.isPaid) : Boolean(parsed.reconciliationRequired),
   } as unknown as FinanceState;
+  if (!state.planning) state.planning = initialPlanning(state);
+  const planning = object(state.planning, "Planning data");
+  for (const key of ["plans", "periods", "recurring", "occurrences"]) {
+    if (!Array.isArray(planning[key])) throw new Error(`Saved planning ${key} could not be read; original records retained.`);
+  }
+  for (const r of state.planning.recurring) validateRecurring(r);
+  for (const p of state.planning.plans) {
+    if (!Number.isFinite(p.limit) || p.limit < 0 || !Array.isArray(p.categories)) throw new Error("Saved budget data could not be validated.");
+  }
+  for (const p of state.planning.periods) {
+    if (!Number.isFinite(p.limit) || (p.limit < 0 && (!p.carryDeficit || !p.carryFrom)) || !Array.isArray(p.categories)) throw new Error("Saved budget period could not be validated.");
+  }
+  const occurrenceIds = new Set<string>();
+  for (const o of state.planning.occurrences) {
+    if (!o.id || occurrenceIds.has(o.id) || !Number.isFinite(o.amount) || o.amount <= 0) throw new Error("Saved recurring occurrence could not be validated.");
+    occurrenceIds.add(o.id);
+  }
   for (const t of state.transactions ?? []) {
     validateTransaction(t, accounts as unknown as Parameters<typeof validateTransaction>[1]);
   }
@@ -136,10 +157,13 @@ export async function loadFinanceState(storage: FinanceStorage, empty: FinanceSt
   const raw = await storage.getItem(FINANCE_STORAGE_KEY);
   const migrated = migrateFinanceState(raw, empty);
   const original = raw === null ? null : JSON.parse(raw) as Partial<FinanceState>;
-  const legacy = original !== null && original.schemaVersion !== SCHEMA_VERSION;
+  const legacy = original !== null && (original.schemaVersion === undefined || original.schemaVersion === 0);
+  const planningUpgrade = original !== null && (original.schemaVersion !== SCHEMA_VERSION || !original.planning);
   const repairedAccounts = original?.accounts?.some(a => a.openingBalance === undefined) ?? false;
-  if (raw !== null && (legacy || repairedAccounts)) {
-    const backupKey = legacy ? LEGACY_BACKUP_KEY : COMPATIBILITY_BACKUP_KEY;
+  if (raw !== null && (legacy || repairedAccounts || planningUpgrade)) {
+    const backupKey = legacy ? LEGACY_BACKUP_KEY : planningUpgrade ? PLANNING_BACKUP_KEY : COMPATIBILITY_BACKUP_KEY;
+    // Preserve the compatibility backup too when this document needs both repairs.
+    if (repairedAccounts && await storage.getItem(COMPATIBILITY_BACKUP_KEY) === null) await storage.setItem(COMPATIBILITY_BACKUP_KEY, raw);
     if (await storage.getItem(backupKey) === null) await storage.setItem(backupKey, raw);
     await storage.setItem(FINANCE_STORAGE_KEY, JSON.stringify(migrated));
   }
