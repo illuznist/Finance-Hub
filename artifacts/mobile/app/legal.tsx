@@ -96,7 +96,7 @@ export default function LegalScreen() {
   const isPrivacy = type === "privacy";
   const title = isPrivacy ? "Privacy Policy" : "Terms & Conditions";
   const sections = isPrivacy ? PRIVACY_SECTIONS : TERMS_SECTIONS;
-  const topPad = Platform.OS === "web" ? 20 : insets.top;
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

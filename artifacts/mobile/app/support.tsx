@@ -129,7 +129,7 @@ export default function SupportScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const topPad = Platform.OS === "web" ? 20 : insets.top;
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   function openEmail(subject: string, body?: string) {
     const params = [`subject=${encodeURIComponent(subject)}`];

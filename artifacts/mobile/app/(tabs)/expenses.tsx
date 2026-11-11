@@ -14,6 +14,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
   type ScrollViewInstance,
 } from "react-native";
 import Swipeable, {
@@ -238,6 +239,7 @@ function AddExpenseModal({
 
 export default function ExpensesScreen() {
   const colors = useColors();
+  const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
@@ -308,11 +310,30 @@ export default function ExpensesScreen() {
       <CategoryFilter selected={selectedCat} onSelect={setSelectedCat} />
 
       {/* Summary row */}
-      <View style={[styles.summaryRow, { paddingHorizontal: 20, marginBottom: 8 }]}>
-        <Text style={[styles.summaryText, { color: colors.mutedForeground }]}>
+      <View
+        style={[
+          styles.summaryRow,
+          screenWidth <= 380 && styles.summaryRowCompact,
+          { paddingHorizontal: 20, marginTop: 6, marginBottom: 12 },
+        ]}
+      >
+        <Text
+          style={[
+            styles.summaryText,
+            screenWidth <= 380 && styles.summaryTextCompact,
+            { color: colors.mutedForeground },
+          ]}
+        >
           {filtered.length} expenses · {paidCount} paid
         </Text>
-        <Text style={[styles.summaryTotal, { color: colors.foreground }]}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.summaryTotal,
+            screenWidth <= 380 && styles.summaryTotalCompact,
+            { color: colors.foreground },
+          ]}
+        >
           {fmt(totalFiltered, finance.currency)}
         </Text>
       </View>
@@ -484,8 +505,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  summaryText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular" },
-  summaryTotal: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
+  summaryRowCompact: { flexDirection: "column", alignItems: "flex-start", gap: 4 },
+  summaryText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", flexShrink: 1 },
+  summaryTextCompact: { width: "100%" },
+  summaryTotal: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold", flexShrink: 1, textAlign: "right" },
+  summaryTotalCompact: { width: "100%", textAlign: "left" },
   expCard: {
     flexDirection: "row",
     alignItems: "center",

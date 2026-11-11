@@ -769,7 +769,7 @@ export default function LoansScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   addButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  pageContent: { paddingHorizontal: 17, paddingTop: 15, gap: 12 },
+  pageContent: { paddingHorizontal: 20, paddingTop: 16, gap: 12 },
   summaryRow: { flexDirection: "row", gap: 8 },
   summaryCard: { flex: 1, minWidth: 0, minHeight: 85, paddingHorizontal: 10, paddingVertical: 11, borderRadius: 14, borderWidth: 1, justifyContent: "space-between" },
   summaryDot: { width: 7, height: 7, borderRadius: 4 },

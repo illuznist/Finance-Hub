@@ -956,7 +956,7 @@ export default function EMIsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  listContent: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT, gap: 13 },
+  listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT, gap: 13 },
   monthlyHero: { borderRadius: 19, padding: 18, minHeight: 133, justifyContent: "center" },
   heroTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   heroIcon: { width: 28, height: 28, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },

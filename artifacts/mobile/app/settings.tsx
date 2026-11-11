@@ -218,7 +218,7 @@ export default function SettingsScreen() {
   const finance = useFinance();
   const auth = useAuth();
   const theme = useTheme();
-  const topPad = Platform.OS === "web" ? 20 : insets.top;
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(finance.userName);

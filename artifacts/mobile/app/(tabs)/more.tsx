@@ -9,8 +9,8 @@ import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
 const MORE_ITEMS = [
-  { title: "Wallets", description: "Accounts, income, and savings goals", icon: "credit-card" as const, route: "/(tabs)/wallets" as const },
-  { title: "Analytics", description: "Spending trends and monthly reports", icon: "bar-chart-2" as const, route: "/(tabs)/analytics" as const },
+  { title: "Wallets", description: "Accounts, income, and savings goals", icon: "credit-card" as const, route: "/wallets" as const },
+  { title: "Analytics", description: "Spending trends and monthly reports", icon: "bar-chart-2" as const, route: "/analytics" as const },
 ];
 
 export default function MoreScreen() {
@@ -27,7 +27,7 @@ export default function MoreScreen() {
             key={item.title}
             accessibilityRole="button"
             testID={`more-${item.title.toLowerCase()}`}
-            onPress={() => router.push(item.route)}
+            onPress={() => router.navigate(item.route)}
             style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
@@ -47,7 +47,7 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 110, gap: 12 },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 110, gap: 12 },
   intro: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular", marginBottom: 3 },
   item: { minHeight: 76, flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 16, borderWidth: 1 },
   iconWrap: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 13 },
