@@ -1,1 +1,2 @@
 - [FinanceApp visual continuity](financeapp-visual-continuity.md) — preserve the app’s existing blue palette during UI refinement.
+- [Native tab navigation](native-tab-navigation.md) — hidden NativeTabs cannot be opened; put secondary screens in a stack instead.

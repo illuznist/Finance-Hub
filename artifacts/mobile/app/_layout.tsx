@@ -331,6 +331,8 @@ function RootLayoutNav() {
       <NotificationScheduler />
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="wallets" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="legal" options={{ headerShown: false, presentation: "card" }} />

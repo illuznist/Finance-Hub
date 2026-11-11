@@ -34,8 +34,6 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
         <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="analytics" hidden />
-      <NativeTabs.Trigger name="wallets" hidden />
     </NativeTabs>
   );
 }
@@ -152,8 +150,6 @@ function ClassicTabLayout() {
           },
         }}
       />
-      <Tabs.Screen name="analytics" options={{ href: null }} />
-      <Tabs.Screen name="wallets" options={{ href: null }} />
     </Tabs>
   );
 }

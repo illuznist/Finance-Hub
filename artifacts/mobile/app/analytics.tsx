@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,8 +24,6 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { generateMonthlyReportHTML } from "@/utils/generateReport";
-
-const TAB_BAR_HEIGHT = 90;
 
 function fmt(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US")}`;
@@ -261,6 +260,17 @@ export default function AnalyticsScreen() {
         title="Analytics"
         topInset={topPad}
         colors={colors}
+        leading={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to More"
+            testID="analytics-back"
+            onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/more")}
+            style={{ minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center" }}
+          >
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
+          </Pressable>
+        }
         trailing={
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Pressable
@@ -313,7 +323,7 @@ export default function AnalyticsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0), gap: 16 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 + Math.max(insets.bottom, Platform.OS === "web" ? 34 : 0), gap: 16 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
