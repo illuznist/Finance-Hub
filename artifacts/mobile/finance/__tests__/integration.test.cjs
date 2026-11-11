@@ -79,6 +79,19 @@ test("paid expense edits synchronize the ledger and retain one movement", () => 
   assert.equal(s.transactions.length, 1); assert.equal(balance(s), 100); assert.equal(balance(s, "b"), 70);
   assert.equal(s.transactions[0].category, "Travel"); assert.equal(s.transactions[0].date, "2026-10-30");
 });
+test("editing a linked paid expense updates its existing noncanonical ledger row", () => {
+  let s = S.saveExpense(base(), { ...expense(), isPaid: true, accountId: "a", paidDate: today });
+  const original = { ...s.transactions[0], id: "imported-expense-row", operationId: "imported-expense-operation" };
+  s = { ...s, transactions: [original] };
+  s = commit(s, state => S.saveExpense(state, { ...state.expenses[0], amount: 35, name: "Corrected imported bill" }));
+  assert.equal(s.transactions.length, 1);
+  assert.equal(s.transactions[0].id, original.id);
+  assert.equal(s.transactions[0].operationId, original.operationId);
+  assert.equal(s.transactions[0].paymentId, original.paymentId);
+  assert.equal(s.transactions[0].amount, 35);
+  assert.equal(s.transactions[0].description, "Corrected imported bill");
+  assert.equal(balance(s), 65);
+});
 test("unpaying a paid expense reverses once even through the context pipeline", () => {
   let s = S.saveExpense(base(), { ...expense(), isPaid: true, accountId: "a", paidDate: today });
   const reverse = s => S.setExpensePayment(s, "e", { paid: false, operationId: "reverse" });

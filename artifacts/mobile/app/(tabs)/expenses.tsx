@@ -104,9 +104,11 @@ function CategoryFilter({
 function AddExpenseModal({
   visible,
   onClose,
+  editing,
 }: {
   visible: boolean;
   onClose: () => void;
+  editing: Expense | null;
 }) {
   const colors = useColors();
   const finance = useFinance();
@@ -119,24 +121,43 @@ function AddExpenseModal({
   const [icon, setIcon] = useState("zap");
   const submissionId = useRef(newId());
   const submitted = useRef(false);
-  useEffect(() => { if (visible) { submissionId.current = newId(); submitted.current = false; } }, [visible]);
+  useEffect(() => {
+    if (!visible) return;
+    submissionId.current = editing?.id ?? newId();
+    submitted.current = false;
+    setName(editing?.name ?? "");
+    setCategory(editing?.category ?? "Bills");
+    setAmount(editing ? String(editing.amount) : "");
+    setDueDate(editing ? String(editing.dueDate) : "1");
+    setIcon(editing?.iconName ?? "zap");
+  }, [visible, editing?.id]);
 
   function submit() {
     if (submitted.current || !name.trim() || !amount.trim()) return;
     submitted.current = true;
     const cat = category as string;
-    try { finance.addExpense({
-      id: submissionId.current,
+    const updates = {
       name: name.trim(),
       category: cat,
       amount: parseFloat(amount) || 0,
       dueDate: Math.max(1, Math.min(31, parseInt(dueDate) || 1)),
-      isPaid: false,
       iconName: icon,
-      color: CATEGORY_COLORS[cat] || "#8B5CF6",
-    }); } catch (error) { submitted.current = false; toast.show(error instanceof Error ? error.message : "Expense could not be saved."); return; }
+      color: CATEGORY_COLORS[cat] || editing?.color || "#8B5CF6",
+    };
+    try {
+      if (editing) finance.updateExpense(editing.id, updates);
+      else finance.addExpense({
+        id: submissionId.current,
+        ...updates,
+        isPaid: false,
+      });
+    } catch (error) {
+      submitted.current = false;
+      toast.show(error instanceof Error ? error.message : "Expense could not be saved.");
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    toast.show("Expense added");
+    toast.show(editing ? "Expense updated" : "Expense added");
     setName("");
     setAmount("");
     setDueDate("1");
@@ -150,7 +171,7 @@ function AddExpenseModal({
       <View style={styles.modalOverlay}>
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Expense</Text>
+          <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editing ? "Edit Expense" : "Add Expense"}</Text>
 
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
           <TextInput
@@ -163,7 +184,7 @@ function AddExpenseModal({
 
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-            {CATEGORIES.filter((c) => c !== "All").map((cat) => (
+            {[...new Set([...CATEGORIES.filter((c) => c !== "All"), ...(editing ? [editing.category] : [])])].map((cat) => (
               <Pressable
                 key={cat}
                 onPress={() => setCategory(cat)}
@@ -225,18 +246,20 @@ function AddExpenseModal({
             ))}
           </ScrollView>
 
-          <Pressable
-            testID="add-expense-recurring-link"
-            accessibilityRole="link"
-            onPress={() => { onClose(); router.push("/recurring?new=1"); }}
-            style={[styles.recurringHint, { backgroundColor: colors.secondary }]}
-          >
-            <Feather name="repeat" size={16} color={colors.primary} />
-            <Text style={[styles.recurringHintText, { color: colors.foreground }]}>
-              Repeats every month or week? Set it up as a recurring expense instead.
-            </Text>
-            <Feather name="chevron-right" size={16} color={colors.primary} />
-          </Pressable>
+          {!editing && (
+            <Pressable
+              testID="add-expense-recurring-link"
+              accessibilityRole="link"
+              onPress={() => { onClose(); router.push("/recurring?new=1"); }}
+              style={[styles.recurringHint, { backgroundColor: colors.secondary }]}
+            >
+              <Feather name="repeat" size={16} color={colors.primary} />
+              <Text style={[styles.recurringHintText, { color: colors.foreground }]}>
+                Repeats every month or week? Set it up as a recurring expense instead.
+              </Text>
+              <Feather name="chevron-right" size={16} color={colors.primary} />
+            </Pressable>
+          )}
 
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Pressable
@@ -246,10 +269,11 @@ function AddExpenseModal({
               <Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text>
             </Pressable>
             <Pressable
+              testID="expense-form-save"
               onPress={submit}
               style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}
             >
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Add</Text>
+              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{editing ? "Save changes" : "Add"}</Text>
             </Pressable>
           </View>
         </View>
@@ -266,6 +290,7 @@ export default function ExpensesScreen() {
   const router = useRouter();
   const [selectedCat, setSelectedCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -307,6 +332,7 @@ export default function ExpensesScreen() {
             testID="expense-add-button"
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setEditingExpense(null);
               setShowAdd(true);
             }}
           />
@@ -381,6 +407,10 @@ export default function ExpensesScreen() {
             key={exp.id}
             expense={exp}
             currency={finance.currency}
+            onEdit={() => {
+              setEditingExpense(exp);
+              setShowAdd(true);
+            }}
             onToggle={() => {
               if (!exp.isPaid) setPayingExpense(exp);
               else Alert.alert("Mark unpaid?", "This removes the current payment and restores its account balance.", [
@@ -403,7 +433,11 @@ export default function ExpensesScreen() {
       </ScrollView>
       )}
 
-      <AddExpenseModal visible={showAdd} onClose={() => setShowAdd(false)} />
+      <AddExpenseModal
+        visible={showAdd}
+        editing={editingExpense}
+        onClose={() => { setShowAdd(false); setEditingExpense(null); }}
+      />
       {payingExpense && <ExpensePaymentModal expense={payingExpense} onClose={() => setPayingExpense(null)} />}
     </View>
   );
@@ -412,11 +446,13 @@ export default function ExpensesScreen() {
 function ExpenseCard({
   expense,
   currency,
+  onEdit,
   onToggle,
   onDelete,
 }: {
   expense: Expense;
   currency: string;
+  onEdit: () => void;
   onToggle: () => void;
   onDelete: () => void;
 }) {
@@ -479,28 +515,43 @@ function ExpenseCard({
         <Text style={[styles.expAmount, { color: expense.isPaid ? colors.mutedForeground : colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
           {fmt(expense.amount, currency)}
         </Text>
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onToggle();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={expense.isPaid ? `Mark ${expense.name} as due` : `Mark ${expense.name} as paid`}
-          hitSlop={8}
-          style={[
-            styles.statusBtn,
-            { backgroundColor: expense.isPaid ? colors.successLight : colors.muted },
-          ]}
-        >
-          <Text
+        <View style={styles.expRightActions}>
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onToggle();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={expense.isPaid ? `Mark ${expense.name} as due` : `Mark ${expense.name} as paid`}
+            hitSlop={8}
             style={[
-              styles.statusBtnText,
-              { color: expense.isPaid ? colors.success : colors.foreground },
+              styles.statusBtn,
+              { backgroundColor: expense.isPaid ? colors.successLight : colors.muted },
             ]}
           >
-            {expense.isPaid ? "Paid" : "Mark paid"}
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.statusBtnText,
+                { color: expense.isPaid ? colors.success : colors.foreground },
+              ]}
+            >
+              {expense.isPaid ? "Paid" : "Mark paid"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID={`expense-edit-${expense.id}`}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onEdit();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit expense ${expense.name}`}
+            hitSlop={8}
+            style={[styles.editExpenseBtn, { backgroundColor: colors.secondary }]}
+          >
+            <Feather name="edit-2" size={14} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
       {Platform.OS === "web" && <Pressable accessibilityRole="button" accessibilityLabel={`Delete expense ${expense.name}`}
         onPress={onDelete} hitSlop={8} style={{ padding: 8 }}>
@@ -550,6 +601,8 @@ const styles = StyleSheet.create({
   expName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   expMeta: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
   expRight: { alignItems: "flex-end", gap: 6, maxWidth: "45%" },
+  expRightActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  editExpenseBtn: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   expAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   statusBtn: {
     minHeight: 28,

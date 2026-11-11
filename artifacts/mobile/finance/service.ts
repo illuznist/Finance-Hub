@@ -505,13 +505,22 @@ export function synchronizeDomain(previous: FinanceState, proposed: FinanceState
       const paymentId = e.paymentId ?? newId();
       const normalized = { ...e, paymentId, paidDate: e.paidDate ?? localDate(), currency: e.currency ?? next.currency };
       next = { ...next, expenses: next.expenses.map(x => x.id === e.id ? normalized : x) };
-      next = putMovement(next, {
-        id: `expense:${paymentId}`, type: "expense", amount: e.amount,
-        date: normalized.paidDate, description: e.name, category: e.category,
-        accountId: e.accountId, notes: e.notes, currency: normalized.currency,
-        referenceType: "expense", referenceId: e.id, paymentId,
-        recurringOccurrenceId: e.recurringOccurrenceId,
-      });
+      const linked = (next.transactions ?? []).find(t =>
+        t.referenceType === "expense" && t.referenceId === e.id && t.paymentId === paymentId);
+      if (linked) {
+        next = updateTransaction(next, linked.id, {
+          amount: e.amount, date: normalized.paidDate, description: e.name,
+          category: e.category, accountId: e.accountId, notes: e.notes,
+        });
+      } else {
+        next = putMovement(next, {
+          id: `expense:${paymentId}`, type: "expense", amount: e.amount,
+          date: normalized.paidDate, description: e.name, category: e.category,
+          accountId: e.accountId, notes: e.notes, currency: normalized.currency,
+          referenceType: "expense", referenceId: e.id, paymentId,
+          recurringOccurrenceId: e.recurringOccurrenceId,
+        });
+      }
     } else if (!e.isPaid && before?.isPaid && before.paymentId) {
       if ((next.transactions ?? []).some(t => t.referenceType === "expense" && t.referenceId === e.id && t.paymentId === before.paymentId)) {
         throw new Error("Reverse the linked expense transaction before marking the expense unpaid.");
