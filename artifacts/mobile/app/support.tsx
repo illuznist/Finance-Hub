@@ -235,8 +235,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderRadius: 20,
-    borderWidth: 1,
-    padding: 24,
+        padding: 24,
     alignItems: "center",
     marginBottom: 8,
   },
@@ -270,8 +269,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 18,
-    borderWidth: 1,
-    overflow: "hidden",
+        overflow: "hidden",
   },
   actionRow: {
     flexDirection: "row",

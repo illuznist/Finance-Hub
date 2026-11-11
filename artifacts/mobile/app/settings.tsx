@@ -377,7 +377,7 @@ export default function SettingsScreen() {
             {editingName ? (
               <TextInput
                 autoFocus
-                style={[styles.nameInput, { color: colors.foreground, borderBottomColor: colors.primary }]}
+                style={[styles.nameInput, { color: colors.foreground, backgroundColor: colors.muted }]}
                 value={nameValue}
                 onChangeText={setNameValue}
                 onBlur={() => {
@@ -453,7 +453,7 @@ export default function SettingsScreen() {
               <TextInput
                 autoFocus
                 keyboardType="numeric"
-                style={[styles.budgetInput, { color: colors.foreground, borderBottomColor: colors.primary }]}
+                style={[styles.budgetInput, { color: colors.foreground, backgroundColor: colors.muted }]}
                 value={budgetValue}
                 onChangeText={setBudgetValue}
                 onBlur={() => {
@@ -734,8 +734,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 18,
-    borderWidth: 1,
-    overflow: "hidden",
+        overflow: "hidden",
     marginBottom: 2,
   },
   profileRow: {
@@ -758,8 +757,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    borderBottomWidth: 1.5,
-    paddingBottom: 4,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   settingRow: {
     flexDirection: "row",
@@ -801,14 +801,16 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 56,
   },
-  budgetValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
+  budgetValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   budgetInput: {
     fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    borderBottomWidth: 1.5,
-    minWidth: 80,
+    fontFamily: "Inter_600SemiBold",
+    fontVariant: ["tabular-nums"],
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 96,
     textAlign: "right",
-    paddingBottom: 2,
   },
   pinModalOverlay: {
     flex: 1,

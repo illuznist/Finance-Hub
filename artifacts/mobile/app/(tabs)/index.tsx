@@ -35,20 +35,6 @@ function fmt(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
 }
 
-function AnimatedCard({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: object;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-  return (
-    <Animated.View style={[{ transform: [{ scale }] }, style]}>
-      {children}
-    </Animated.View>
-  );
-}
 
 function ExpenseRow({
   name,
@@ -280,16 +266,6 @@ function ResetBanner() {
   );
 }
 
-const INSIGHTS = [
-  { icon: "trending-up", text: "18% more spent\nthis month", color: "#F59E0B" },
-  { icon: "bell", text: "3 payments due\nnext week", color: "#EF4444" },
-  { icon: "layers", text: "SAR 117 on\nsubscriptions", color: "#8B5CF6" },
-  {
-    icon: "trending-down",
-    text: "Can save SAR 900\non food delivery",
-    color: "#10B981",
-  },
-];
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -402,9 +378,6 @@ export default function DashboardScreen() {
             </View>
             <Text style={[styles.greetingText, { color: colors.foreground }]}>
               {greeting(finance.userName)}
-            </Text>
-            <Text style={[styles.greetingSubtitle, { color: colors.mutedForeground }]}>
-              Here's your financial summary
             </Text>
           </View>
         </View>
@@ -702,56 +675,11 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ── Smart Insights ── */}
-        <Text
-          style={[
-            styles.sectionTitle,
-            { color: colors.foreground, marginBottom: 12 },
-          ]}
-        >
-          Smart Insights
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 10, paddingRight: 4 }}
-          style={{ marginBottom: 24 }}
-        >
-          {INSIGHTS.map((ins, i) => (
-            <AnimatedCard key={i}>
-              <View
-                style={[
-                  styles.insightChip,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: ins.color + "40",
-                    borderWidth: 1,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.insightIconWrap,
-                    { backgroundColor: ins.color + "20" },
-                  ]}
-                >
-                  <Feather name={ins.icon as any} size={16} color={ins.color} />
-                </View>
-                <Text
-                  style={[styles.insightText, { color: colors.foreground }]}
-                >
-                  {ins.text}
-                </Text>
-              </View>
-            </AnimatedCard>
-          ))}
-        </ScrollView>
-
         {/* ── Active EMIs ── */}
         <Text
           style={[
             styles.sectionTitle,
-            { color: colors.foreground, marginBottom: 12 },
+            { color: colors.foreground, marginBottom: 12, marginTop: 4 },
           ]}
         >
           Active EMIs
@@ -926,11 +854,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     lineHeight: 30,
   },
-  greetingSubtitle: {
-    fontSize: TYPOGRAPHY.bodySmall,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
   // Hero balance card
   balanceCard: {
     position: "relative",
@@ -977,7 +900,7 @@ const styles = StyleSheet.create({
   },
   balanceAmount: {
     fontSize: TYPOGRAPHY.displayValue,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     color: "#FFFFFF",
     marginTop: 4,
     marginBottom: 14,
@@ -1005,6 +928,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: "#FFFFFF",
     marginTop: 6,
+    fontVariant: ["tabular-nums"],
   },
   balanceSep: {
     width: 1,
@@ -1018,7 +942,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     gap: 12,
-    borderWidth: 1,
   },
   remainingTop: {
     flexDirection: "row",
@@ -1033,8 +956,9 @@ const styles = StyleSheet.create({
   },
   remainingAmount: {
     fontSize: TYPOGRAPHY.heroValue,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     lineHeight: 34,
+    fontVariant: ["tabular-nums"],
   },
   remainingSubtitle: {
     fontSize: TYPOGRAPHY.bodySmall,
@@ -1075,7 +999,6 @@ const styles = StyleSheet.create({
   savingsCard: {
     borderRadius: 20,
     padding: 18,
-    borderWidth: 1,
     gap: 12,
   },
   savingsHeader: {
@@ -1104,7 +1027,7 @@ const styles = StyleSheet.create({
   },
   savingsTitle: {
     fontSize: TYPOGRAPHY.cardTitle,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   savingsSubtitle: {
     fontSize: TYPOGRAPHY.bodySmall,
@@ -1113,8 +1036,9 @@ const styles = StyleSheet.create({
   },
   savingsTotal: {
     fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     flexShrink: 0,
+    fontVariant: ["tabular-nums"],
   },
   savingsGoalRow: {
     flexDirection: "row",
@@ -1153,7 +1077,7 @@ const styles = StyleSheet.create({
   },
   savingsBreakdownValue: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"]
   },
 
   // Shared
@@ -1167,24 +1091,6 @@ const styles = StyleSheet.create({
     marginBottom: -4,
   },
   sectionCount: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular" },
-  insightChip: {
-    borderRadius: 14,
-    padding: 14,
-    width: 140,
-    gap: 10,
-  },
-  insightIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  insightText: {
-    fontSize: TYPOGRAPHY.bodySmall,
-    fontFamily: "Inter_500Medium",
-    lineHeight: 18,
-  },
   expenseRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1197,7 +1103,6 @@ const styles = StyleSheet.create({
   },
   expenseList: {
     borderRadius: 16,
-    borderWidth: 1,
     overflow: "hidden",
   },
   expenseIcon: {
@@ -1210,7 +1115,7 @@ const styles = StyleSheet.create({
   expenseInfo: { flex: 1 },
   expenseName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   expenseDue: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
-  expenseAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
+  expenseAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   paidBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1222,7 +1127,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 14,
     padding: 14,
-    borderWidth: 1,
     gap: 12,
   },
   emiMiniHeader: {

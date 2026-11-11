@@ -31,7 +31,7 @@ const ACCENT = "#60A5FA";
 const ACCENT2 = "#34D399";
 const ACCENT3 = "#A78BFA";
 const TEXT = "#F0F6FF";
-const MUTED = "#64748B";
+const MUTED = "#94A3B8";
 const CARD = "#0D1420";
 const BORDER = "#1A2A45";
 
@@ -411,8 +411,6 @@ const styles = StyleSheet.create({
     backgroundColor: CARD,
     borderRadius: 14,
     padding: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
   },
   featureIcon: {
     width: 36,
@@ -439,18 +437,14 @@ const styles = StyleSheet.create({
   formGroup: { marginBottom: 24 },
   label: {
     fontFamily: "Inter_500Medium",
-    fontSize: TYPOGRAPHY.supporting,
+    fontSize: TYPOGRAPHY.bodySmall,
     color: MUTED,
     marginBottom: 8,
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
   },
   input: {
     height: 52,
-    backgroundColor: CARD,
+    backgroundColor: "#111E35",
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
     paddingHorizontal: 16,
     color: TEXT,
     fontFamily: "Inter_500Medium",
@@ -492,10 +486,8 @@ const styles = StyleSheet.create({
   budgetInputRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: CARD,
+    backgroundColor: "#111E35",
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
     paddingHorizontal: 16,
     height: 60,
   },
@@ -521,7 +513,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 9,
     backgroundColor: CARD,
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: BORDER,
   },

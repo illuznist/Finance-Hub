@@ -7,6 +7,7 @@ import {
 } from "@expo-google-fonts/inter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Stack } from "expo-router";
@@ -63,19 +64,19 @@ function NumPad({
   onPress: (d: string) => void;
   onBackspace: () => void;
 }) {
-  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","del"];
   return (
     <View style={pinStyles.numpad}>
       {keys.map((k, i) => (
         <Pressable
           key={i}
-          onPress={() => (k === "⌫" ? onBackspace() : k ? onPress(k) : undefined)}
+          onPress={() => (k === "del" ? onBackspace() : k ? onPress(k) : undefined)}
           style={({ pressed }) => [
             pinStyles.numKey,
             { opacity: k === "" ? 0 : pressed ? 0.6 : 1 },
           ]}
         >
-          <Text style={pinStyles.numKeyText}>{k}</Text>
+          {k === "del" ? <Feather name="delete" size={22} color="#fff" accessibilityLabel="Delete digit" /> : <Text style={pinStyles.numKeyText}>{k}</Text>}
         </Pressable>
       ))}
     </View>
@@ -132,7 +133,7 @@ function PinEntry({
     <View style={pinStyles.screen}>
       <View style={pinStyles.lockIcon}>
         <View style={pinStyles.lockIconInner}>
-          <Text style={{ fontSize: 28 }}>{"🔒"}</Text>
+          <Feather name="lock" size={26} color="#60A5FA" />
         </View>
       </View>
       <Text style={pinStyles.title}>Enter PIN</Text>

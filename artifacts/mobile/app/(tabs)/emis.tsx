@@ -154,11 +154,11 @@ function DonutChart({ progress, color, bgColor }: { progress: number; color: str
 function SummaryMetric({ label, value, icon, color }: { label: string; value: string; icon: React.ComponentProps<typeof Feather>["name"]; color: string }) {
   const colors = useColors();
   return (
-    <View style={[styles.metric, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={styles.metric}>
       <View style={[styles.metricIcon, { backgroundColor: color + "20" }]}>
-        <Feather name={icon} size={15} color={color} />
+        <Feather name={icon} size={14} color={color} />
       </View>
-      <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.metricLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.metricValue, { color: colors.foreground }]}>{value}</Text>
     </View>
   );
@@ -315,7 +315,7 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, multilin
         style={[
           styles.input,
           multiline && styles.multilineInput,
-          { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border },
+          { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" },
         ]}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
@@ -820,7 +820,6 @@ export default function EMIsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="EMI plans"
-        subtitle="Repayment tracking"
         topInset={topPad}
         colors={colors}
         trailing={
@@ -866,11 +865,10 @@ export default function EMIsScreen() {
             <Text style={styles.heroFootnote}>{totals.activeCount} active repayment {totals.activeCount === 1 ? "plan" : "plans"}</Text>
           </LinearGradient>
 
-          <View style={styles.metricsGrid}>
+          <View style={[styles.metricsGrid, { backgroundColor: colors.card }]}>
             <SummaryMetric label="Amount paid" value={fmt(totals.paid, finance.currency)} icon="check-circle" color={colors.success} />
             <SummaryMetric label="Monthly balance" value={fmt(totals.monthlyBalance, finance.currency)} icon="clock" color={colors.primary} />
             <SummaryMetric label="Balloon balance" value={fmt(totals.balloonBalance, finance.currency)} icon="flag" color={colors.warning} />
-            <SummaryMetric label="Active plans" value={String(totals.activeCount)} icon="layers" color={colors.accent} />
           </View>
 
           {activeEMIs.length === 0 && completedEMIs.length === 0 && (
@@ -961,29 +959,29 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   heroIcon: { width: 28, height: 28, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
   heroLabel: { color: "rgba(255,255,255,0.82)", fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium" },
-  monthlyHeroValue: { color: "#FFFFFF", fontSize: TYPOGRAPHY.heroValue, fontFamily: "Inter_700Bold", marginTop: 9 },
+  monthlyHeroValue: { color: "#FFFFFF", fontSize: TYPOGRAPHY.heroValue, fontFamily: "Inter_600SemiBold", marginTop: 9, fontVariant: ["tabular-nums"] },
   heroFootnote: { color: "rgba(255,255,255,0.72)", fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
-  metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  metric: { width: "48%", flexGrow: 1, minHeight: 93, borderRadius: 15, borderWidth: 1, padding: 12, justifyContent: "space-between" },
-  metricIcon: { width: 27, height: 27, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  metricLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginTop: 8 },
-  metricValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold", marginTop: 2 },
+  metricsGrid: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6 },
+  metric: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 46 },
+  metricIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  metricLabel: { flex: 1, fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
+  metricValue: { fontSize: TYPOGRAPHY.cardTitle, flexShrink: 1, textAlign: "right", fontFamily: "Inter_600SemiBold", marginTop: 0, fontVariant: ["tabular-nums"] },
   listHeading: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold", marginTop: 4 },
-  emiCard: { borderRadius: 19, padding: 15, borderWidth: 1, gap: 12 },
+  emiCard: { borderRadius: 19, padding: 15, gap: 12 },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   cardTitleGroup: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   emiIcon: { width: 43, height: 43, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  emiName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_700Bold" },
+  emiName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   emiDue: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
   chartRow: { flexDirection: "row", alignItems: "center", gap: 11 },
   donutWrap: { width: DONUT_SIZE, height: DONUT_SIZE, alignItems: "center", justifyContent: "center" },
   donutCenter: { position: "absolute", alignItems: "center", justifyContent: "center", maxWidth: 82 },
-  donutAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold", textAlign: "center" },
+  donutAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", textAlign: "center", fontVariant: ["tabular-nums"] },
   donutLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
   emiStats: { flex: 1, gap: 7 },
   statRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 6 },
   statLabel: { flex: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
-  statValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  statValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right", fontVariant: ["tabular-nums"] },
   divider: { height: 1 },
   progressTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   progressFill: { height: 6, borderRadius: 3 },
@@ -997,7 +995,7 @@ const styles = StyleSheet.create({
   quickPayText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
   emptyState: { alignItems: "center", paddingHorizontal: 20, paddingVertical: 32, gap: 8 },
   emptyIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 3 },
-  emptyText: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_700Bold" },
+  emptyText: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   helperText: { fontSize: TYPOGRAPHY.bodySmall, lineHeight: 19, fontFamily: "Inter_400Regular" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
   formSheet: { maxHeight: "94%", borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 20, paddingTop: 11, paddingBottom: 20 },
@@ -1006,14 +1004,14 @@ const styles = StyleSheet.create({
   modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   modalTitle: { fontSize: TYPOGRAPHY.dialogTitle, fontFamily: "Inter_700Bold" },
-  sectionLabel: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold", marginTop: 8, marginBottom: 9 },
+  sectionLabel: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold", marginTop: 16, marginBottom: 12 },
   fieldWrap: { flex: 1, marginBottom: 10 },
-  fieldLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginBottom: 5 },
-  input: { minHeight: 45, borderRadius: 11, paddingHorizontal: 12, fontSize: 16, fontFamily: "Inter_400Regular", borderWidth: 1 },
+  fieldLabel: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", marginBottom: 8 },
+  input: { minHeight: 50, borderRadius: 12, paddingHorizontal: 14, fontSize: 16, fontFamily: "Inter_400Regular", borderWidth: 1 },
   multilineInput: { minHeight: 70, paddingTop: 11 },
   twoFields: { flexDirection: "row", gap: 10 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 12 },
-  choiceChip: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 9, borderWidth: 1 },
+  choiceChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
   choiceText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   toggleRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 },
   toggleLabel: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
@@ -1021,7 +1019,7 @@ const styles = StyleSheet.create({
   toggleTrack: { width: 43, height: 25, borderRadius: 13, padding: 3, justifyContent: "center" },
   toggleThumb: { width: 19, height: 19, borderRadius: 10 },
   accountChoices: { gap: 7, marginBottom: 10 },
-  accountChoice: { minHeight: 43, flexDirection: "row", alignItems: "center", gap: 9, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10 },
+  accountChoice: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10 },
   errorText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginVertical: 7 },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 8 },
   actionButton: { flex: 1, minHeight: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
@@ -1031,14 +1029,14 @@ const styles = StyleSheet.create({
   detailSubTitle: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", marginTop: 2 },
   headerIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
   detailContent: { paddingBottom: 28, gap: 11 },
-  detailHero: { borderRadius: 17, padding: 16, borderWidth: 1 },
+  detailHero: { borderRadius: 17, padding: 16, },
   heroCaption: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium" },
-  heroAmount: { fontSize: TYPOGRAPHY.heroValue, fontFamily: "Inter_700Bold", marginTop: 4, marginBottom: 14 },
+  heroAmount: { fontSize: TYPOGRAPHY.heroValue, fontFamily: "Inter_600SemiBold", marginTop: 4, marginBottom: 14, fontVariant: ["tabular-nums"] },
   detailHeroStats: { flexDirection: "row", alignItems: "center", gap: 14 },
   heroDivider: { width: 1, height: 30 },
   heroStatLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
-  heroStatValue: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", marginTop: 4 },
-  infoCard: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
+  heroStatValue: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", marginTop: 4, fontVariant: ["tabular-nums"] },
+  infoCard: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 9 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", gap: 10, paddingVertical: 6 },
   infoLabel: { flex: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
   infoValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right" },
@@ -1053,7 +1051,7 @@ const styles = StyleSheet.create({
   paymentTypeIcon: { width: 25, height: 25, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   paymentTitle: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   paymentMeta: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
-  paymentAmount: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
+  paymentAmount: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   paymentControl: { width: 24, height: 30, alignItems: "center", justifyContent: "center" },
   disclaimer: { fontSize: TYPOGRAPHY.supporting, lineHeight: 16, fontFamily: "Inter_400Regular", paddingHorizontal: 3 },
 });

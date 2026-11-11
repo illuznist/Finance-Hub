@@ -163,7 +163,7 @@ function LoanField({ label, value, onChangeText, placeholder, numeric, multiline
         style={[
           styles.input,
           multiline && styles.multilineInput,
-          { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border },
+          { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" },
         ]}
       />
     </View>
@@ -586,9 +586,9 @@ function SummaryItem({ title, amount, color }: { title: string; amount: number; 
   const finance = useFinance();
   const colors = useColors();
   return (
-    <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.summaryCard]}>
       <View style={[styles.summaryDot, { backgroundColor: color }]} />
-      <Text numberOfLines={1} style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{title}</Text>
+      <Text numberOfLines={1} style={[styles.summaryLabel, { color: colors.mutedForeground, flex: 1 }]}>{title}</Text>
       <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.summaryValue, { color: colors.foreground }]}>{fmt(amount, finance.currency)}</Text>
     </View>
   );
@@ -648,7 +648,7 @@ export default function LoansScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Loans"
-        subtitle="Money borrowed and lent"
+        subtitle={`${finance.activeLoanCount} active · ${finance.settledLoanCount} settled`}
         topInset={topPad}
         colors={colors}
         trailing={
@@ -664,18 +664,11 @@ export default function LoansScreen() {
       />
 
       <ScrollView contentContainerStyle={[styles.pageContent, { paddingBottom: 100 + (Platform.OS === "web" ? 34 : 0) }]} showsVerticalScrollIndicator={false}>
-        <View style={styles.summaryRow}>
+        <View style={[styles.summaryRow, { backgroundColor: colors.card }]}>
           <SummaryItem title="You Owe" amount={finance.outstandingBorrowedBalance} color={colors.warning} />
           <SummaryItem title="Owed to You" amount={finance.outstandingLentBalance} color={colors.success} />
           <SummaryItem title="Repaid" amount={finance.totalRepaidOnBorrowedLoans} color={colors.primary} />
-        </View>
-        <View style={styles.countRow}>
-          <Text style={[styles.countText, { color: colors.mutedForeground }]}>{finance.activeLoanCount} active</Text>
-          <View style={[styles.countDot, { backgroundColor: colors.border }]} />
-          <Text style={[styles.countText, { color: colors.mutedForeground }]}>{finance.settledLoanCount} settled</Text>
-          <Text style={[styles.countText, { color: colors.mutedForeground, marginLeft: "auto" }]}>
-            {fmt(finance.totalReceivedOnLentLoans, finance.currency)} received
-          </Text>
+          <SummaryItem title="Received" amount={finance.totalReceivedOnLentLoans} color={colors.accent} />
         </View>
 
         <View style={styles.listHeader}>
@@ -695,9 +688,9 @@ export default function LoansScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 onPress={() => setFilter(item.value)}
-                style={[styles.filterChip, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}
+                style={({ pressed }) => [styles.filterChip, { opacity: pressed ? 0.7 : 1, backgroundColor: active ? colors.foreground : "transparent", borderColor: active ? colors.foreground : colors.border }]}
               >
-                <Text style={[styles.filterText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{item.label}</Text>
+                <Text style={[styles.filterText, { color: active ? colors.background : colors.mutedForeground }]}>{item.label}</Text>
               </Pressable>
             );
           })}
@@ -770,40 +763,37 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   addButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   pageContent: { paddingHorizontal: 20, paddingTop: 16, gap: 12 },
-  summaryRow: { flexDirection: "row", gap: 8 },
-  summaryCard: { flex: 1, minWidth: 0, minHeight: 85, paddingHorizontal: 10, paddingVertical: 11, borderRadius: 14, borderWidth: 1, justifyContent: "space-between" },
+  summaryRow: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 6 },
+  summaryCard: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 },
   summaryDot: { width: 7, height: 7, borderRadius: 4 },
-  summaryLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginTop: 6 },
-  summaryValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold", marginTop: 3 },
-  countRow: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 2 },
-  countText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium" },
-  countDot: { width: 3, height: 3, borderRadius: 2 },
+  summaryLabel: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
+  summaryValue: { fontSize: TYPOGRAPHY.cardTitle, flexShrink: 1, textAlign: "right", fontFamily: "Inter_600SemiBold", marginTop: 0, fontVariant: ["tabular-nums"] },
   listHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
   sectionHeading: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold" },
   addInline: { flexDirection: "row", alignItems: "center", gap: 4, padding: 5 },
   addInlineText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_600SemiBold" },
   filterRow: { flexDirection: "row", gap: 7, paddingRight: 10 },
-  filterChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1 },
   filterText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   loanList: { gap: 10 },
-  loanCard: { padding: 14, borderRadius: 17, borderWidth: 1, gap: 10 },
+  loanCard: { padding: 14, borderRadius: 17, gap: 10 },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   loanIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  loanName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_700Bold" },
+  loanName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   counterparty: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
   tagRow: { flexDirection: "row", gap: 6 },
   statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 7 },
   statusText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   balanceRow: { flexDirection: "row", gap: 10 },
   cardLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
-  cardAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold", marginTop: 3 },
+  cardAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", marginTop: 3, fontVariant: ["tabular-nums"] },
   progressTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   progressFill: { height: 6, borderRadius: 3 },
   progressCaptionRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   progressCaption: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium" },
   emptyState: { alignItems: "center", paddingHorizontal: 26, paddingVertical: 36, gap: 8 },
   emptyIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 2 },
-  emptyTitle: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_700Bold" },
+  emptyTitle: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   emptyDescription: { fontSize: TYPOGRAPHY.bodySmall, lineHeight: 19, textAlign: "center", fontFamily: "Inter_400Regular" },
   emptyButton: { paddingHorizontal: 15, height: 42, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 6 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
@@ -814,12 +804,12 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   modalTitle: { fontSize: TYPOGRAPHY.dialogTitle, fontFamily: "Inter_700Bold" },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 12, marginTop: 5 },
-  choiceChip: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 9, borderWidth: 1 },
+  choiceChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
   choiceText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
-  sectionTitle: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold", marginTop: 8, marginBottom: 9 },
+  sectionTitle: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold", marginTop: 16, marginBottom: 12 },
   fieldWrap: { flex: 1, marginBottom: 10 },
-  fieldLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginBottom: 5 },
-  input: { minHeight: 45, borderRadius: 11, paddingHorizontal: 12, fontSize: 16, fontFamily: "Inter_400Regular", borderWidth: 1 },
+  fieldLabel: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", marginBottom: 8 },
+  input: { minHeight: 50, borderRadius: 12, paddingHorizontal: 14, fontSize: 16, fontFamily: "Inter_400Regular", borderWidth: 1 },
   multilineInput: { minHeight: 70, paddingTop: 11 },
   optionalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 5 },
   errorText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginVertical: 7 },
@@ -832,12 +822,12 @@ const styles = StyleSheet.create({
   detailSubtitle: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
   headerIcon: { width: 33, height: 33, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   detailContent: { paddingBottom: 28, gap: 11 },
-  outstandingCard: { borderRadius: 17, padding: 16, borderWidth: 1, gap: 10 },
+  outstandingCard: { borderRadius: 17, padding: 16, gap: 10 },
   outstandingTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   detailLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium" },
-  outstandingValue: { fontSize: TYPOGRAPHY.heroValue, fontFamily: "Inter_700Bold" },
+  outstandingValue: { fontSize: TYPOGRAPHY.heroValue, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   recordButton: { minHeight: 46, borderRadius: 12, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center" },
-  infoCard: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  infoCard: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", gap: 10, paddingVertical: 6 },
   infoLabel: { flex: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
   infoValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right" },
@@ -848,7 +838,7 @@ const styles = StyleSheet.create({
   paymentIcon: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   paymentTitle: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   paymentMeta: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
-  paymentAmount: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
+  paymentAmount: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   paymentControl: { width: 23, height: 30, alignItems: "center", justifyContent: "center" },
   infoNote: { fontSize: TYPOGRAPHY.supporting, lineHeight: 16, fontFamily: "Inter_400Regular", paddingHorizontal: 3 },
   deleteLoanButton: { minHeight: 44, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },

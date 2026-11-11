@@ -14,8 +14,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
-  type ScrollViewInstance,
 } from "react-native";
 import Swipeable, {
   type SwipeableMethods,
@@ -76,18 +74,19 @@ function CategoryFilter({
               Haptics.selectionAsync();
               onSelect(cat);
             }}
-            style={[
+            style={({ pressed }) => [
               styles.catChip,
+              { opacity: pressed ? 0.7 : 1 },
               {
-                backgroundColor: active ? colors.primary : colors.card,
-                borderColor: active ? colors.primary : colors.border,
+                backgroundColor: active ? colors.foreground : "transparent",
+                borderColor: active ? colors.foreground : colors.border,
               },
             ]}
           >
             <Text
               style={[
                 styles.catChipText,
-                { color: active ? colors.primaryForeground : colors.mutedForeground },
+                { color: active ? colors.background : colors.mutedForeground },
               ]}
             >
               {cat}
@@ -146,7 +145,7 @@ function AddExpenseModal({
 
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+            style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
             placeholder="Expense name"
             placeholderTextColor={colors.mutedForeground}
             value={name}
@@ -177,7 +176,7 @@ function AddExpenseModal({
                 Amount ({finance.currency})
               </Text>
               <TextInput
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
                 placeholder="0"
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="numeric"
@@ -188,7 +187,7 @@ function AddExpenseModal({
             <View style={{ flex: 1 }}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Due Day</Text>
               <TextInput
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
                 placeholder="1-31"
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="numeric"
@@ -239,7 +238,6 @@ function AddExpenseModal({
 
 export default function ExpensesScreen() {
   const colors = useColors();
-  const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
@@ -266,7 +264,6 @@ export default function ExpensesScreen() {
     .filter((e) => !search.trim() || e.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   const totalFiltered = filtered.reduce((s, e) => s + e.amount, 0);
-  const paidCount = filtered.filter((e) => e.isPaid).length;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -289,11 +286,11 @@ export default function ExpensesScreen() {
       />
 
       {/* Search bar */}
-      <View style={[styles.searchWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+      <View style={[styles.searchWrap, { backgroundColor: colors.muted }]}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder="Search expenses..."
+          placeholder="Search"
           placeholderTextColor={colors.mutedForeground}
           value={search}
           onChangeText={setSearch}
@@ -309,30 +306,16 @@ export default function ExpensesScreen() {
 
       <CategoryFilter selected={selectedCat} onSelect={setSelectedCat} />
 
-      {/* Summary row */}
-      <View
-        style={[
-          styles.summaryRow,
-          screenWidth <= 380 && styles.summaryRowCompact,
-          { paddingHorizontal: 20, marginTop: 6, marginBottom: 12 },
-        ]}
-      >
-        <Text
-          style={[
-            styles.summaryText,
-            screenWidth <= 380 && styles.summaryTextCompact,
-            { color: colors.mutedForeground },
-          ]}
-        >
-          {filtered.length} expenses · {paidCount} paid
+      {/* Filtered total */}
+      <View style={styles.summaryBlock} accessible accessibilityLabel={`${search.trim() ? "Matching expenses" : selectedCat === "All" ? "Total expenses" : selectedCat + " total"} ${fmt(totalFiltered, finance.currency)}`}>
+        <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>
+          {search.trim() ? "Matching expenses" : selectedCat === "All" ? "Total expenses" : `${selectedCat} total`}
         </Text>
         <Text
           numberOfLines={1}
-          style={[
-            styles.summaryTotal,
-            screenWidth <= 380 && styles.summaryTotalCompact,
-            { color: colors.foreground },
-          ]}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[styles.summaryTotal, { color: colors.foreground }]}
         >
           {fmt(totalFiltered, finance.currency)}
         </Text>
@@ -356,9 +339,11 @@ export default function ExpensesScreen() {
       >
         {filtered.length === 0 && (
           <View style={styles.emptyState}>
-            <Feather name="inbox" size={36} color={colors.mutedForeground} />
+            <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
+              <Feather name="inbox" size={22} color={colors.primary} />
+            </View>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              No expenses in this category
+              {search.trim() ? "No matching expenses" : "Nothing here yet"}
             </Text>
           </View>
         )}
@@ -442,7 +427,7 @@ function ExpenseCard({
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
     <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false} rightThreshold={60}>
-    <View style={[styles.expCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.expCard, { backgroundColor: colors.card }]}>
       <View style={[styles.expIconWrap, { backgroundColor: expense.color + "20" }]}>
         <Feather name={expense.iconName as any} size={20} color={expense.color} />
       </View>
@@ -455,7 +440,7 @@ function ExpenseCard({
         </Text>
       </View>
       <View style={styles.expRight}>
-        <Text style={[styles.expAmount, { color: colors.foreground }]}>
+        <Text style={[styles.expAmount, { color: expense.isPaid ? colors.mutedForeground : colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
           {fmt(expense.amount, currency)}
         </Text>
         <TouchableOpacity
@@ -463,18 +448,21 @@ function ExpenseCard({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onToggle();
           }}
+          accessibilityRole="button"
+          accessibilityLabel={expense.isPaid ? `Mark ${expense.name} as due` : `Mark ${expense.name} as paid`}
+          hitSlop={8}
           style={[
             styles.statusBtn,
-            { backgroundColor: expense.isPaid ? colors.successLight : colors.errorLight },
+            { backgroundColor: expense.isPaid ? colors.successLight : colors.muted },
           ]}
         >
           <Text
             style={[
               styles.statusBtnText,
-              { color: expense.isPaid ? colors.success : colors.destructive },
+              { color: expense.isPaid ? colors.success : colors.foreground },
             ]}
           >
-            {expense.isPaid ? "Paid" : "Due"}
+            {expense.isPaid ? "Paid" : "Mark paid"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -500,22 +488,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   catChipText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium" },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  summaryRowCompact: { flexDirection: "column", alignItems: "flex-start", gap: 4 },
-  summaryText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", flexShrink: 1 },
-  summaryTextCompact: { width: "100%" },
-  summaryTotal: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold", flexShrink: 1, textAlign: "right" },
-  summaryTotalCompact: { width: "100%", textAlign: "left" },
+  summaryBlock: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
+  summaryLabel: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium" },
+  summaryTotal: { fontSize: TYPOGRAPHY.heroValue, lineHeight: 40, fontFamily: "Inter_700Bold", fontVariant: ["tabular-nums"], letterSpacing: -0.6, marginTop: 4 },
   expCard: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     gap: 12,
   },
   expIconWrap: {
@@ -525,25 +506,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  expInfo: { flex: 1 },
+  expInfo: { flex: 1, minWidth: 0 },
   expName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   expMeta: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
-  expRight: { alignItems: "flex-end", gap: 5 },
-  expAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
+  expRight: { alignItems: "flex-end", gap: 6, maxWidth: "45%" },
+  expAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   statusBtn: {
+    minHeight: 28,
+    justifyContent: "center",
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
   statusBtnText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 4,
+    marginTop: 12,
+    marginBottom: 2,
     borderRadius: 14,
-    borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 10,
@@ -555,9 +537,10 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    paddingTop: 60,
-    gap: 12,
+    paddingTop: 56,
+    gap: 14,
   },
+  emptyIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
   emptyText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
   modalOverlay: {
     flex: 1,
@@ -578,14 +561,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: { fontSize: TYPOGRAPHY.dialogTitle, fontFamily: "Inter_700Bold", marginBottom: 20 },
-  fieldLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginBottom: 6, letterSpacing: 0.5 },
+  fieldLabel: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", marginBottom: 8 },
   input: {
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
     fontFamily: "Inter_400Regular",
-    marginBottom: 16,
+    marginBottom: 18,
     borderWidth: 1,
+    borderColor: "transparent",
   },
   iconOption: {
     width: 44,

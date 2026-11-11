@@ -5,15 +5,17 @@ import { NativeTabs } from "expo-router/native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { useTheme } from "@/context/ThemeContext";
 
 function NativeTabLayout() {
+  const colors = useColors();
   return (
-    <NativeTabs>
+    <NativeTabs tintColor={colors.primary} backgroundColor={colors.card}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
@@ -40,9 +42,9 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const colors = useColors();
-  const colorScheme = useColorScheme();
+  const { resolvedScheme } = useTheme();
   const safeAreaInsets = useSafeAreaInsets();
-  const isDark = colorScheme === "dark";
+  const isDark = resolvedScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 

@@ -72,8 +72,7 @@ export function ScreenHeader({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 8,
   },
   row: {
     minHeight: 44,
@@ -102,6 +101,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.pageTitle,
     lineHeight: 30,
     fontFamily: "Inter_700Bold",
+    letterSpacing: -0.4,
   },
   centeredTitle: {
     textAlign: "center",

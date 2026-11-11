@@ -23,7 +23,7 @@ const BG_TOP = "#0B1529";
 const BG_BOTTOM = "#070A12";
 const ACCENT = "#60A5FA";
 const TEXT = "#F0F6FF";
-const MUTED = "#64748B";
+const MUTED = "#94A3B8";
 const CARD = "#0D1420";
 const BORDER = "#1A2A45";
 const ERROR = "#F87171";
@@ -79,11 +79,9 @@ const fieldStyles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: CARD,
+    backgroundColor: "#111E35",
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     height: 54,
     marginBottom: 12,
   },
@@ -344,10 +342,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logoText: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     fontSize: 20,
     color: TEXT,
-    letterSpacing: 0.2,
   },
 
   headline: {
@@ -369,8 +366,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: CARD,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
     padding: 4,
     marginBottom: 24,
   },
@@ -395,9 +390,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: ERROR + "15",
     borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: ERROR + "30",
+    padding: 12,
   },
   errorText: {
     fontFamily: "Inter_400Regular",
@@ -433,9 +426,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 14,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: SUCCESS + "40",
-    backgroundColor: SUCCESS + "10",
+    backgroundColor: SUCCESS + "14",
   },
   bioBtnText: {
     fontFamily: "Inter_600SemiBold",
@@ -452,7 +443,8 @@ const styles = StyleSheet.create({
   },
   securityText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.supporting,
+    lineHeight: 18,
     color: MUTED,
     flex: 1,
     textAlign: "center",

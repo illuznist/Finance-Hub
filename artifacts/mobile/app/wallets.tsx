@@ -244,7 +244,7 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Account</Text>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Account Name</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="e.g. Al Rajhi Bank" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Al Rajhi Bank" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Type</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
             {ACCOUNT_TYPES.map((t) => (
@@ -254,7 +254,7 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
             ))}
           </View>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Balance ({finance.currency})</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={balance} onChangeText={setBalance} />
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={balance} onChangeText={setBalance} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Color</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
             {PALETTE.map((col, i) => (
@@ -294,7 +294,7 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Income</Text>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="e.g. Monthly Salary" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Monthly Salary" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Type</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
             {INCOME_TYPES.map((t) => (
@@ -304,7 +304,7 @@ function AddIncomeModal({ visible, onClose }: { visible: boolean; onClose: () =>
             ))}
           </View>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Amount ({finance.currency})</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={amount} onChangeText={setAmount} />
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={amount} onChangeText={setAmount} />
           <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
             <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text></Pressable>
             <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>Add</Text></Pressable>
@@ -349,19 +349,19 @@ function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => v
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground }]}>New Savings Goal</Text>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Goal Name</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="e.g. Emergency Fund" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Emergency Fund" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
           <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Target ({finance.currency})</Text>
-              <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="45000" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={target} onChangeText={setTarget} />
+              <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="45000" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={target} onChangeText={setTarget} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Already saved</Text>
-              <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={saved} onChangeText={setSaved} />
+              <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={saved} onChangeText={setSaved} />
             </View>
           </View>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Deadline (YYYY-MM, optional)</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]} placeholder="2026-06" placeholderTextColor={colors.mutedForeground} value={deadline} onChangeText={setDeadline} />
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="2026-06" placeholderTextColor={colors.mutedForeground} value={deadline} onChangeText={setDeadline} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Color</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
             {PALETTE.map((col, i) => (
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   totalCard: { borderRadius: 20, padding: 24 },
   totalLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
-  totalAmount: { fontSize: 34, fontFamily: "Inter_700Bold", color: "#FFFFFF", marginTop: 4, marginBottom: 16 },
+  totalAmount: { fontSize: 34, fontFamily: "Inter_600SemiBold", color: "#FFFFFF", marginTop: 4, marginBottom: 16, fontVariant: ["tabular-nums"] },
   totalRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.2)", paddingTop: 14, gap: 8 },
   totalItem: { flex: 1 },
   totalItemLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)" },
@@ -587,16 +587,16 @@ const styles = StyleSheet.create({
   accountDeleteBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.2)", alignItems: "center", justifyContent: "center" },
   accountName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold", color: "#FFFFFF" },
   accountType: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", marginBottom: 8 },
-  accountBalance: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
+  accountBalance: { fontSize: 20, fontFamily: "Inter_600SemiBold", color: "#FFFFFF", fontVariant: ["tabular-nums"] },
   incomeRow: { flexDirection: "row", alignItems: "center", borderRadius: 14, padding: 14, borderWidth: 1, gap: 12 },
   rowIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   rowInfo: { flex: 1 },
   rowName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
   rowMeta: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
-  incomeAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
+  incomeAmount: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   deleteSmall: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   // Savings goal rows (minimal)
-  goalListCard: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
+  goalListCard: { borderRadius: 18, overflow: "hidden" },
   goalRow: { padding: 16, gap: 10 },
   goalRowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
   goalDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
@@ -614,10 +614,10 @@ const styles = StyleSheet.create({
   goalTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   goalFill: { height: 6, borderRadius: 3 },
   overallGoalBar: { borderRadius: 12, padding: 12, borderWidth: 1 },
-  overviewCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 12 },
+  overviewCard: { borderRadius: 16, padding: 18, gap: 12 },
   overviewRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   overviewLabel: { flex: 1, fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
-  overviewValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_700Bold" },
+  overviewValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"] },
   overviewDivider: { height: 1 },
   emptyState: { alignItems: "center", paddingVertical: 24, gap: 12 },
   emptyText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
@@ -625,9 +625,9 @@ const styles = StyleSheet.create({
   modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
   modalTitle: { fontSize: TYPOGRAPHY.dialogTitle, fontFamily: "Inter_700Bold", marginBottom: 20 },
-  fieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", marginBottom: 6, letterSpacing: 0.5 },
-  input: { borderRadius: 12, padding: 14, fontSize: 16, fontFamily: "Inter_400Regular", marginBottom: 16, borderWidth: 1 },
-  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  fieldLabel: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", marginBottom: 8 },
+  input: { borderRadius: 12, padding: 14, fontSize: 16, fontFamily: "Inter_400Regular", marginBottom: 18, borderWidth: 1 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
   chipText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium" },
   colorDot: { width: 28, height: 28, borderRadius: 14 },
   btn: { height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center" },

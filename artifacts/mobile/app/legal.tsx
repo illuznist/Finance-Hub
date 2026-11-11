@@ -158,8 +158,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     gap: 24,
   },
   metaRow: {
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingBottom: 20,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   metaText: {
     fontFamily: "Inter_400Regular",
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: TYPOGRAPHY.sectionHeading,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   sectionBody: {
     fontFamily: "Inter_400Regular",
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   footer: {
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 20,
     alignItems: "center",
   },

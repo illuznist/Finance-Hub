@@ -21,14 +21,13 @@ export default function MoreScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="More" topInset={topPad} colors={colors} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.intro, { color: colors.mutedForeground }]}>Your other finance tools</Text>
         {MORE_ITEMS.map((item) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"
             testID={`more-${item.title.toLowerCase()}`}
             onPress={() => router.push(item.route)}
-            style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={({ pressed }) => [styles.item, { backgroundColor: colors.card, opacity: pressed ? 0.75 : 1 }]}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
               <Feather name={item.icon} size={19} color={colors.primary} />
@@ -48,9 +47,8 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 110, gap: 12 },
-  intro: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular", marginBottom: 3 },
-  item: { minHeight: 76, flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 16, borderWidth: 1 },
+  item: { minHeight: 76, flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 18 },
   iconWrap: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 13 },
-  itemTitle: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_700Bold" },
-  itemDescription: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 3 },
+  itemTitle: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold" },
+  itemDescription: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", marginTop: 3 },
 });
