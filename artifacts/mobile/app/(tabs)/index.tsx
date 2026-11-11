@@ -59,6 +59,7 @@ function ExpenseRow({
   iconName,
   color,
   onToggle,
+  isLast,
 }: {
   name: string;
   amount: number;
@@ -68,6 +69,7 @@ function ExpenseRow({
   iconName: string;
   color: string;
   onToggle: () => void;
+  isLast: boolean;
 }) {
   const colors = useColors();
   const suffix =
@@ -76,7 +78,8 @@ function ExpenseRow({
     <View
       style={[
         styles.expenseRow,
-        { backgroundColor: colors.card, borderColor: colors.border },
+        { borderBottomColor: colors.border },
+        !isLast && styles.expenseRowSeparator,
       ]}
     >
       <View style={[styles.expenseIcon, { backgroundColor: color + "20" }]}>
@@ -164,9 +167,30 @@ function BudgetAlertBanner({
   if (!isVisible) return null;
 
   const config = {
-    warning:  { bg: "#7C4A00", border: "#F59E0B", icon: "alert-triangle" as const, color: "#FCD34D", title: "Heads up", body: `You've used ${Math.round(spentPerc * 100)}% of your monthly budget` },
-    danger:   { bg: "#7F1D1D", border: "#EF4444", icon: "alert-circle"   as const, color: "#FCA5A5", title: "Low budget", body: `Only ${currency} ${remaining.toLocaleString()} left this month` },
-    exceeded: { bg: "#7F1D1D", border: "#EF4444", icon: "x-circle"       as const, color: "#FCA5A5", title: "Budget exceeded", body: `Over by ${currency} ${overspend.toLocaleString()} — review your spending` },
+    warning: {
+      bg: colors.warningLight,
+      border: colors.warning,
+      icon: "alert-triangle" as const,
+      color: colors.warning,
+      title: "Heads up",
+      body: `You've used ${Math.round(spentPerc * 100)}% of your monthly budget`,
+    },
+    danger: {
+      bg: colors.errorLight,
+      border: colors.destructive,
+      icon: "alert-circle" as const,
+      color: colors.destructive,
+      title: "Low budget",
+      body: `Only ${currency} ${remaining.toLocaleString()} left this month`,
+    },
+    exceeded: {
+      bg: colors.errorLight,
+      border: colors.destructive,
+      icon: "x-circle" as const,
+      color: colors.destructive,
+      title: "Budget exceeded",
+      body: `Over by ${currency} ${overspend.toLocaleString()} — review your spending`,
+    },
   }[level];
 
   function dismiss() {
@@ -191,10 +215,10 @@ function BudgetAlertBanner({
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.alertTitle, { color: config.color }]}>{config.title}</Text>
-        <Text style={[styles.alertBody, { color: config.color + "CC" }]}>{config.body}</Text>
+        <Text style={[styles.alertBody, { color: colors.mutedForeground }]}>{config.body}</Text>
       </View>
-      <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10}>
-        <Feather name="x" size={16} color={config.color + "99"} />
+      <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10} accessibilityLabel="Dismiss budget alert">
+        <Feather name="x" size={16} color={colors.mutedForeground} />
       </Pressable>
     </Animated.View>
   );
@@ -202,6 +226,7 @@ function BudgetAlertBanner({
 
 function ResetBanner() {
   const finance = useFinance();
+  const colors = useColors();
   const info = finance.monthResetInfo;
   const slideAnim = useRef(new Animated.Value(-60)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -230,26 +255,26 @@ function ResetBanner() {
       style={[
         styles.alertBanner,
         {
-          backgroundColor: "#0C2340",
-          borderColor: "#3B82F6",
+          backgroundColor: colors.secondary,
+          borderColor: colors.border,
           transform: [{ translateY: slideAnim }],
           opacity: opacityAnim,
         },
       ]}
     >
-      <View style={[styles.alertIconWrap, { backgroundColor: "#3B82F633" }]}>
-        <Feather name="refresh-cw" size={18} color="#60A5FA" />
+      <View style={[styles.alertIconWrap, { backgroundColor: colors.primary + "20" }]}>
+        <Feather name="refresh-cw" size={18} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.alertTitle, { color: "#60A5FA" }]}>
+        <Text style={[styles.alertTitle, { color: colors.primary }]}>
           {info.month} is here
         </Text>
-        <Text style={[styles.alertBody, { color: "#93C5FDCC" }]}>
+        <Text style={[styles.alertBody, { color: colors.mutedForeground }]}>
           {info.count} recurring {info.count === 1 ? "expense" : "expenses"} reset and ready to track
         </Text>
       </View>
       <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10}>
-        <Feather name="x" size={16} color="#60A5FA99" />
+        <Feather name="x" size={16} color={colors.mutedForeground} />
       </Pressable>
     </Animated.View>
   );
@@ -322,12 +347,12 @@ export default function DashboardScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
       }
     >
-      {/* ── Hero gradient header ── */}
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.heroGradient, { paddingTop: topPad + 8 }]}
+      {/* ── Brand, greeting, and balance hero ── */}
+      <View
+        style={[
+          styles.heroGradient,
+          { paddingTop: topPad + 8, backgroundColor: colors.background },
+        ]}
       >
         <View style={styles.brandRow}>
           <View style={styles.brandIdentity}>
@@ -340,48 +365,62 @@ export default function DashboardScreen() {
             <Text
               style={[
                 styles.brandName,
-                { color: colors.primaryForeground, opacity: 0.94 },
+                { color: colors.foreground, opacity: 0.94 },
               ]}
             >
               FinanceApp
             </Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/settings");
+            }}
+            style={[
+              styles.settingsButton,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="settings" size={18} color={colors.primary} />
+          </Pressable>
         </View>
         {/* Greeting row */}
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, styles.headerRowStacked]}>
           <View style={styles.greetingBlock}>
-            <Text
-              style={[
-                styles.dateText,
-                { color: colors.primaryForeground, opacity: 0.82 },
-              ]}
-            >
-              {new Date().toLocaleDateString(undefined, {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </Text>
-            <Text style={styles.greetingText}>
+            <View style={styles.dateRow}>
+              <Feather name="calendar" size={13} color={colors.mutedForeground} />
+              <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
+                {new Date().toLocaleDateString(undefined, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </Text>
+            </View>
+            <Text style={[styles.greetingText, { color: colors.foreground }]}>
               {greeting(finance.userName)}
             </Text>
-            <Text style={styles.greetingSubtitle}>
+            <Text style={[styles.greetingSubtitle, { color: colors.mutedForeground }]}>
               Here's your financial summary
             </Text>
           </View>
-          <Pressable
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/settings"); }}
-            style={styles.avatarCircle}
-          >
-            <Text style={styles.avatarText}>
-              {finance.userName.charAt(0).toUpperCase()}
-            </Text>
-          </Pressable>
         </View>
 
-        {/* Total Balance card (hero number) */}
-        <View style={styles.balanceCard}>
+        {/* Total Balance card with subtle circular detailing */}
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceCard}
+        >
+          <View style={styles.balanceRings} pointerEvents="none">
+            <View style={[styles.balanceRing, styles.balanceRingOuter]} />
+            <View style={[styles.balanceRing, styles.balanceRingMiddle]} />
+            <View style={[styles.balanceRing, styles.balanceRingInner]} />
+          </View>
           <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
           <Text style={styles.balanceAmount}>
             {fmt(finance.totalBalance, finance.currency)}
@@ -389,48 +428,36 @@ export default function DashboardScreen() {
           <View style={styles.balanceDivider} />
           <View style={styles.balanceRow}>
             <View style={styles.balanceItem}>
-              <View style={styles.balanceItemIcon}>
-                <Feather name="arrow-down-circle" size={14} color="#34D399" />
+              <View style={styles.balanceItemLabelRow}>
+                <Feather name="arrow-down-left" size={13} color="rgba(255,255,255,0.72)" />
+                <Text style={styles.balanceItemLabel}>Monthly income</Text>
               </View>
-              <Text style={styles.balanceItemLabel}>Monthly Income</Text>
               <Text style={styles.balanceItemValue}>
                 {fmt(finance.totalMonthlyIncome, finance.currency)}
               </Text>
             </View>
             <View style={styles.balanceSep} />
             <View style={styles.balanceItem}>
-              <View style={styles.balanceItemIcon}>
-                <Feather name="arrow-up-circle" size={14} color="#F87171" />
+              <View style={styles.balanceItemLabelRow}>
+                <Feather name="arrow-up-right" size={13} color="rgba(255,255,255,0.72)" />
+                <Text style={styles.balanceItemLabel}>Monthly outflow</Text>
               </View>
-              <Text style={styles.balanceItemLabel}>Monthly Spent</Text>
               <Text style={styles.balanceItemValue}>
                 {fmt(totalSpent, finance.currency)}
               </Text>
             </View>
           </View>
-        </View>
-      </LinearGradient>
+        </LinearGradient>
+      </View>
 
       <View style={styles.content}>
-        {/* ── Monthly Reset Banner ── */}
-        <ResetBanner />
-
-        {/* ── Budget Alert Banner ── */}
-        <BudgetAlertBanner
-          spentPerc={totalSpentPerc}
-          remaining={remaining}
-          overspend={Math.max(0, totalSpent - finance.monthlyBudget)}
-          currency={finance.currency}
-        />
-
         {/* ── Remaining Balance card (prominent, below hero) ── */}
         <View
           style={[
             styles.remainingCard,
             {
               backgroundColor: colors.card,
-              borderColor: remainingColor + "50",
-              borderWidth: 1.5,
+              borderColor: colors.border,
             },
           ]}
         >
@@ -505,6 +532,46 @@ export default function DashboardScreen() {
               Budget {fmt(finance.monthlyBudget, finance.currency)}
             </Text>
           </View>
+        </View>
+
+        {/* ── Contextual alerts, below the budget snapshot ── */}
+        <ResetBanner />
+        <BudgetAlertBanner
+          spentPerc={totalSpentPerc}
+          remaining={remaining}
+          overspend={Math.max(0, totalSpent - finance.monthlyBudget)}
+          currency={finance.currency}
+        />
+
+        {/* ── Upcoming payments ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            Coming up
+          </Text>
+          <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>
+            {finance.expenses.filter((e) => !e.isPaid).length} pending
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.expenseList,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          {finance.expenses.map((exp, index) => (
+            <ExpenseRow
+              key={exp.id}
+              name={exp.name}
+              amount={exp.amount}
+              currency={finance.currency}
+              dueDate={exp.dueDate}
+              isPaid={exp.isPaid}
+              iconName={exp.iconName}
+              color={exp.color}
+              onToggle={() => finance.toggleExpensePaid(exp.id)}
+              isLast={index === finance.expenses.length - 1}
+            />
+          ))}
         </View>
 
         {/* ── Savings card with bar ── */}
@@ -680,31 +747,6 @@ export default function DashboardScreen() {
           ))}
         </ScrollView>
 
-        {/* ── This Month's Payments ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            This Month
-          </Text>
-          <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>
-            {finance.expenses.filter((e) => !e.isPaid).length} pending
-          </Text>
-        </View>
-        <View style={{ gap: 8, marginBottom: 24 }}>
-          {finance.expenses.map((exp) => (
-            <ExpenseRow
-              key={exp.id}
-              name={exp.name}
-              amount={exp.amount}
-              currency={finance.currency}
-              dueDate={exp.dueDate}
-              isPaid={exp.isPaid}
-              iconName={exp.iconName}
-              color={exp.color}
-              onToggle={() => finance.toggleExpensePaid(exp.id)}
-            />
-          ))}
-        </View>
-
         {/* ── Active EMIs ── */}
         <Text
           style={[
@@ -808,10 +850,10 @@ const styles = StyleSheet.create({
   alertBanner: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    padding: 14,
-    gap: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
     overflow: "hidden",
   },
   alertIconWrap: {
@@ -839,12 +881,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  heroGradient: { paddingHorizontal: 20, paddingBottom: 32 },
+  heroGradient: { paddingHorizontal: 20, paddingBottom: 18 },
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 22,
   },
   brandIdentity: { flexDirection: "row", alignItems: "center", gap: 9 },
   brandIcon: { width: 34, height: 34, borderRadius: 10 },
@@ -853,50 +895,78 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.15,
   },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
+    alignItems: "flex-start",
+    marginBottom: 18,
   },
+  headerRowStacked: { marginBottom: 18 },
   greetingBlock: { flex: 1, minWidth: 0 },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 5,
+  },
   dateText: {
     fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_500Medium",
-    letterSpacing: 0.05,
-    marginBottom: 6,
+    letterSpacing: 0,
   },
   greetingText: {
     fontSize: TYPOGRAPHY.pageTitle,
     fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
+    lineHeight: 30,
   },
   greetingSubtitle: {
     fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.75)",
     marginTop: 2,
-  },
-  avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
   },
   // Hero balance card
   balanceCard: {
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 20,
+    position: "relative",
+    borderRadius: 22,
     padding: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(255,255,255,0.22)",
+    overflow: "hidden",
+  },
+  balanceRings: {
+    ...StyleSheet.absoluteFill,
+    overflow: "hidden",
+  },
+  balanceRing: {
+    position: "absolute",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+  },
+  balanceRingOuter: {
+    width: 300,
+    height: 300,
+    top: -208,
+    right: -126,
+  },
+  balanceRingMiddle: {
+    width: 244,
+    height: 244,
+    top: -180,
+    right: -96,
+  },
+  balanceRingInner: {
+    width: 190,
+    height: 190,
+    top: -152,
+    right: -70,
   },
   balanceLabel: {
     fontSize: TYPOGRAPHY.supporting,
@@ -910,47 +980,45 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 14,
+    fontVariant: ["tabular-nums"],
   },
   balanceDivider: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.2)",
-    marginBottom: 16,
+    marginBottom: 13,
   },
-  balanceRow: { flexDirection: "row", alignItems: "center" },
-  balanceItem: { flex: 1, alignItems: "center" },
-  balanceItemIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  balanceRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  balanceItem: { flex: 1, minWidth: 0 },
+  balanceItemLabelRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
+    gap: 6,
   },
   balanceItemLabel: {
     fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.65)",
+    color: "rgba(255,255,255,0.74)",
   },
   balanceItemValue: {
     fontSize: TYPOGRAPHY.body,
     fontFamily: "Inter_600SemiBold",
     color: "#FFFFFF",
-    marginTop: 2,
+    marginTop: 6,
   },
   balanceSep: {
     width: 1,
-    height: 40,
+    height: 42,
     backgroundColor: "rgba(255,255,255,0.2)",
   },
   content: { padding: 20, gap: 16 },
 
   // Remaining Balance card
   remainingCard: {
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 18,
+    padding: 16,
     gap: 12,
+    borderWidth: 1,
   },
   remainingTop: {
     flexDirection: "row",
@@ -974,24 +1042,25 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   remainingBadge: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    flexDirection: "row",
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   remainingBadgeText: {
     fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_700Bold",
   },
   remainingTrack: {
-    height: 10,
-    borderRadius: 5,
+    height: 8,
+    borderRadius: 8,
     overflow: "hidden",
   },
   remainingFill: {
-    height: 10,
-    borderRadius: 5,
+    height: 8,
+    borderRadius: 8,
   },
   remainingCapRow: {
     flexDirection: "row",
@@ -1095,6 +1164,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: -4,
   },
   sectionCount: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular" },
   insightChip: {
@@ -1118,10 +1188,17 @@ const styles = StyleSheet.create({
   expenseRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    gap: 10,
+  },
+  expenseRowSeparator: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  expenseList: {
+    borderRadius: 16,
     borderWidth: 1,
-    gap: 12,
+    overflow: "hidden",
   },
   expenseIcon: {
     width: 40,
