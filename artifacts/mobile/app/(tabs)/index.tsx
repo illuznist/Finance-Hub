@@ -327,7 +327,7 @@ export default function DashboardScreen() {
         colors={[colors.gradientStart, colors.gradientEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.heroGradient, { paddingTop: topPad + 16 }]}
+        style={[styles.heroGradient, { paddingTop: topPad + 8 }]}
       >
         <View style={styles.brandRow}>
           <View style={styles.brandIdentity}>
@@ -353,13 +353,14 @@ export default function DashboardScreen() {
             <Text
               style={[
                 styles.dateText,
-                { color: colors.primaryForeground, opacity: 0.72 },
+                { color: colors.primaryForeground, opacity: 0.82 },
               ]}
             >
               {new Date().toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
+                weekday: "long",
                 day: "numeric",
+                month: "long",
+                year: "numeric",
               })}
             </Text>
             <Text style={styles.greetingText}>
@@ -843,12 +844,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   brandIdentity: { flexDirection: "row", alignItems: "center", gap: 9 },
-  brandIcon: { width: 25, height: 25, borderRadius: 7 },
+  brandIcon: { width: 34, height: 34, borderRadius: 10 },
   brandName: {
-    fontSize: TYPOGRAPHY.bodySmall,
+    fontSize: TYPOGRAPHY.cardTitle,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.15,
   },
@@ -862,9 +863,8 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_500Medium",
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
-    marginBottom: 4,
+    letterSpacing: 0.05,
+    marginBottom: 6,
   },
   greetingText: {
     fontSize: TYPOGRAPHY.pageTitle,

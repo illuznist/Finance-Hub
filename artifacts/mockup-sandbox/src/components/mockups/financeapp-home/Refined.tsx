@@ -124,13 +124,13 @@ export function Refined() {
       <style>{`
         .financeapp-refined { --fa-background:#f2f6fc; --fa-card:#fff; --fa-foreground:#152b4a; --fa-muted:#eaf0f8; --fa-muted-foreground:#71829a; --fa-border:#e2eaf4; }
         .financeapp-refined .fa-scroll { min-height:100dvh; padding-bottom:40px; }
-        .financeapp-refined .fa-hero { padding:28px 20px 25px; background:linear-gradient(145deg,#164a91 0%,#2369c7 100%); }
+        .financeapp-refined .fa-hero { padding:17px 20px 25px; background:linear-gradient(145deg,#164a91 0%,#2369c7 100%); }
         .financeapp-refined .fa-header-row { align-items:flex-start; margin-bottom:22px; }
-        .financeapp-refined .fa-brand-row { display:flex; align-items:center; gap:8px; margin-bottom:19px; }
-        .financeapp-refined .fa-brand-icon { width:23px; height:23px; border-radius:7px; object-fit:cover; }
-        .financeapp-refined .fa-brand-name { color:rgba(255,255,255,.9); font-size:13px; font-weight:650; letter-spacing:.15px; }
+        .financeapp-refined .fa-brand-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+        .financeapp-refined .fa-brand-icon { width:34px; height:34px; border-radius:10px; object-fit:cover; }
+        .financeapp-refined .fa-brand-name { color:rgba(255,255,255,.94); font-size:16px; font-weight:650; letter-spacing:.15px; }
         .financeapp-refined .fa-greeting { font-size:24px; letter-spacing:-.45px; }
-        .financeapp-refined .fa-date { display:block; margin-bottom:5px; color:rgba(255,255,255,.68); font-size:12px; font-weight:600; letter-spacing:.65px; text-transform:uppercase; }
+        .financeapp-refined .fa-date { display:block; margin-bottom:6px; color:rgba(255,255,255,.82); font-size:12px; font-weight:500; letter-spacing:.05px; }
         .financeapp-refined .fa-greeting-subtitle { margin-top:5px; color:rgba(255,255,255,.76); }
         .financeapp-refined .fa-avatar { width:38px; height:38px; border:1px solid rgba(255,255,255,.3); background:rgba(255,255,255,.16); cursor:pointer; }
         .financeapp-refined .fa-balance-card { padding:19px; border:1px solid rgba(255,255,255,.26); border-radius:18px; background:rgba(255,255,255,.13); box-shadow:0 12px 24px rgba(8,43,91,.13); }
@@ -175,7 +175,7 @@ export function Refined() {
           </div>
           <div className="fa-header-row">
             <div>
-              <span className="fa-date">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</span>
+              <span className="fa-date">{new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span>
               <div className="fa-greeting">{greeting(userName)}</div>
               <div className="fa-greeting-subtitle">Here&apos;s your financial summary</div>
             </div>
