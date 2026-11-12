@@ -12,14 +12,16 @@ export function getUpcoming(state: FinanceState, from: string, to: string, today
   if (from > to) throw new Error("The end date must follow the start date.");
   const result: UpcomingPayment[] = [], seen = new Set<string>();
   const add = (item: UpcomingPayment) => {
-    if (item.dueDate < from || item.dueDate > to || seen.has(item.id)) return;
+    if (!validLocalDate(item.dueDate) || item.dueDate < from || item.dueDate > to || seen.has(item.id)) return;
     seen.add(item.id);
     result.push({ ...item, accountId: state.accounts.some(a => a.id === item.accountId) ? item.accountId : undefined });
   };
   for (const r of state.planning?.recurring ?? []) {
     const existing = state.planning!.occurrences.filter(o => o.recurringId === r.id);
     const occurrences = [...existing];
-    if (r.active && !r.deleted) scheduleDates(r, from > r.nextDueDate ? from : r.nextDueDate, to).forEach(date => {
+    const datesValid = validLocalDate(r.startDate) && validLocalDate(r.nextDueDate) &&
+      (!r.endDate || validLocalDate(r.endDate));
+    if (r.active && !r.deleted && datesValid) scheduleDates(r, from > r.nextDueDate ? from : r.nextDueDate, to).forEach(date => {
       if (!existing.some(o => o.dueDate === date)) occurrences.push(occurrenceFor(r, date));
     });
     occurrences.forEach(o => add({ id: o.id, sourceId: r.id, recurringId: r.id, occurrenceId: o.id, type: "expense",
@@ -36,11 +38,17 @@ export function getUpcoming(state: FinanceState, from: string, to: string, today
       let unassigned = Math.max(0, e.paidInstallments - history.filter(p => p.scheduledDueDate).length);
       for (let index = 0; index < Math.min(e.durationMonths ?? e.totalInstallments, 1200); index++) {
         const due = index === 0 ? first : addMonths(first, index, e.paymentDueDay ?? e.dueDayOfMonth);
-        const linked = history.some(p => p.scheduledDueDate === due);
-        const paid = linked || unassigned > 0;
-        if (!linked && unassigned > 0) unassigned--;
+        const linkedPayments = history.filter(p => p.scheduledDueDate === due);
+        const scheduledUnits = minorUnits(e.monthlyEMIAmount ?? e.monthlyAmount);
+        const recordedUnits = linkedPayments.reduce((sum, payment) => sum + minorUnits(payment.amount), 0);
+        let remainingUnits = Math.max(0, scheduledUnits - recordedUnits);
+        if (linkedPayments.length === 0 && unassigned > 0) {
+          unassigned--;
+          remainingUnits = 0;
+        }
+        const paid = remainingUnits === 0;
         add({ id: `emi:${e.id}:${due}`, sourceId: e.id, name: e.name, type: "emi", currency,
-          dueDate: due, amount: e.monthlyEMIAmount ?? e.monthlyAmount, accountId: e.linkedAccountId,
+          dueDate: due, amount: remainingUnits / 100, accountId: e.linkedAccountId,
           status: paid ? "paid" : dueStatus(due, today), reminder: !paid });
       }
     }
@@ -48,7 +56,7 @@ export function getUpcoming(state: FinanceState, from: string, to: string, today
       const paid = (e.paymentHistory ?? []).filter(p => p.paymentType === "balloon").reduce((s, p) => s + minorUnits(p.amount), 0);
       const remaining = Math.max(0, minorUnits(e.balloonPaymentAmount!) - paid) / 100;
       add({ id: `balloon:${e.id}:${e.balloonPaymentDueDate}`, sourceId: e.id, name: `${e.name} · Balloon`, type: "balloon",
-        currency, accountId: e.linkedAccountId, dueDate: e.balloonPaymentDueDate, amount: remaining || e.balloonPaymentAmount!,
+        currency, accountId: e.linkedAccountId, dueDate: e.balloonPaymentDueDate, amount: remaining,
         status: remaining > 0 ? dueStatus(e.balloonPaymentDueDate, today) : "paid", reminder: remaining > 0 });
     }
   }
@@ -69,7 +77,7 @@ export function getUpcoming(state: FinanceState, from: string, to: string, today
       unassigned -= allocation;
       const remaining = Math.max(0, scheduled - assigned - allocation);
       add({ id: `loan:${l.id}:${due}`, sourceId: l.id, type: "loan", name: l.direction === "lent" ? `${l.name} · Receipt` : l.name,
-        amount: (remaining || scheduled) / 100, currency: l.currency ?? state.currency, dueDate: due, accountId: l.linkedAccountId,
+        amount: remaining / 100, currency: l.currency ?? state.currency, dueDate: due, accountId: l.linkedAccountId,
         status: remaining ? dueStatus(due, today) : "paid", reminder: remaining > 0 });
     }
   }

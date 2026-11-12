@@ -323,6 +323,22 @@ export default function AnalyticsScreen() {
           onPress={() => { tap(); setSettingsOpen(o => !o); }} />} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 + Math.max(insets.bottom, Platform.OS === "web" ? 34 : 0), gap: 16 }}
         showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Pressable testID="analytics-open-forecast" accessibilityRole="button" accessibilityLabel="Open cash flow forecast"
+          onPress={() => { tap(); router.push("/forecast"); }}
+          style={({ pressed }) => [ui.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}>
+          <View style={ui.between}>
+            <View style={[ui.row, { paddingVertical: 0, flex: 1 }]}>
+              <View style={[ui.icon, { backgroundColor: colors.secondary }]}>
+                <Feather name="trending-up" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[ui.bodyStrong, { color: colors.foreground }]}>Plan ahead</Text>
+                <Text style={[ui.small, { color: colors.mutedForeground }]}>Forecast balances and upcoming commitments</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </View>
+        </Pressable>
         <View>
           <Chips prefix="analytics-period" value={preset} onChange={p => { tap(); setPreset(p); }} items={PERIODS} />
           {report && report.currencies.length > 1 ? (

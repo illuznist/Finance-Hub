@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -539,6 +540,7 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   const colors = useColors();
   const finance = useFinance();
   const toast = useToast();
+  const currency = emi.currency ?? finance.currency;
   const due = paymentType === "monthly_emi" ? emiMonthly(emi) : balloonRemaining(emi);
   const [accountId, setAccountId] = useState(editing ? editing.accountId : emi.linkedAccountId);
   const operationId = useRef(newId());
@@ -580,9 +582,9 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
             <Pressable accessibilityLabel="Close payment form" onPress={onClose} hitSlop={10}><Feather name="x" size={21} color={colors.mutedForeground} /></Pressable>
           </View>
           <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-            {paymentType === "balloon" ? `Remaining balloon balance: ${fmt(balloonRemaining(emi), finance.currency)}` : `Scheduled amount: ${fmt(emiMonthly(emi), finance.currency)}`}
+            {paymentType === "balloon" ? `Remaining balloon balance: ${fmt(balloonRemaining(emi), currency)}` : `Scheduled amount: ${fmt(emiMonthly(emi), currency)}`}
           </Text>
-          <Field label={`Amount (${finance.currency})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+          <Field label={`Amount (${currency})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="2026-04-10" />
           {editing?.legacy || editing?.id.startsWith("imported-")
             ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Historical record: corrections do not change account balances. Review balances in Transactions.</Text>
@@ -624,6 +626,7 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
   const colors = useColors();
   const finance = useFinance();
   const toast = useToast();
+  const currency = emi.currency ?? finance.currency;
   const payments = emi.paymentHistory ?? [];
   const account = getLinkedAccount(emi, finance.accounts);
   const scheduledMonthly = emiMonthly(emi) * emiDuration(emi);
@@ -668,30 +671,30 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
           <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
             <View style={[styles.detailHero, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.heroCaption, { color: colors.mutedForeground }]}>Total remaining commitment</Text>
-              <Text style={[styles.heroAmount, { color: colors.foreground }]}>{fmt(totalRemaining, finance.currency)}</Text>
+              <Text style={[styles.heroAmount, { color: colors.foreground }]}>{fmt(totalRemaining, currency)}</Text>
               <View style={styles.detailHeroStats}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.heroStatLabel, { color: colors.mutedForeground }]}>Monthly balance</Text>
-                  <Text style={[styles.heroStatValue, { color: colors.foreground }]}>{fmt(monthlyBalance, finance.currency)}</Text>
+                  <Text style={[styles.heroStatValue, { color: colors.foreground }]}>{fmt(monthlyBalance, currency)}</Text>
                 </View>
                 <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.heroStatLabel, { color: colors.mutedForeground }]}>Balloon balance</Text>
-                  <Text style={[styles.heroStatValue, { color: colors.warning }]}>{fmt(balloonBalance, finance.currency)}</Text>
+                  <Text style={[styles.heroStatValue, { color: colors.warning }]}>{fmt(balloonBalance, currency)}</Text>
                 </View>
               </View>
             </View>
 
             <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <SectionLabel title="Repayment overview" />
-              <InfoRow label="Original financed amount" value={fmt(emi.financedAmount ?? emi.totalAmount, finance.currency)} />
-              <InfoRow label="Monthly EMI" value={fmt(emiMonthly(emi), finance.currency)} />
+              <InfoRow label="Original financed amount" value={fmt(emi.financedAmount ?? emi.totalAmount, currency)} />
+              <InfoRow label="Monthly EMI" value={fmt(emiMonthly(emi), currency)} />
               <InfoRow label="Duration" value={`${emiDuration(emi)} months`} />
               <InfoRow label="Installments paid" value={`${monthlyPayments} / ${emiDuration(emi)}`} />
               <InfoRow label="Installments remaining" value={`${Math.max(0, emiDuration(emi) - monthlyPayments)}`} />
-              <InfoRow label="Scheduled monthly repayment" value={fmt(scheduledMonthly, finance.currency)} />
-              <InfoRow label="Total scheduled repayment" value={fmt(scheduledMonthly + (emi.balloonPaymentAmount ?? 0), finance.currency)} />
-              <InfoRow label="Total amount paid" value={fmt(allPaid(emi), finance.currency)} color={colors.success} />
+              <InfoRow label="Scheduled monthly repayment" value={fmt(scheduledMonthly, currency)} />
+              <InfoRow label="Total scheduled repayment" value={fmt(scheduledMonthly + (emi.balloonPaymentAmount ?? 0), currency)} />
+              <InfoRow label="Total amount paid" value={fmt(allPaid(emi), currency)} color={colors.success} />
               <InfoRow label="Start date" value={displayDate(emi.startDate)} />
               <InfoRow label="Next expected monthly payment" value={displayDate(nextMonthlyPaymentDate(emi))} />
             </View>
@@ -702,10 +705,10 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
                   <View style={[styles.balloonIcon, { backgroundColor: colors.warningLight }]}><Feather name="flag" size={15} color={colors.warning} /></View>
                   <SectionLabel title="Balloon payment" />
                 </View>
-                <InfoRow label="Scheduled balloon amount" value={fmt(emi.balloonPaymentAmount ?? 0, finance.currency)} color={colors.warning} />
+                  <InfoRow label="Scheduled balloon amount" value={fmt(emi.balloonPaymentAmount ?? 0, currency)} color={colors.warning} />
                 <InfoRow label="Due date" value={displayDate(emi.balloonPaymentDueDate)} />
-                <InfoRow label="Amount paid" value={fmt(balloonPaid(emi), finance.currency)} />
-                <InfoRow label="Remaining balloon balance" value={fmt(balloonBalance, finance.currency)} color={colors.warning} />
+                  <InfoRow label="Amount paid" value={fmt(balloonPaid(emi), currency)} />
+                  <InfoRow label="Remaining balloon balance" value={fmt(balloonBalance, currency)} color={colors.warning} />
                 {balloonBalance > 0 && (
                   <Pressable testID="emi-record-balloon" onPress={() => onRecordPayment("balloon")} style={[styles.actionButton, styles.detailAction, { backgroundColor: colors.warningLight }]}>
                     <Text style={[styles.actionText, { color: colors.warning }]}>Record balloon payment</Text>
@@ -718,7 +721,7 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
               <SectionLabel title="Bank deduction" />
               <InfoRow label="Auto-debit tracking" value={emi.autoDebitEnabled ? "Enabled — manual confirmation required" : "Off"} color={emi.autoDebitEnabled ? colors.success : undefined} />
               <InfoRow label="Linked account" value={account?.name ?? (emi.autoDebitEnabled ? "Account unavailable" : "Not linked")} />
-              {emi.autoDebitEnabled && <InfoRow label="Expected monthly deduction" value={fmt(emiMonthly(emi), finance.currency)} />}
+              {emi.autoDebitEnabled && <InfoRow label="Expected monthly deduction" value={fmt(emiMonthly(emi), currency)} />}
             </View>
 
             {!!emi.notes && (
@@ -774,6 +777,8 @@ export default function EMIsScreen() {
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
+  const params = useLocalSearchParams<{ emiId?: string }>();
+  const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<EMI | undefined>();
   const [selectedEMI, setSelectedEMI] = useState<EMI | undefined>();
@@ -781,6 +786,12 @@ export default function EMIsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  useEffect(() => {
+    if (!params.emiId || !finance.isReady) return;
+    const selected = finance.emis.find(emi => emi.id === params.emiId);
+    if (selected) setSelectedEMI(selected);
+    router.setParams({ emiId: undefined });
+  }, [params.emiId, finance.emis, finance.isReady, router]);
   const currencyEMIs = finance.emis.filter(e => (e.currency ?? finance.currency) === finance.currency);
   const activeEMIs = currencyEMIs.filter(isPlanActive);
   const completedEMIs = currencyEMIs.filter((emi) => !isPlanActive(emi));

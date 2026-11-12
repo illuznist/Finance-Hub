@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -307,6 +308,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
   const [kind, setKind] = useState<"expected" | "received">("expected");
   const [accountId, setAccountId] = useState<string | undefined>();
   const [date, setDate] = useState(localDate());
+  const [expectedDate, setExpectedDate] = useState("");
   const [category, setCategory] = useState("");
   const [error, setError] = useState("");
   const submitted = useRef(false);
@@ -317,18 +319,22 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
     submitted.current = false; submissionId.current = editing?.id ?? newId(); setError("");
     setName(editing?.name ?? ""); setAmount(editing ? String(editing.amount) : "");
     setType(editing?.type ?? "salary"); setKind(editing?.kind ?? "expected");
-    setAccountId(editing?.accountId); setDate(editing?.date ?? localDate()); setCategory(editing?.category ?? "");
+    setAccountId(editing?.accountId); setDate(editing?.kind === "received" ? editing.date ?? localDate() : localDate());
+    setExpectedDate(editing?.kind === "expected" ? editing.date ?? "" : ""); setCategory(editing?.category ?? "");
   }, [visible, editing]);
   const INCOME_TYPES = ["salary", "freelance", "other"] as const;
 
   function submit() {
     if (submitted.current) return;
-    if (!name.trim() || !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || (kind === "received" && !validLocalDate(date))) {
-      setError("Enter a name, positive amount and valid received date."); return;
+    if (!name.trim() || !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 ||
+      (kind === "received" && !validLocalDate(date)) || (kind === "expected" && !!expectedDate && !validLocalDate(expectedDate))) {
+      setError("Enter a name, positive amount and valid date."); return;
     }
     submitted.current = true;
     try {
-      const input = { name: name.trim(), amount: Number(amount), type, kind, category: category.trim() || type, accountId: kind === "received" ? accountId : undefined, date: kind === "received" ? date : undefined, currency, color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" };
+      const input = { name: name.trim(), amount: Number(amount), type, kind, category: category.trim() || type, accountId,
+        date: kind === "received" ? date : expectedDate.trim() || undefined, currency,
+        color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" };
       if (editing) finance.updateIncome(editing.id, input);
       else finance.addIncome({ ...input, id: submissionId.current });
     } catch (e) { submitted.current = false; setError(e instanceof Error ? e.message : "Income could not be saved."); return; }
@@ -346,10 +352,22 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
             {(["expected", "received"] as const).map(k => <Pressable key={k} disabled={editing?.kind === "received" && k === "expected"} onPress={() => setKind(k)} style={[styles.chip, { opacity: editing?.kind === "received" && k === "expected" ? 0.4 : 1, backgroundColor: kind === k ? colors.primary : colors.muted }]}><Text style={{ color: kind === k ? colors.primaryForeground : colors.foreground }}>{k === "expected" ? "Expected monthly" : "Received"}</Text></Pressable>)}
           </View>
-          {kind === "received" && <>
-            <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
-            <TextInput accessibilityLabel="Income received date" value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
-          </>}
+          {kind === "received" ? (
+            <>
+              <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
+              <TextInput accessibilityLabel="Income received date" value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
+            </>
+          ) : (
+            <>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Next expected date (optional)</Text>
+              <TextInput testID="income-expected-date" accessibilityLabel="Next expected income date" value={expectedDate} onChangeText={setExpectedDate}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
+              <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting, marginTop: -8, marginBottom: 12 }}>
+                Only a specific date is included in cash forecasts; the monthly plan remains an estimate.
+              </Text>
+              {!!expectedDate ? <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} /> : null}
+            </>
+          )}
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Monthly Salary" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Type</Text>
@@ -445,12 +463,23 @@ export default function WalletsScreen() {
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
+  const params = useLocalSearchParams<{ incomeId?: string }>();
+  const router = useRouter();
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddIncome, setShowAddIncome] = useState(false);
   const [editingIncome, setEditingIncome] = useState<Income | undefined>();
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  useEffect(() => {
+    if (!params.incomeId || !finance.isReady) return;
+    const selected = finance.incomes.find(income => income.id === params.incomeId);
+    if (selected) {
+      setEditingIncome(selected);
+      setShowAddIncome(true);
+    }
+    router.setParams({ incomeId: undefined });
+  }, [params.incomeId, finance.incomes, finance.isReady, router]);
 
   const onRefresh = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

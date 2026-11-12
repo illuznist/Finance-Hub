@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -37,7 +37,7 @@ export default function RecurringScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const finance = usePlanning();
-  const params = useLocalSearchParams<{ new?: string; id?: string }>();
+  const params = useLocalSearchParams<{ new?: string; id?: string; detailId?: string }>();
   const isWeb = Platform.OS === "web";
   const topInset = isWeb ? 67 : insets.top;
   const bottomInset = isWeb ? 34 : insets.bottom;
@@ -46,6 +46,11 @@ export default function RecurringScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const all = useMemo(() => (finance.planning?.recurring ?? []).filter(r => !r.deleted), [finance.planning]);
+  useEffect(() => {
+    if (!params.detailId || !finance.isReady) return;
+    if (all.some(r => r.id === params.detailId)) setDetailId(params.detailId);
+    router.setParams({ detailId: undefined });
+  }, [params.detailId, all, finance.isReady, router]);
   const nextDue = (r: RecurringExpense) => (finance.planning?.occurrences ?? [])
     .filter(o => o.recurringId === r.id && o.status === "pending")
     .reduce((earliest, o) => o.dueDate < earliest ? o.dueDate : earliest, r.nextDueDate);
