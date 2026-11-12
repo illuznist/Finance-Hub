@@ -1,8 +1,21 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "x9tfu01Xl7J7FQQxJQ0re"
 uri = "file://artifacts/mobile/assets/images/icon.png"
 type = "image"
 title = "finance app icon"
+
+[[outputs]]
+id = "G_hFtB9PInPseOGvzshxV"
+uri = "file://artifacts/mobile/PHASE4_IMPLEMENTATION_REPORT.md"
+type = "text"
+title = "Phase 4 implementation report"
+description = "Security design, backup and restore safeguards, verification results, and remaining limitations."
+logical_id = "897ae94b-edab-4ff4-bced-79e1828a1802"
+content_hash = "sha256:5c7b9d9912d3a6ab425b1b53404db9c61e54b82c6a2524887c0d014a265169b2"
+size = 7959
+mtime_ms = 1794468061930
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:f0f82d3b-331b-4508-8ae1-bbbabe06982d/897ae94b-edab-4ff4-bced-79e1828a1802/17625122-ef19-4d99-96e5-5bce6812e8b8"
+storage_version_token = "1794468126301060"
+content_type = "text/markdown"
