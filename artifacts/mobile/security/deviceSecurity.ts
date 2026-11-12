@@ -5,34 +5,49 @@ import { Platform } from "react-native";
 import { equalBytes } from "@noble/ciphers/utils.js";
 import {
   createPasswordVerifier,
-  verifyPasswordVerifier,
   utf8,
   type RandomBytes,
 } from "./crypto.ts";
-import type { JournalStorage } from "./restoreJournal.ts";
+import {
+  clearPinVerifier as clearDerivedPinVerifier,
+  PIN_ATTEMPTS_KEY,
+  PIN_LENGTH,
+  PIN_VERIFIER_KEY,
+  savePinVerifier as saveDerivedPinVerifier,
+  verifyPinVerifier,
+  type PinVerifierRecord,
+} from "./pinVerifier.ts";
+import {
+  ANALYTICS_BACKUP_KEY,
+  COMPATIBILITY_BACKUP_KEY,
+  FINANCE_STORAGE_KEY,
+  LEGACY_BACKUP_KEY,
+  PLANNING_BACKUP_KEY,
+} from "../finance/migration.ts";
+import { pinDelayMs } from "./pinPolicy.ts";
+import { sanitizeLegacyFinanceSnapshot } from "./sanitizeFinanceSnapshot.ts";
+import {
+  RESTORE_FINANCE_DOCUMENT_KEY,
+  RESTORE_THEME_PREFERENCE_KEY,
+  type JournalStorage,
+} from "./restoreJournal.ts";
 
 export const LEGACY_PIN_STORAGE_KEY = "@finance_pin_v1";
 export const LEGACY_PIN_SECURE_KEY = "finance_pin_secure_v1";
-export const PIN_VERIFIER_KEY = "finance_pin_verifier_v2";
-export const PIN_ATTEMPTS_KEY = "finance_pin_attempts_v1";
 export const ACCOUNT_CREDENTIALS_KEY = "finance_creds_v1";
 export const ACCOUNT_SESSION_KEY = "finance_session_v1";
 export const BIOMETRIC_PREF_KEY = "finance_biometric_v1";
-export const FINANCE_STATE_STORAGE_KEY = "@finance_state_v4";
-export const PIN_LENGTH = 4;
-
+export const FINANCE_STATE_STORAGE_KEY = FINANCE_STORAGE_KEY;
+const LEGACY_FINANCE_BACKUP_KEYS = [
+  LEGACY_BACKUP_KEY,
+  COMPATIBILITY_BACKUP_KEY,
+  PLANNING_BACKUP_KEY,
+  ANALYTICS_BACKUP_KEY,
+];
 export type PinVerification = {
   ok: boolean;
   retryAfterMs?: number;
   warning?: string;
-};
-
-export type PinVerifierRecord = {
-  version: 1;
-  algorithm: "PBKDF2-HMAC-SHA256";
-  iterations: number;
-  salt: string;
-  verifier: string;
 };
 
 type LegacyPinRecord = {
@@ -60,16 +75,20 @@ export async function deleteSecret(key: string): Promise<void> {
 }
 
 export async function savePinVerifier(pin: string): Promise<void> {
-  if (!new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin)) throw new Error(`Enter a ${PIN_LENGTH}-digit PIN.`);
-  const verifier = await createPasswordVerifier(pin, randomBytes);
-  await writeSecret(PIN_VERIFIER_KEY, JSON.stringify({ version: 1, ...verifier }));
-  await deleteSecret(PIN_ATTEMPTS_KEY);
+  await saveDerivedPinVerifier(pin, {
+    get: readSecret,
+    set: writeSecret,
+    remove: deleteSecret,
+  }, randomBytes);
   await removeLegacyPinRecords();
 }
 
 export async function clearPinVerifier(): Promise<void> {
-  await deleteSecret(PIN_VERIFIER_KEY);
-  await deleteSecret(PIN_ATTEMPTS_KEY);
+  await clearDerivedPinVerifier({
+    get: readSecret,
+    set: writeSecret,
+    remove: deleteSecret,
+  });
   await removeLegacyPinRecords();
 }
 
@@ -89,13 +108,11 @@ export async function verifyStoredPin(pin: string): Promise<PinVerification> {
   let matches = false;
   let legacyRecord: LegacyPinRecord | null = null;
   if (verifierRaw) {
-    let verifier: PinVerifierRecord;
     try {
-      verifier = parseVerifier(verifierRaw);
+      matches = await verifyPinVerifier(pin, verifierRaw);
     } catch {
       throw new Error("PIN protection data is unreadable. Use account-password recovery; your finance data is unchanged.");
     }
-    matches = await verifyPasswordVerifier(pin, verifier);
   } else {
     legacyRecord = await readLegacyPinRecord();
     if (legacyRecord?.pin) {
@@ -121,23 +138,18 @@ export async function verifyStoredPin(pin: string): Promise<PinVerification> {
       return { ok: true };
     } catch {
       return {
-        ok: true,
-        warning: "PIN verified. Secure storage could not finish upgrading the old PIN, so the app kept its existing lock data for retry.",
+        ok: false,
+        warning: "Secure PIN storage could not be upgraded. The app remains locked; retry or use account-password recovery.",
       };
     }
   }
   return { ok: true };
 }
 
-export function pinDelayMs(failureCount: number): number {
-  const exponent = Math.max(0, Math.min(5, Math.floor(failureCount) - 1));
-  return Math.min(30_000, 1_000 * 2 ** exponent);
-}
-
 /**
  * Upgrade old plaintext PIN records before finance migration removes the raw
- * field. If secure storage is temporarily unavailable, preserve a retriable
- * legacy record rather than weakening the lock or discarding the only copy.
+ * field. If the verifier cannot be saved, abort migration and leave the
+ * existing finance document and PIN records untouched for a safe retry.
  */
 export async function migrateLegacyPinBeforeFinanceLoad(
   storage: JournalStorage,
@@ -164,38 +176,52 @@ export async function migrateLegacyPinBeforeFinanceLoad(
     parseLegacyPinRecord(asyncRaw),
     financeRecord,
   ].filter((record): record is LegacyPinRecord => record !== null);
+  const enabled = candidates.some(record => record.pinEnabled === true);
+  const pins = [...new Set(candidates.map(record => record.pin).filter((pin): pin is string => typeof pin === "string" && /^\d{4}$/.test(pin)))];
 
   if (existingVerifier) {
     try {
       parseVerifier(existingVerifier);
+      if (!enabled) {
+        await deleteSecret(PIN_VERIFIER_KEY);
+        await deleteSecret(PIN_ATTEMPTS_KEY);
+      }
       await removeLegacyPinRecords(storage);
+      await scrubLegacyPinBackups(storage);
       return;
     } catch {
       // Rebuild a malformed verifier from the old PIN when a recoverable copy exists.
+      if (!enabled) {
+        await deleteSecret(PIN_VERIFIER_KEY);
+        await deleteSecret(PIN_ATTEMPTS_KEY);
+        await removeLegacyPinRecords(storage);
+        await scrubLegacyPinBackups(storage);
+        return;
+      }
     }
   }
 
-  const enabled = candidates.some(record => record.pinEnabled === true);
-  const pins = [...new Set(candidates.map(record => record.pin).filter((pin): pin is string => typeof pin === "string" && /^\d{4}$/.test(pin)))];
   if (pins.length > 1) {
     throw new Error("Older PIN records do not agree. Your saved finance data is unchanged; retry or contact support.");
   }
-  if (!enabled || pins.length === 0) return;
+  if (!enabled) {
+    await removeLegacyPinRecords(storage);
+    await scrubLegacyPinBackups(storage);
+    return;
+  }
+  if (pins.length === 0) {
+    await scrubLegacyPinBackups(storage);
+    return;
+  }
 
-  const legacy = candidates.find(record => record.pin === pins[0]);
   try {
     const verifier = await createPasswordVerifier(pins[0], randomBytes);
     await writeSecret(PIN_VERIFIER_KEY, JSON.stringify({ version: 1, ...verifier }));
-    await removeLegacyPinRecords(storage);
   } catch {
-    if (!asyncRaw) {
-      await storage.setItem(LEGACY_PIN_STORAGE_KEY, JSON.stringify({
-        pinEnabled: true,
-        pin: pins[0],
-        autoLockMinutes: legacy?.autoLockMinutes ?? financeRecord?.autoLockMinutes ?? 5,
-      }));
-    }
+    throw new Error("Secure PIN protection could not be upgraded. Your existing records and lock are unchanged; retry safely.");
   }
+  await removeLegacyPinRecords(storage);
+  await scrubLegacyPinBackups(storage);
 }
 
 export async function verifyCurrentAccountPassword(
@@ -216,13 +242,17 @@ export async function verifyCurrentAccountPassword(
 export async function createProtectedRestoreJournal(
   storage: JournalStorage,
   currentFinanceJson: string | null,
+  currentThemePreference: string | null,
 ): Promise<void> {
   const { createRestoreJournal } = await import("./restoreJournal.ts");
   await createRestoreJournal(storage, {
     get: readSecret,
     set: writeSecret,
     remove: deleteSecret,
-  }, currentFinanceJson, randomBytes);
+  }, {
+    [RESTORE_FINANCE_DOCUMENT_KEY]: currentFinanceJson,
+    [RESTORE_THEME_PREFERENCE_KEY]: currentThemePreference,
+  }, randomBytes);
 }
 
 export async function recoverProtectedRestoreJournal(
@@ -287,6 +317,16 @@ async function removeLegacyPinRecords(storage: JournalStorage = financeStorageAd
     storage.removeItem(LEGACY_PIN_STORAGE_KEY),
     deleteSecret(LEGACY_PIN_SECURE_KEY),
   ]);
+}
+
+async function scrubLegacyPinBackups(storage: JournalStorage): Promise<void> {
+  for (const key of LEGACY_FINANCE_BACKUP_KEYS) {
+    const raw = await storage.getItem(key);
+    if (!raw) continue;
+    const sanitized = sanitizeLegacyFinanceSnapshot(raw);
+    // A malformed recovery copy is retained unchanged rather than discarded.
+    if (sanitized !== null) await storage.setItem(key, sanitized);
+  }
 }
 
 function parseLegacyPinRecord(raw: string | null): LegacyPinRecord | null {

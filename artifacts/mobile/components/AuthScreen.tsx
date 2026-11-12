@@ -208,7 +208,7 @@ export default function AuthScreen({ onComplete }: Props) {
             <Text style={styles.sub}>
               {mode === "login"
                 ? "Sign in to access your financial data"
-                : "Your data is stored securely on your device"}
+                : "Your records stay on this device"}
             </Text>
 
             {/* Mode toggle */}
@@ -314,8 +314,8 @@ export default function AuthScreen({ onComplete }: Props) {
               <Feather name="shield" size={13} color={MUTED} />
               <Text style={styles.securityText}>
                 {mode === "signup"
-                  ? "Your data never leaves your device. No cloud storage."
-                  : "Your financial data is protected by encryption."}
+                  ? "No cloud sync. Backups export only when you choose."
+                  : "Sign in to access the finance records stored on this device."}
               </Text>
             </View>
           </Animated.View>

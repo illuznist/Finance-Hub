@@ -23,6 +23,12 @@ test("base64 encoding round trips empty, padded, and binary values", () => {
   assert.throws(() => C.decodeBase64("bad!"));
 });
 
+test("UTF-8 decoding rejects malformed and overlong sequences", () => {
+  assert.throws(() => C.fromUtf8(Uint8Array.from([0xc0, 0x80])));
+  assert.throws(() => C.fromUtf8(Uint8Array.from([0xe2, 0x28, 0xa1])));
+  assert.throws(() => C.fromUtf8(Uint8Array.from([0xed, 0xa0, 0x80])));
+});
+
 test("AES-256-GCM rejects changed ciphertext and additional data", async () => {
   const key = new Uint8Array(32).fill(5);
   const { nonce, ciphertext } = await C.encryptGcm(key, C.utf8("financial records"), C.utf8("header"), fixedRandom);
@@ -36,14 +42,14 @@ test("AES-256-GCM rejects changed ciphertext and additional data", async () => {
 test("backup encrypt/decrypt round trip preserves records and excludes device security state", async () => {
   const state = {
     schemaVersion: 2,
-    accounts: [{ id: "account-1", openingBalance: 100 }],
+    accounts: [{ id: "account-1", openingBalance: 100, balance: 150, currency: "SAR" }],
     transactions: [{ id: "txn-1", operationId: "op-1", amount: 25 }],
     incomes: [{ id: "income-1", amount: 50 }],
     expenses: [{ id: "expense-1", amount: 10 }],
-    emis: [{ id: "emi-1", paymentHistory: [{ id: "emi-payment-1" }] }],
-    loans: [{ id: "loan-1", payments: [{ id: "loan-payment-1" }] }],
-    savingsGoals: [{ id: "goal-1" }],
-    netWorthSnapshots: [{ id: "snapshot-1" }],
+    emis: [{ id: "emi-1", paymentHistory: [{ id: "emi-payment-1", operationId: "emi-op-1" }] }],
+    loans: [{ id: "loan-1", fundingHistory: [{ id: "funding-1" }], payments: [{ id: "loan-payment-1", operationId: "loan-op-1" }] }],
+    savingsGoals: [{ id: "goal-1", contributions: [{ id: "contribution-1" }] }],
+    netWorthSnapshots: [{ id: "snapshot-1", total: 150 }],
     planning: {
       plans: [{ id: "plan-1" }],
       periods: [{ id: "period-1" }],
@@ -61,8 +67,9 @@ test("backup encrypt/decrypt round trip preserves records and excludes device se
     "2026-11-12T12:00:00.000Z",
   );
   const opened = await B.openFinanceBackup(serialized, "long-enough-backup-password");
-  assert.equal(opened.payload.financeState.securitySettings, undefined);
-  assert.equal(opened.payload.financeState.accounts[0].openingBalance, 100);
+  const expectedFinanceState = structuredClone(state);
+  delete expectedFinanceState.securitySettings;
+  assert.deepEqual(opened.payload.financeState, expectedFinanceState);
   assert.equal(opened.payload.userPreferences.themeMode, "dark");
   assert.equal(opened.metadata.recordCounts.transactions, 1);
   assert.equal(opened.metadata.recordCounts.emiPayments, 1);
@@ -108,10 +115,15 @@ function memorySecretStore(initial = {}) {
 test("prepared restore journal restores the exact old finance document", async () => {
   const storage = memoryStorage({ "@finance_state_v4": '{"schemaVersion":2,"accounts":[]}' });
   const secrets = memorySecretStore();
-  await J.createRestoreJournal(storage, secrets, await storage.getItem("@finance_state_v4"), fixedRandom);
+  await J.createRestoreJournal(storage, secrets, {
+    "@finance_state_v4": await storage.getItem("@finance_state_v4"),
+    "@finance_theme_v1": "dark",
+  }, fixedRandom);
   await storage.setItem("@finance_state_v4", '{"schemaVersion":2,"accounts":[{"id":"new"}]}');
+  await storage.setItem("@finance_theme_v1", "light");
   assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
   assert.equal(await storage.getItem("@finance_state_v4"), '{"schemaVersion":2,"accounts":[]}');
+  assert.equal(await storage.getItem("@finance_theme_v1"), "dark");
   assert.equal(await storage.getItem(J.RESTORE_JOURNAL_KEY), null);
   assert.equal(await secrets.get(J.RESTORE_JOURNAL_SECRET_KEY), null);
 });
@@ -119,7 +131,10 @@ test("prepared restore journal restores the exact old finance document", async (
 test("committed restore journal keeps the replacement and clears recovery material", async () => {
   const storage = memoryStorage({ "@finance_state_v4": '{"before":true}' });
   const secrets = memorySecretStore();
-  await J.createRestoreJournal(storage, secrets, await storage.getItem("@finance_state_v4"), fixedRandom);
+  await J.createRestoreJournal(storage, secrets, {
+    "@finance_state_v4": await storage.getItem("@finance_state_v4"),
+    "@finance_theme_v1": null,
+  }, fixedRandom);
   await storage.setItem("@finance_state_v4", '{"after":true}');
   await J.commitRestoreJournal(storage);
   assert.equal(await J.recoverInterruptedRestore(storage, secrets), "committed");
@@ -131,7 +146,7 @@ test("committed restore journal keeps the replacement and clears recovery materi
 test("restore journal restores an empty starting app after interrupted import", async () => {
   const storage = memoryStorage();
   const secrets = memorySecretStore();
-  await J.createRestoreJournal(storage, secrets, null, fixedRandom);
+  await J.createRestoreJournal(storage, secrets, { "@finance_state_v4": null, "@finance_theme_v1": null }, fixedRandom);
   await storage.setItem("@finance_state_v4", '{"partial":true}');
   assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
   assert.equal(await storage.getItem("@finance_state_v4"), null);
@@ -140,8 +155,26 @@ test("restore journal restores an empty starting app after interrupted import", 
 test("restore journal refuses to change finance data when its protected key is missing", async () => {
   const storage = memoryStorage({ "@finance_state_v4": '{"after":true}' });
   const secrets = memorySecretStore();
-  await J.createRestoreJournal(storage, secrets, '{"before":true}', fixedRandom);
+  await J.createRestoreJournal(storage, secrets, {
+    "@finance_state_v4": '{"before":true}',
+    "@finance_theme_v1": "system",
+  }, fixedRandom);
   await secrets.remove(J.RESTORE_JOURNAL_SECRET_KEY);
   await assert.rejects(() => J.recoverInterruptedRestore(storage, secrets), /cannot be opened/);
   assert.equal(await storage.getItem("@finance_state_v4"), '{"after":true}');
+});
+
+test("restore journal refuses a tampered recovery snapshot without overwriting current data", async () => {
+  const storage = memoryStorage({ "@finance_state_v4": '{"after":true}' });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, {
+    "@finance_state_v4": '{"before":true}',
+    "@finance_theme_v1": null,
+  }, fixedRandom);
+  const journal = JSON.parse(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+  journal.ciphertext = `${journal.ciphertext[0] === "A" ? "B" : "A"}${journal.ciphertext.slice(1)}`;
+  await storage.setItem(J.RESTORE_JOURNAL_KEY, JSON.stringify(journal));
+  await assert.rejects(() => J.recoverInterruptedRestore(storage, secrets), /integrity check/);
+  assert.equal(await storage.getItem("@finance_state_v4"), '{"after":true}');
+  assert.ok(await storage.getItem(J.RESTORE_JOURNAL_KEY));
 });

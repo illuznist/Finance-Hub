@@ -29,11 +29,11 @@ const SUPPORT_EMAIL = "support@financeapp.com";
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Is my data safe and private?",
-    a: "All your financial data is stored locally on your device using encrypted storage. Nothing is sent to any server. Only you can access it.",
+    a: "Finance records stay in this app's local store and are not uploaded to a FinanceApp server. The finance database is not encrypted at rest by the app. Native credentials and PIN verifiers use device secure storage; browser builds use local storage.",
   },
   {
     q: "I forgot my PIN — what do I do?",
-    a: "If you enabled Face ID or fingerprint, use that to unlock the app. If biometrics are not available, you will need to reinstall the app. Your PIN cannot be recovered for security reasons.",
+    a: "Tap “Forgot PIN?” on the lock screen and verify your account password to reset the app lock. This does not delete finance records. You can enable biometrics as an optional alternative in Settings.",
   },
   {
     q: "How do I enable Face ID or Fingerprint?",
@@ -49,7 +49,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I export or backup my data?",
-    a: "Export and cloud backup features are on our roadmap. Currently, all data lives on your device. Be careful not to delete the app without a backup.",
+    a: "Open Settings → Backup & Restore to create a password-protected encrypted file or restore one. The app does not upload backups. Keep the password separately; it cannot be recovered if lost.",
   },
   {
     q: "How do EMIs work?",

@@ -12,6 +12,27 @@ export const ANALYTICS_BACKUP_KEY = "@finance_state_v4_pre_analytics_backup";
 export const SCHEMA_VERSION = 2;
 
 type JsonRecord = Record<string, unknown>;
+export function assertBackupFinanceCompleteness(value: unknown): asserts value is JsonRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("The selected backup does not contain a finance document.");
+  }
+  const document = value as JsonRecord;
+  const requiredCollections = ["accounts", "expenses", "emis", "loans", "incomes", "savingsGoals", "transactions"];
+  if (requiredCollections.some(name => !Array.isArray(document[name]))) {
+    throw new Error("The selected backup is missing required finance records. Your current records are unchanged.");
+  }
+  if (document.schemaVersion === SCHEMA_VERSION) {
+    const planning = document.planning;
+    if (!planning || typeof planning !== "object" || Array.isArray(planning)) {
+      throw new Error("The selected backup is missing its current planning data. Your current records are unchanged.");
+    }
+    const planningRecord = planning as JsonRecord;
+    if (["plans", "periods", "recurring", "occurrences"].some(name => !Array.isArray(planningRecord[name]))) {
+      throw new Error("The selected backup is missing current budget or recurring records. Your current records are unchanged.");
+    }
+  }
+}
+
 function object(value: unknown, label: string): JsonRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} is not a valid object. Your saved data has not been replaced.`);
   return value as JsonRecord;
@@ -98,13 +119,24 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
   const incomes = records(parsed.incomes, "incomes").map(i => ({
     ...i, kind: i.kind ?? "expected", currency: i.currency ?? currency,
   }));
+  const securitySettings = {
+    ...empty.securitySettings,
+    ...object(parsed.securitySettings ?? {}, "Security settings"),
+  };
+  securitySettings.pinEnabled = securitySettings.pinEnabled === true;
+  if (![ -1, 0, 1, 5, 10, 15, 30 ].includes(Number(securitySettings.autoLockMinutes))) {
+    securitySettings.autoLockMinutes = empty.securitySettings.autoLockMinutes;
+  }
+  // The plaintext PIN was only a legacy migration source. Never emit it into
+  // the current finance document or any newly saved state.
+  delete (securitySettings as JsonRecord).pin;
   const state = {
     ...empty, ...parsed, accounts, emis, loans, incomes,
     expenses: records(parsed.expenses, "expenses").map(e => ({ ...e, currency: e.currency ?? currency })),
     savingsGoals: records(parsed.savingsGoals, "savingsGoals").map(g => ({ ...g, currency: g.currency ?? currency })),
     budgetCurrency: parsed.budgetCurrency ?? currency,
     notificationSettings: { ...empty.notificationSettings, ...object(parsed.notificationSettings ?? {}, "Notification settings") },
-    securitySettings: { ...empty.securitySettings, ...object(parsed.securitySettings ?? {}, "Security settings") },
+    securitySettings,
     transactions: legacy ? [] : (parsed.transactions ?? []),
     schemaVersion: SCHEMA_VERSION,
     reconciliationRequired: legacy ? accounts.length > 0 || emis.length > 0 || loans.length > 0 || records(parsed.expenses, "expenses").some(e => e.isPaid) : Boolean(parsed.reconciliationRequired),

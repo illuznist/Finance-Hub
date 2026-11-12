@@ -12,6 +12,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { readStaticFile } = require("./safeStaticPath");
 
 const STATIC_ROOT = path.resolve(__dirname, "..", "static-build");
 const TEMPLATE_PATH = path.resolve(__dirname, "templates", "landing-page.html");
@@ -46,9 +47,8 @@ function getAppName() {
 }
 
 function serveManifest(platform, res) {
-  const manifestPath = path.join(STATIC_ROOT, platform, "manifest.json");
-
-  if (!fs.existsSync(manifestPath)) {
+  const manifest = readStaticFile(STATIC_ROOT, `${platform}/manifest.json`, "utf-8");
+  if (manifest.status !== "ok") {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(
       JSON.stringify({ error: `Manifest not found for platform: ${platform}` }),
@@ -56,13 +56,12 @@ function serveManifest(platform, res) {
     return;
   }
 
-  const manifest = fs.readFileSync(manifestPath, "utf-8");
   res.writeHead(200, {
     "content-type": "application/json",
     "expo-protocol-version": "1",
     "expo-sfv-version": "0",
   });
-  res.end(manifest);
+  res.end(manifest.content);
 }
 
 function serveLandingPage(req, res, landingPageTemplate, appName) {
@@ -82,26 +81,22 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
 }
 
 function serveStaticFile(urlPath, res) {
-  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
-  const filePath = path.join(STATIC_ROOT, safePath);
-
-  if (!filePath.startsWith(STATIC_ROOT)) {
+  const result = readStaticFile(STATIC_ROOT, urlPath);
+  if (result.status === "forbidden") {
     res.writeHead(403);
     res.end("Forbidden");
     return;
   }
-
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+  if (result.status !== "ok") {
     res.writeHead(404);
     res.end("Not Found");
     return;
   }
 
-  const ext = path.extname(filePath).toLowerCase();
+  const ext = path.extname(result.filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
-  const content = fs.readFileSync(filePath);
   res.writeHead(200, { "content-type": contentType });
-  res.end(content);
+  res.end(result.content);
 }
 
 const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, "utf-8");

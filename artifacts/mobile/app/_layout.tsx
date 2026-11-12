@@ -8,17 +8,11 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import * as LocalAuthentication from "expo-local-authentication";
 import { Stack } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Platform,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -27,19 +21,18 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AppLockGate } from "@/components/AppLockGate";
 import OnboardingScreen, { ONBOARDING_KEY } from "@/components/OnboardingScreen";
 import AuthScreen from "@/components/AuthScreen";
 import {
   AuthProvider,
   useAuth,
-  BIOMETRIC_PREF_KEY,
-  PIN_SECURE_KEY,
 } from "@/context/AuthContext";
-import { FinanceProvider, PIN_STORAGE_KEY, useFinance } from "@/context/FinanceContext";
+import { FinanceProvider, useFinance } from "@/context/FinanceContext";
 import { FinanceStorageGate } from "@/components/FinanceStorageGate";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { ToastProvider } from "@/context/ToastContext";
-import { TYPOGRAPHY } from "@/constants/typography";
+import { useColors } from "@/hooks/useColors";
+import { ToastProvider, useToast } from "@/context/ToastContext";
 import {
   scheduleAllNotifications,
   setupNotificationHandler,
@@ -50,197 +43,32 @@ setupNotificationHandler().catch(() => {});
 
 const queryClient = new QueryClient();
 
-// ── Secure helpers (web fallback) ──
-async function secureRead(key: string): Promise<string | null> {
-  if (Platform.OS === "web") return localStorage.getItem(key);
-  return SecureStore.getItemAsync(key);
-}
-
-// ── NumPad ──
-function NumPad({
-  onPress,
-  onBackspace,
-}: {
-  onPress: (d: string) => void;
-  onBackspace: () => void;
-}) {
-  const keys = ["1","2","3","4","5","6","7","8","9","","0","del"];
-  return (
-    <View style={pinStyles.numpad}>
-      {keys.map((k, i) => (
-        <Pressable
-          key={i}
-          onPress={() => (k === "del" ? onBackspace() : k ? onPress(k) : undefined)}
-          style={({ pressed }) => [
-            pinStyles.numKey,
-            { opacity: k === "" ? 0 : pressed ? 0.6 : 1 },
-          ]}
-        >
-          {k === "del" ? <Feather name="delete" size={22} color="#fff" accessibilityLabel="Delete digit" /> : <Text style={pinStyles.numKeyText}>{k}</Text>}
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-// ── PinEntry (with biometric button) ──
-function PinEntry({
-  storedPin,
-  onUnlock,
-  showBiometric,
-  biometricLabel,
-  biometricIcon,
-  onBiometricPress,
-}: {
-  storedPin: string;
-  onUnlock: () => void;
-  showBiometric: boolean;
-  biometricLabel: string;
-  biometricIcon: string;
-  onBiometricPress: () => void;
-}) {
-  const [entered, setEntered] = useState("");
-  const [error, setError] = useState(false);
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  function handlePress(digit: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = entered + digit;
-    setEntered(next);
-    if (next.length === 4) {
-      if (next === storedPin) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onUnlock();
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setError(true);
-        Animated.sequence([
-          Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: false }),
-          Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: false }),
-          Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: false }),
-          Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: false }),
-        ]).start(() => { setEntered(""); setError(false); });
-      }
-    }
-  }
-
-  function handleBackspace() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setEntered(entered.slice(0, -1));
-  }
-
-  return (
-    <View style={pinStyles.screen}>
-      <View style={pinStyles.lockIcon}>
-        <View style={pinStyles.lockIconInner}>
-          <Feather name="lock" size={26} color="#60A5FA" />
-        </View>
-      </View>
-      <Text style={pinStyles.title}>Enter PIN</Text>
-      <Text style={pinStyles.subtitle}>Your data is protected</Text>
-
-      <Animated.View style={[pinStyles.dotsRow, { transform: [{ translateX: shakeAnim }] }]}>
-        {[0, 1, 2, 3].map((i) => (
-          <View
-            key={i}
-            style={[
-              pinStyles.dot,
-              i < entered.length
-                ? { backgroundColor: error ? "#EF4444" : "#60A5FA", borderColor: error ? "#EF4444" : "#60A5FA" }
-                : { backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.3)" },
-            ]}
-          />
-        ))}
-      </Animated.View>
-
-      {error && <Text style={pinStyles.errorText}>Incorrect PIN</Text>}
-
-      <NumPad onPress={handlePress} onBackspace={handleBackspace} />
-
-      {showBiometric && (
-        <Pressable onPress={onBiometricPress} style={pinStyles.bioBtn}>
-          <Text style={pinStyles.bioBtnText}>{biometricLabel}</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-// ── PinGate (reads PIN from SecureStore → AsyncStorage fallback, supports biometrics) ──
-function PinGate({ children }: { children: React.ReactNode }) {
-  const auth = useAuth();
-  const [status, setStatus] = useState<"loading" | "locked" | "open">("loading");
-  const [storedPin, setStoredPin] = useState("");
-
-  const biometricAvailable = auth.biometricAvailable && auth.biometricEnabled && Platform.OS !== "web";
-  const biometricLabel = auth.biometricType === "face" ? "Use Face ID" : "Use Fingerprint";
-
-  async function tryBiometric(): Promise<boolean> {
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Unlock FinanceApp",
-        fallbackLabel: "Use PIN",
-        cancelLabel: "Cancel",
-        disableDeviceFallback: false,
-      });
-      if (result.success) { setStatus("open"); return true; }
-    } catch {}
-    return false;
-  }
-
-  useEffect(() => {
-    async function load() {
-      try {
-        // 1. Try SecureStore
-        let raw = await secureRead(PIN_SECURE_KEY);
-        // 2. Fall back to AsyncStorage (pre-upgrade users)
-        if (!raw) raw = await AsyncStorage.getItem(PIN_STORAGE_KEY);
-
-        if (raw) {
-          const { pinEnabled, pin } = JSON.parse(raw);
-          if (pinEnabled && pin?.length === 4) {
-            setStoredPin(pin);
-            // Auto-trigger biometric if enabled + available
-            if (auth.biometricAvailable && auth.biometricEnabled && Platform.OS !== "web") {
-              const unlocked = await tryBiometric();
-              if (unlocked) return;
-            }
-            setStatus("locked");
-            return;
-          }
-        }
-      } catch {}
-      setStatus("open");
-    }
-    if (!auth.isLoading) load();
-  }, [auth.isLoading, auth.biometricAvailable, auth.biometricEnabled]);
-
-  if (status === "loading") return null;
-  if (status === "locked") {
-    return (
-      <PinEntry
-        storedPin={storedPin}
-        onUnlock={() => setStatus("open")}
-        showBiometric={biometricAvailable}
-        biometricLabel={biometricLabel}
-        biometricIcon={auth.biometricType === "face" ? "smile" : "aperture"}
-        onBiometricPress={tryBiometric}
-      />
-    );
-  }
-  return <>{children}</>;
-}
-
 // ── AuthGate ──
 function AuthGate({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
+  const colors = useColors();
   if (auth.isLoading) return null;
+  if (auth.authError) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 28, backgroundColor: colors.background }}>
+        <Feather name="shield" size={30} color={colors.primary} />
+        <Text style={{ color: colors.foreground, fontSize: 19, fontWeight: "700", marginTop: 16, textAlign: "center" }}>
+          Account security data is unavailable
+        </Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 14, lineHeight: 21, marginTop: 8, textAlign: "center" }}>
+          Your saved records have not been changed. Retry safely; do not clear app storage.
+        </Text>
+        <Pressable onPress={auth.retryAuthStorage} style={{ backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, marginTop: 20 }}>
+          <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>Retry safely</Text>
+        </Pressable>
+      </View>
+    );
+  }
   if (!auth.isLoggedIn) {
     return <AuthScreen onComplete={() => {}} />;
   }
   return <>{children}</>;
 }
-
 // ── OnboardingGate ──
 function OnboardingGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<"loading" | "onboarding" | "done">("loading");
@@ -318,12 +146,27 @@ function NotificationScheduler() {
   return null;
 }
 
+function StorageRecoveryNotifier() {
+  const finance = useFinance();
+  const toast = useToast();
+  const shownRef = useRef(false);
+
+  useEffect(() => {
+    if (!finance.storageRecoveryNotice || shownRef.current) return;
+    shownRef.current = true;
+    toast.show(finance.storageRecoveryNotice, "info");
+  }, [finance.storageRecoveryNotice, toast]);
+
+  return null;
+}
+
 // ── RootLayoutNav ──
 function RootLayoutNav() {
   return (
     <>
       <ResetNotifier />
       <NotificationScheduler />
+      <StorageRecoveryNotifier />
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
@@ -332,6 +175,7 @@ function RootLayoutNav() {
         <Stack.Screen name="recurring" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="upcoming" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="backup" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="legal" options={{ headerShown: false, presentation: "card" }} />
       </Stack>
@@ -367,9 +211,9 @@ export default function RootLayout() {
                   <AuthGate>
                     <FinanceStorageGate>
                     <OnboardingGate>
-                      <PinGate>
+                      <AppLockGate>
                         <RootLayoutNav />
-                      </PinGate>
+                      </AppLockGate>
                     </OnboardingGate>
                     </FinanceStorageGate>
                   </AuthGate>
@@ -384,78 +228,3 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
-
-const pinStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#0B1E3D",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  lockIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: "rgba(96,165,250,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  lockIconInner: { alignItems: "center", justifyContent: "center" },
-  title: {
-    fontSize: TYPOGRAPHY.dialogTitle,
-    fontFamily: "Inter_700Bold",
-    color: "#fff",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.body,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.5)",
-    marginBottom: 40,
-  },
-  dotsRow: { flexDirection: "row", gap: 18, marginBottom: 12 },
-  dot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5 },
-  errorText: {
-    fontSize: TYPOGRAPHY.bodySmall,
-    fontFamily: "Inter_500Medium",
-    color: "#EF4444",
-    marginBottom: 8,
-  },
-  numpad: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    width: 264,
-    gap: 14,
-    marginTop: 32,
-    justifyContent: "center",
-  },
-  numKey: {
-    width: 78,
-    height: 60,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  numKeyText: {
-    fontSize: 24,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
-  bioBtn: {
-    marginTop: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(52,211,153,0.4)",
-    backgroundColor: "rgba(52,211,153,0.1)",
-  },
-  bioBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: "#34D399",
-  },
-});

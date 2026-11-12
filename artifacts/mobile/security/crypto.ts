@@ -37,12 +37,16 @@ export async function createPasswordVerifier(
 ): Promise<{ algorithm: typeof BACKUP_KDF; iterations: number; salt: string; verifier: string }> {
   const salt = await checkedRandomBytes(randomBytes, KDF_SALT_BYTES);
   const key = await deriveKey(password, salt, iterations);
-  return {
-    algorithm: BACKUP_KDF,
-    iterations,
-    salt: bytesToHex(salt),
-    verifier: bytesToHex(key),
-  };
+  try {
+    return {
+      algorithm: BACKUP_KDF,
+      iterations,
+      salt: bytesToHex(salt),
+      verifier: bytesToHex(key),
+    };
+  } finally {
+    key.fill(0);
+  }
 }
 
 export async function verifyPasswordVerifier(
@@ -61,7 +65,12 @@ export async function verifyPasswordVerifier(
   }
   const expected = hexToBytes(record.verifier);
   const actual = await deriveKey(password, hexToBytes(record.salt), record.iterations);
-  return equalBytes(actual, expected);
+  try {
+    return equalBytes(actual, expected);
+  } finally {
+    actual.fill(0);
+    expected.fill(0);
+  }
 }
 
 export async function encryptGcm(
@@ -143,11 +152,32 @@ export function fromUtf8(value: Uint8Array): string {
     if (first < 0x80) {
       output += String.fromCharCode(first);
     } else if ((first & 0xe0) === 0xc0 && index < value.length) {
-      output += String.fromCodePoint(((first & 0x1f) << 6) | (value[index++] & 0x3f));
+      const second = value[index++];
+      if ((second & 0xc0) !== 0x80) throw new Error("The encrypted data contains invalid text.");
+      const code = ((first & 0x1f) << 6) | (second & 0x3f);
+      if (code < 0x80) throw new Error("The encrypted data contains invalid text.");
+      output += String.fromCodePoint(code);
     } else if ((first & 0xf0) === 0xe0 && index + 1 < value.length) {
-      output += String.fromCodePoint(((first & 0x0f) << 12) | ((value[index++] & 0x3f) << 6) | (value[index++] & 0x3f));
+      const second = value[index++];
+      const third = value[index++];
+      if ((second & 0xc0) !== 0x80 || (third & 0xc0) !== 0x80) {
+        throw new Error("The encrypted data contains invalid text.");
+      }
+      const code = ((first & 0x0f) << 12) | ((second & 0x3f) << 6) | (third & 0x3f);
+      if (code < 0x800 || (code >= 0xd800 && code <= 0xdfff)) {
+        throw new Error("The encrypted data contains invalid text.");
+      }
+      output += String.fromCodePoint(code);
     } else if ((first & 0xf8) === 0xf0 && index + 2 < value.length) {
-      output += String.fromCodePoint(((first & 0x07) << 18) | ((value[index++] & 0x3f) << 12) | ((value[index++] & 0x3f) << 6) | (value[index++] & 0x3f));
+      const second = value[index++];
+      const third = value[index++];
+      const fourth = value[index++];
+      if ((second & 0xc0) !== 0x80 || (third & 0xc0) !== 0x80 || (fourth & 0xc0) !== 0x80) {
+        throw new Error("The encrypted data contains invalid text.");
+      }
+      const code = ((first & 0x07) << 18) | ((second & 0x3f) << 12) | ((third & 0x3f) << 6) | (fourth & 0x3f);
+      if (code < 0x10000 || code > 0x10ffff) throw new Error("The encrypted data contains invalid text.");
+      output += String.fromCodePoint(code);
     } else {
       throw new Error("The encrypted data contains invalid text.");
     }

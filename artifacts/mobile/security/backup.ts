@@ -88,7 +88,7 @@ export function countFinanceRecords(state: Record<string, unknown>): BackupRecor
 }
 
 export async function createFinanceBackup(
-  financeState: Record<string, unknown>,
+  financeState: object,
   themeMode: "system" | "light" | "dark",
   password: string,
   randomBytes: RandomBytes,
@@ -98,7 +98,9 @@ export async function createFinanceBackup(
   if (passwordCodePoints(password) < MIN_BACKUP_PASSWORD_LENGTH) {
     throw new Error(`Choose a backup password with at least ${MIN_BACKUP_PASSWORD_LENGTH} characters.`);
   }
-  const safeState = JSON.parse(JSON.stringify(financeState)) as Record<string, unknown>;
+  const serializedState = JSON.stringify(financeState);
+  if (!serializedState) throw new Error("The finance records could not be prepared for backup.");
+  const safeState = JSON.parse(serializedState) as Record<string, unknown>;
   // App-lock preferences and credentials are device-specific and must not travel with finance data.
   delete safeState.securitySettings;
   const payload: FinanceBackupPayload = {

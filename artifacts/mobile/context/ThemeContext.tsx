@@ -13,13 +13,13 @@ const THEME_KEY = "@finance_theme_v1";
 
 interface ThemeContextValue {
   mode: ThemeMode;
-  setMode: (m: ThemeMode) => void;
+  setMode: (m: ThemeMode) => Promise<void>;
   resolvedScheme: "light" | "dark";
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
   mode: "system",
-  setMode: () => {},
+  setMode: async () => {},
   resolvedScheme: "dark",
 });
 

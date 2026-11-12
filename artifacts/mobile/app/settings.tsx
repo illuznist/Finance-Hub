@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -17,17 +16,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import * as SecureStore from "expo-secure-store";
-
 import { ScreenHeader } from "@/components/ScreenHeader";
 import {
   type NotificationSettings,
   type SecuritySettings,
   SUPPORTED_CURRENCIES,
-  PIN_STORAGE_KEY,
   useFinance,
 } from "@/context/FinanceContext";
-import { useAuth, PIN_SECURE_KEY } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useTheme, type ThemeMode } from "@/context/ThemeContext";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
@@ -178,6 +174,91 @@ function PinSetupModal({
   );
 }
 
+function PasswordConfirmationModal({
+  visible,
+  title,
+  onCancel,
+  onConfirm,
+}: {
+  visible: boolean;
+  title: string;
+  onCancel: () => void;
+  onConfirm: (password: string) => Promise<boolean>;
+}) {
+  const colors = useColors();
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!password || busy) return;
+    setBusy(true);
+    try {
+      if (await onConfirm(password)) {
+        setPassword("");
+        setError("");
+        onCancel();
+      } else {
+        setError("That password was not correct.");
+      }
+    } catch {
+      setError("Password verification could not complete. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
+      <View style={[styles.pinModalOverlay, { justifyContent: "center" }]}>
+        <View style={[styles.pinModalSheet, { backgroundColor: colors.card }]}>
+          <Text style={[styles.pinTitle, { color: colors.foreground }]}>{title}</Text>
+          <Text style={[styles.pinSubtitle, { color: colors.mutedForeground }]}>
+            Verify your account password before changing app lock settings.
+          </Text>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Account password"
+            placeholderTextColor={colors.mutedForeground}
+            returnKeyType="done"
+            onSubmitEditing={submit}
+            style={{
+              marginTop: 20,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.muted,
+              color: colors.foreground,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              fontSize: 16,
+            }}
+          />
+          {!!error && <Text style={[styles.pinError, { color: colors.destructive }]}>{error}</Text>}
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 20 }}>
+            <Pressable onPress={onCancel} style={{ flex: 1, paddingVertical: 13, alignItems: "center" }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 15 }}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={submit}
+              disabled={busy}
+              style={{ flex: 1, paddingVertical: 13, alignItems: "center", borderRadius: 12, backgroundColor: colors.primary }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontSize: 15, fontWeight: "600" }}>
+                {busy ? "Checking…" : "Continue"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function NumPad({
   onPress,
   onBackspace,
@@ -225,6 +306,7 @@ export default function SettingsScreen() {
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetValue, setBudgetValue] = useState(finance.monthlyBudget.toString());
   const [showPinSetup, setShowPinSetup] = useState(false);
+  const [passwordAction, setPasswordAction] = useState<"disable-pin" | "change-pin" | null>(null);
 
   const notif = finance.notificationSettings;
   const security = finance.securitySettings;
@@ -237,8 +319,12 @@ export default function SettingsScreen() {
     finance.setNotificationSettings(next);
   }
 
-  function updateSecurity(updates: Partial<SecuritySettings>) {
-    finance.setSecuritySettings({ ...security, ...updates });
+  async function updateSecurity(updates: Partial<SecuritySettings>) {
+    try {
+      await finance.setSecuritySettings({ ...security, ...updates });
+    } catch (error) {
+      Alert.alert("Could not save security settings", error instanceof Error ? error.message : "Retry safely.");
+    }
   }
 
   function handlePinToggle(value: boolean) {
@@ -250,25 +336,36 @@ export default function SettingsScreen() {
         {
           text: "Disable",
           style: "destructive",
-          onPress: () => {
-            updateSecurity({ pinEnabled: false, pin: "" });
-            AsyncStorage.setItem(PIN_STORAGE_KEY, JSON.stringify({ pinEnabled: false, pin: "" })).catch(() => {});
-          },
+          onPress: () => setPasswordAction("disable-pin"),
         },
       ]);
     }
   }
 
   async function handlePinSaved(pin: string) {
-    setShowPinSetup(false);
-    updateSecurity({ pinEnabled: true, pin });
-    const pinData = JSON.stringify({ pinEnabled: true, pin });
-    if (Platform.OS !== "web") {
-      await SecureStore.setItemAsync(PIN_SECURE_KEY, pinData).catch(() => {});
-    } else {
-      localStorage.setItem(PIN_SECURE_KEY, pinData);
+    try {
+      await auth.savePin(pin);
+      await finance.setSecuritySettings({ ...security, pinEnabled: true });
+      setShowPinSetup(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      Alert.alert("PIN could not be saved", error instanceof Error ? error.message : "Try again. Your current app lock was not changed.");
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  async function confirmSecurityPassword(password: string): Promise<boolean> {
+    const valid = await auth.verifyAccountPassword(password);
+    if (!valid) return false;
+    const action = passwordAction;
+    if (action === "disable-pin") {
+      await auth.clearPin();
+      await finance.setSecuritySettings({ ...finance.securitySettings, pinEnabled: false });
+      setPasswordAction(null);
+    } else if (action === "change-pin") {
+      setPasswordAction(null);
+      setShowPinSetup(true);
+    }
+    return true;
   }
 
   async function handleSignOut() {
@@ -299,9 +396,9 @@ export default function SettingsScreen() {
     updateNotif({ timing: next });
   }
 
-  const autoLockLabels: Record<number, string> = { 1: "1 min", 5: "5 min", 10: "10 min", 30: "30 min", 0: "Never" };
+  const autoLockLabels: Record<number, string> = { [-1]: "Immediately", 1: "1 min", 5: "5 min", 10: "10 min", 30: "30 min", 0: "Never" };
   function cycleAutoLock() {
-    const options = [1, 5, 10, 30, 0];
+    const options = [-1, 1, 5, 10, 30, 0];
     const next = options[(options.indexOf(security.autoLockMinutes) + 1) % options.length];
     updateSecurity({ autoLockMinutes: next });
   }
@@ -601,7 +698,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.settingLabel, { color: colors.foreground }]}>PIN Lock</Text>
               <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>
-                {security.pinEnabled ? "PIN is set — app locks on close" : "Protect your data with a PIN"}
+                {security.pinEnabled ? "PIN set — locks on restart and after inactivity" : "Protect your data with a PIN"}
               </Text>
             </View>
             <Switch
@@ -626,7 +723,7 @@ export default function SettingsScreen() {
                 <Feather name="chevron-right" size={14} color={colors.mutedForeground} style={{ marginLeft: 4 }} />
               </Pressable>
               <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
-              <Pressable style={styles.settingRow} onPress={() => setShowPinSetup(true)}>
+               <Pressable style={styles.settingRow} onPress={() => setPasswordAction("change-pin")}>
                 <View style={[styles.settingIconWrap, { backgroundColor: "#8B5CF620" }]}>
                   <Feather name="edit-3" size={17} color="#8B5CF6" />
                 </View>
@@ -636,6 +733,23 @@ export default function SettingsScreen() {
               </Pressable>
             </>
           )}
+        </View>
+
+        <SectionHeader title="DATA & PRIVACY" />
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>
+          <Pressable
+            style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => router.push("/backup")}
+          >
+            <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
+              <Feather name="archive" size={17} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingLabel, { color: colors.foreground }]}>Backup & Restore</Text>
+              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>Encrypted local file, no cloud upload</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </Pressable>
         </View>
 
         {/* Account */}
@@ -726,6 +840,12 @@ export default function SettingsScreen() {
         visible={showPinSetup}
         onClose={() => setShowPinSetup(false)}
         onSave={handlePinSaved}
+      />
+      <PasswordConfirmationModal
+        visible={passwordAction !== null}
+        title={passwordAction === "change-pin" ? "Verify to change PIN" : "Verify to disable PIN"}
+        onCancel={() => setPasswordAction(null)}
+        onConfirm={confirmSecurityPassword}
       />
     </View>
   );

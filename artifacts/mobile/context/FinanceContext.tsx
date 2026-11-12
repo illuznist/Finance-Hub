@@ -15,8 +15,16 @@ import * as recurring from "@/finance/recurring";
 import { getUpcoming as upcomingPayments, recordScheduledPayment as confirmScheduledPayment } from "@/finance/upcoming";
 import type { Transaction } from "@/finance/ledger";
 import { getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits, localDate } from "@/finance/ledger";
-import { loadFinanceState, createWriteQueue } from "@/finance/migration";
+import { assertBackupFinanceCompleteness, loadFinanceState, createWriteQueue, migrateFinanceState } from "@/finance/migration";
 import * as ledgerService from "@/finance/service";
+import {
+  clearProtectedRestoreJournal,
+  commitProtectedRestoreJournal,
+  createProtectedRestoreJournal,
+  financeStorageAdapter,
+  migrateLegacyPinBeforeFinanceLoad,
+  recoverProtectedRestoreJournal,
+} from "@/security/deviceSecurity";
 import { captureNetWorthSnapshots } from "@/finance/netWorth";
 import type { NetWorthSnapshot } from "@/finance/analyticsTypes";
 import { buildAnalyticsReport } from "@/finance/analytics";
@@ -178,7 +186,6 @@ export interface NotificationSettings {
 
 export interface SecuritySettings {
   pinEnabled: boolean;
-  pin: string;
   autoLockMinutes: number;
 }
 
@@ -215,8 +222,6 @@ export const SUPPORTED_CURRENCIES = [
   { code: "INR", name: "Indian Rupee", symbol: "INR" },
 ];
 
-export const PIN_STORAGE_KEY = "@finance_pin_v1";
-
 interface FinanceContextType extends FinanceState {
   calendarKey: string;
   getBudget: (month: string, currency?: string) => ReturnType<typeof budgets.getBudgetView>;
@@ -231,6 +236,7 @@ interface FinanceContextType extends FinanceState {
   recordScheduledPayment: (item: UpcomingPayment, accountId: string | undefined, date: string, amount?: number, operationId?: string) => boolean;
   transactions: Transaction[];
   storageError: string | null;
+  storageRecoveryNotice: string | null;
   isReady: boolean;
   retryStorage: () => void;
   setExpensePaid: (id: string, paid: boolean, accountId?: string, date?: string) => boolean;
@@ -270,7 +276,10 @@ interface FinanceContextType extends FinanceState {
   setUserName: (name: string) => void;
   setCurrency: (currency: string) => void;
   setNotificationSettings: (s: NotificationSettings) => void;
-  setSecuritySettings: (s: SecuritySettings) => void;
+  setSecuritySettings: (s: SecuritySettings) => Promise<void>;
+  validateFinanceRestore: (candidate: unknown) => FinanceState;
+  restoreFinanceState: (candidate: unknown, themeMode?: "system" | "light" | "dark") => Promise<void>;
+  getFinanceStateSnapshot: () => FinanceState;
   monthResetInfo: { count: number; month: string } | null;
   dismissResetInfo: () => void;
   totalBalance: number;
@@ -304,7 +313,6 @@ const defaultNotificationSettings: NotificationSettings = {
 
 const defaultSecuritySettings: SecuritySettings = {
   pinEnabled: false,
-  pin: "",
   autoLockMinutes: 5,
 };
 
@@ -429,13 +437,25 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const loadingRef = useRef(false);
   const readyRef = useRef(false);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [storageRecoveryNotice, setStorageRecoveryNotice] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const queueWrite = useMemo(() => createWriteQueue(AsyncStorage), []);
 
   const load = useCallback(() => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    loadFinanceState(AsyncStorage, defaultState).then(async (initial) => {
+    void (async () => {
+      const recovery = await recoverProtectedRestoreJournal(AsyncStorage);
+      if (recovery === "rolled-back") {
+        setStorageRecoveryNotice("An interrupted restore was rolled back. Your previous finance records were retained.");
+      } else if (recovery === "committed") {
+        setStorageRecoveryNotice("A completed restore was recovered after restart.");
+      }
+      await migrateLegacyPinBeforeFinanceLoad(AsyncStorage);
+      const initial = await loadFinanceState(AsyncStorage, defaultState);
+      // Finance migration may create a compatibility copy from the old document;
+      // strip its device-only plaintext PIN after that recovery copy is complete.
+      await migrateLegacyPinBeforeFinanceLoad(AsyncStorage);
       let loaded = initial;
       loaded = { ...loaded, emis: loaded.emis.map(normalizeEMI) };
       loaded = { ...loaded, loans: loaded.loans.map(normalizeLoan) };
@@ -453,7 +473,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setIsReady(true);
       setStorageError(null);
       setState(loaded);
-    }).catch(error => {
+    })().catch(error => {
       readyRef.current = false;
       setStorageError(error instanceof Error ? error.message : "Saved data could not be loaded. No records have been reset.");
     }).finally(() => { loadingRef.current = false; });
@@ -473,11 +493,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     });
   }, [queueWrite]);
 
-  const retryStorage = useCallback(() => {
+  const retryStorage = useCallback(async () => {
     if (!readyRef.current && stateRef.current === defaultState) { load(); return; }
-    queueWrite(stateRef.current).then(() => {
+    try {
+      const recovery = await recoverProtectedRestoreJournal(AsyncStorage);
+      if (recovery !== "none") { load(); return; }
+      await queueWrite(stateRef.current);
       readyRef.current = true; setStorageError(null);
-    }).catch(error => setStorageError(String(error)));
+    } catch (error) {
+      readyRef.current = false;
+      setStorageError(error instanceof Error ? error.message : "Saved data could not be retried safely.");
+    }
   }, [load, queueWrite]);
 
   const attempt = useCallback((updater: (prev: FinanceState) => FinanceState): boolean => {
@@ -703,15 +729,85 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
   const setSecuritySettings = useCallback(
-    (securitySettings: SecuritySettings) => {
-      persist((prev) => ({ ...prev, securitySettings }));
-      AsyncStorage.setItem(
-        PIN_STORAGE_KEY,
-        JSON.stringify({ pinEnabled: securitySettings.pinEnabled, pin: securitySettings.pin })
-      ).catch(() => {});
+    async (securitySettings: SecuritySettings) => {
+      if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before changing security settings.");
+      const next = { ...stateRef.current, securitySettings };
+      stateRef.current = next;
+      setState(next);
+      try {
+        await queueWrite(next);
+        readyRef.current = true;
+        setStorageError(null);
+      } catch {
+        readyRef.current = false;
+        setStorageError("Security settings could not be saved. Keep the app open and retry safely.");
+        throw new Error("Security settings could not be saved. Retry safely before leaving this screen.");
+      }
     },
-    [persist]
+    [queueWrite]
   );
+  const validateFinanceRestore = useCallback((candidate: unknown): FinanceState => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new Error("The selected backup does not contain a finance document.");
+    }
+    assertBackupFinanceCompleteness(candidate);
+    const serialized = JSON.stringify(candidate);
+    if (!serialized) throw new Error("The selected backup contains an unreadable finance document.");
+    const restored = migrateFinanceState(serialized, defaultState);
+    const safeState = { ...restored, securitySettings: stateRef.current.securitySettings };
+    for (const account of ledgerService.balances(safeState)) {
+      if (!Number.isFinite(account.balance)) throw new Error("A restored account balance could not be verified.");
+    }
+    return safeState;
+  }, []);
+  const restoreFinanceState = useCallback(async (
+    candidate: unknown,
+    themeMode?: "system" | "light" | "dark",
+  ) => {
+    if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before restoring a backup.");
+    const restored = validateFinanceRestore(candidate);
+    readyRef.current = false;
+    let journalPrepared = false;
+    try {
+      // Drain earlier writes before capturing the protected pre-restore state.
+      await queueWrite(stateRef.current);
+      const [originalFinance, originalTheme] = await Promise.all([
+        AsyncStorage.getItem("@finance_state_v4"),
+        AsyncStorage.getItem("@finance_theme_v1"),
+      ]);
+      await createProtectedRestoreJournal(financeStorageAdapter, originalFinance, originalTheme);
+      journalPrepared = true;
+      await AsyncStorage.setItem("@finance_state_v4", JSON.stringify(restored));
+      if (themeMode) await AsyncStorage.setItem("@finance_theme_v1", themeMode);
+      await commitProtectedRestoreJournal(financeStorageAdapter);
+    } catch (error) {
+      if (journalPrepared) {
+        try {
+          await recoverProtectedRestoreJournal(AsyncStorage);
+          readyRef.current = true;
+          setStorageError(null);
+        } catch {
+          readyRef.current = false;
+          setStorageError("A restore was interrupted. The protected recovery copy is still present. Do not clear app storage; tap Retry safely.");
+          throw new Error("Restore did not finish. Keep the app open and use Retry safely to recover the previous records.");
+        }
+      } else {
+        readyRef.current = false;
+        setStorageError("Restore could not start safely. Your current records are unchanged; tap Retry safely before continuing.");
+      }
+      throw new Error(error instanceof Error ? error.message : "Restore did not finish; previous records were retained.");
+    }
+
+    stateRef.current = restored;
+    setState(restored);
+    readyRef.current = true;
+    setStorageError(null);
+    try {
+      await clearProtectedRestoreJournal(financeStorageAdapter);
+    } catch {
+      // The committed journal is safe to clean on the next startup.
+    }
+  }, [queueWrite, validateFinanceRestore]);
 
   const dismissResetInfo = useCallback(() => setMonthResetInfo(null), []);
 
@@ -752,6 +848,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         accounts,
         transactions,
         storageError,
+        storageRecoveryNotice,
         isReady,
         retryStorage,
         setExpensePaid,
@@ -795,6 +892,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         setCurrency,
         setNotificationSettings,
         setSecuritySettings,
+        validateFinanceRestore,
+        restoreFinanceState,
+        getFinanceStateSnapshot: () => stateRef.current,
         monthResetInfo,
         dismissResetInfo,
         totalBalance,

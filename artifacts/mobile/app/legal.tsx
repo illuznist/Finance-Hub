@@ -15,20 +15,20 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 
-const LAST_UPDATED = "May 2025";
+const LAST_UPDATED = "November 2026";
 
 const PRIVACY_SECTIONS = [
   {
     title: "Data Storage",
-    body: "FinanceApp stores all your financial data exclusively on your device using encrypted local storage. No data is transmitted to any server, third party, or cloud service. We have no access to your financial information.",
+    body: "Your finance records are stored in the app's on-device database and are not uploaded to a FinanceApp server. The app does not encrypt that database at rest; on native devices it is protected by the operating system's app sandbox, while browser storage is accessible to the browser profile. Encrypted backups are created only when you export them.",
   },
   {
     title: "Data We Do Not Collect",
-    body: "We do not collect personal information, analytics, usage telemetry, or any identifiable data. There are no user accounts on our servers. Your name, email (used only for local login), and all financial records remain solely on your device.",
+    body: "The app has no FinanceApp-hosted account service and does not send your finance records to a server. Your name, email, and local account verifier are stored on this device. Browser sign-in data uses browser local storage and is not protected by device secure hardware.",
   },
   {
     title: "Authentication",
-    body: "Your login credentials are hashed using SHA-256 and stored in your device's secure enclave (iOS Keychain / Android Keystore). Biometric authentication is handled entirely by your device's operating system. We never see your password or biometric data.",
+    body: "Passwords are stored as salted PBKDF2-HMAC-SHA256 verifiers. On native devices, the verifier and optional PIN verifier are stored with the operating system's Keychain or Keystore through SecureStore; they are not kept in the secure enclave. Browser builds use local storage instead. Biometrics are opt-in and verified by the operating system; the app does not receive biometric samples.",
   },
   {
     title: "Notifications",
@@ -40,7 +40,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Data Deletion",
-    body: "All your data can be deleted by uninstalling the app. Since everything is stored locally, uninstalling permanently removes all data. We have no copy of your data to delete on your behalf.",
+    body: "Finance records are local to the app. Removing app data or uninstalling may permanently remove those records; exported backup files remain wherever you saved them. Some operating systems may retain Keychain credentials after an app is removed. FinanceApp does not hold a server-side copy to delete.",
   },
   {
     title: "Contact",
@@ -63,7 +63,7 @@ const TERMS_SECTIONS = [
   },
   {
     title: "Data Responsibility",
-    body: "Since all data is stored locally on your device, you are solely responsible for maintaining backups. We are not liable for data loss resulting from device failure, app deletion, OS updates, or any other cause.",
+    body: "Records are stored locally on your device. You are responsible for creating and keeping encrypted backups in a location you control. A backup password cannot be recovered by the app. We are not liable for data loss resulting from device failure, app deletion, OS updates, or other causes.",
   },
   {
     title: "Accuracy of Information",

@@ -229,6 +229,23 @@ test("legacy migration preserves records and does not invent transactions or EMI
   assert.equal(migrated.reconciliationRequired, true);
   assert.deepEqual(M.migrateFinanceState(JSON.stringify(migrated), empty()), migrated);
 });
+test("backup restore rejects missing current collections before migration can default them", () => {
+  const complete = {
+    ...empty(),
+    schemaVersion: 2,
+    planning: { plans: [], periods: [], recurring: [], occurrences: [] },
+  };
+  assert.doesNotThrow(() => M.assertBackupFinanceCompleteness(complete));
+  for (const field of ["accounts", "expenses", "emis", "loans", "incomes", "savingsGoals", "transactions"]) {
+    const incomplete = { ...complete };
+    delete incomplete[field];
+    assert.throws(() => M.assertBackupFinanceCompleteness(incomplete), /missing required finance records/);
+  }
+  assert.throws(
+    () => M.assertBackupFinanceCompleteness({ ...complete, planning: { plans: [], periods: [], recurring: [] } }),
+    /missing current budget or recurring records/,
+  );
+});
 test("fresh installations have no fictional financial records", () => {
   const s = M.migrateFinanceState(null, empty());
   for (const key of ["accounts", "expenses", "incomes", "emis", "loans", "savingsGoals", "transactions"]) assert.equal(s[key].length, 0);
@@ -365,4 +382,13 @@ test("schema 1 opening repair preserves existing ledger impact exactly once", ()
   assert.equal(loaded.accounts[0].openingBalance, 1000);
   assert.equal(balance(loaded), 1150);
   assert.deepEqual(loaded.transactions, state.transactions);
+});
+test("finance migration removes the legacy plaintext PIN but preserves lock preferences and balances", () => {
+  const state = base();
+  state.securitySettings = { pinEnabled: true, pin: "1234", autoLockMinutes: 10 };
+  const loaded = M.migrateFinanceState(JSON.stringify(state), empty());
+  assert.equal(loaded.securitySettings.pinEnabled, true);
+  assert.equal(loaded.securitySettings.autoLockMinutes, 10);
+  assert.equal("pin" in loaded.securitySettings, false);
+  assert.equal(balance(loaded), balance(state));
 });

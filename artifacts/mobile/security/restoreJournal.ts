@@ -15,7 +15,11 @@ import { gcm } from "@noble/ciphers/aes.js";
 
 export const RESTORE_JOURNAL_KEY = "@finance_restore_journal_v1";
 export const RESTORE_JOURNAL_SECRET_KEY = "finance_restore_key_v1";
-const FINANCE_DOCUMENT_KEY = "@finance_state_v4";
+export const RESTORE_FINANCE_DOCUMENT_KEY = "@finance_state_v4";
+export const RESTORE_THEME_PREFERENCE_KEY = "@finance_theme_v1";
+const FINANCE_DOCUMENT_KEY = RESTORE_FINANCE_DOCUMENT_KEY;
+const THEME_PREFERENCE_KEY = RESTORE_THEME_PREFERENCE_KEY;
+const ALLOWED_RESTORE_KEYS = new Set([FINANCE_DOCUMENT_KEY, THEME_PREFERENCE_KEY]);
 const JOURNAL_AAD = utf8("Finance Hub restore journal v1");
 
 export interface JournalStorage {
@@ -33,7 +37,7 @@ export interface JournalSecretStore {
 interface RestoreJournal {
   version: 1;
   status: "prepared" | "committed";
-  hadPrimaryDocument: boolean;
+  originalValues: Record<string, string | null>;
   nonce: string;
   ciphertext: string;
 }
@@ -45,19 +49,22 @@ interface RestoreJournal {
 export async function createRestoreJournal(
   storage: JournalStorage,
   secrets: JournalSecretStore,
-  originalRaw: string | null,
+  originalValues: Record<string, string | null>,
   randomBytes: RandomBytes,
 ): Promise<void> {
+  for (const key of Object.keys(originalValues)) {
+    if (!ALLOWED_RESTORE_KEYS.has(key)) throw new Error("This restore cannot change an unsupported local preference.");
+  }
   const key = await checkedRandomBytes(randomBytes, AES_KEY_BYTES);
   const nonce = await checkedRandomBytes(randomBytes, GCM_NONCE_BYTES);
-  const plaintext = utf8(JSON.stringify({ hadPrimaryDocument: originalRaw !== null, originalRaw }));
+  const plaintext = utf8(JSON.stringify({ originalValues }));
   try {
     await secrets.set(RESTORE_JOURNAL_SECRET_KEY, hex(key));
     const ciphertext = gcm(key, nonce, JOURNAL_AAD).encrypt(plaintext);
     const journal: RestoreJournal = {
       version: 1,
       status: "prepared",
-      hadPrimaryDocument: originalRaw !== null,
+      originalValues: Object.fromEntries(Object.keys(originalValues).map(key => [key, originalValues[key]])),
       nonce: encodeBase64(nonce),
       ciphertext: encodeBase64(ciphertext),
     };
@@ -125,18 +132,22 @@ export async function recoverInterruptedRestore(
     key.fill(0);
   }
   try {
-    const snapshot = JSON.parse(fromUtf8(plaintext)) as { hadPrimaryDocument?: unknown; originalRaw?: unknown };
-    if (
-      typeof snapshot.hadPrimaryDocument !== "boolean" ||
-      (snapshot.hadPrimaryDocument && typeof snapshot.originalRaw !== "string") ||
-      (!snapshot.hadPrimaryDocument && snapshot.originalRaw !== null)
-    ) {
+    const snapshot = JSON.parse(fromUtf8(plaintext)) as { originalValues?: unknown };
+    if (!snapshot.originalValues || typeof snapshot.originalValues !== "object" || Array.isArray(snapshot.originalValues)) {
       throw new Error("The protected restore copy has an invalid structure.");
     }
-    if (snapshot.hadPrimaryDocument) {
-      await storage.setItem(FINANCE_DOCUMENT_KEY, snapshot.originalRaw as string);
-    } else {
-      await storage.removeItem(FINANCE_DOCUMENT_KEY);
+    const originalValues = snapshot.originalValues as Record<string, unknown>;
+    for (const [key, value] of Object.entries(originalValues)) {
+      if (!ALLOWED_RESTORE_KEYS.has(key) || (value !== null && typeof value !== "string")) {
+        throw new Error("The protected restore copy contains an invalid value.");
+      }
+    }
+    if (!Object.hasOwn(originalValues, FINANCE_DOCUMENT_KEY)) {
+      throw new Error("The protected restore copy is missing the finance document.");
+    }
+    for (const [key, value] of Object.entries(originalValues)) {
+      if (value === null) await storage.removeItem(key);
+      else await storage.setItem(key, value as string);
     }
   } finally {
     plaintext.fill(0);
@@ -159,7 +170,7 @@ function parseJournal(raw: string): RestoreJournal {
   if (
     journal.version !== 1 ||
     (journal.status !== "prepared" && journal.status !== "committed") ||
-    typeof journal.hadPrimaryDocument !== "boolean" ||
+    !journal.originalValues ||
     typeof journal.nonce !== "string" ||
     typeof journal.ciphertext !== "string"
   ) {
