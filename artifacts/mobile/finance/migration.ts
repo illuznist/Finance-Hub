@@ -3,6 +3,7 @@ import { validSnapshot } from "./netWorth";
 import { minorUnits, validateTransaction } from "./ledger";
 import { initialPlanning } from "./budgets";
 import { validateRecurring } from "./recurring";
+import { translateAppText } from "../i18n/localization";
 
 export const FINANCE_STORAGE_KEY = "@finance_state_v4";
 export const LEGACY_BACKUP_KEY = "@finance_state_v4_pre_ledger_backup";
@@ -34,16 +35,23 @@ export function assertBackupFinanceCompleteness(value: unknown): asserts value i
 }
 
 function object(value: unknown, label: string): JsonRecord {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} is not a valid object. Your saved data has not been replaced.`);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(translateAppText("{label} is not a valid object. Your saved data has not been replaced.", { label: translateAppText(label) }));
+  }
   return value as JsonRecord;
 }
 function records(value: unknown, name: string): JsonRecord[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new Error(`Saved ${name} could not be read. Your original data is preserved.`);
+  const translatedName = translateAppText(name);
+  if (!Array.isArray(value)) {
+    throw new Error(translateAppText("Saved {name} could not be read. Your original data is preserved.", { name: translatedName }));
+  }
   const ids = new Set<string>();
   return value.map(entry => {
     const record = object(entry, name);
-    if (typeof record.id !== "string" || !record.id || ids.has(record.id)) throw new Error(`Saved ${name} contain missing or duplicate identities.`);
+    if (typeof record.id !== "string" || !record.id || ids.has(record.id)) {
+      throw new Error(translateAppText("Saved {name} contain missing or duplicate identities.", { name: translatedName }));
+    }
     ids.add(record.id);
     return record;
   });
@@ -60,7 +68,7 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
   for (const [name, field] of [["expenses", "amount"], ["incomes", "amount"], ["loans", "principalAmount"], ["savingsGoals", "savedAmount"]]) {
     for (const r of records(parsed[name], name)) {
       if (typeof r[field] !== "number" || !Number.isFinite(r[field]) || Number(r[field]) < 0) {
-        throw new Error(`Saved ${name} contain an unreadable amount. Original records have been retained.`);
+        throw new Error(translateAppText("Saved {name} contain an unreadable amount. Original records have been retained.", { name: translateAppText(name) }));
       }
     }
   }
@@ -144,7 +152,9 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
   if (!state.planning) state.planning = initialPlanning(state);
   const planning = object(state.planning, "Planning data");
   for (const key of ["plans", "periods", "recurring", "occurrences"]) {
-    if (!Array.isArray(planning[key])) throw new Error(`Saved planning ${key} could not be read; original records retained.`);
+    if (!Array.isArray(planning[key])) {
+      throw new Error(translateAppText("Saved planning {key} could not be read; original records retained.", { key: translateAppText(key) }));
+    }
   }
   for (const r of state.planning.recurring) validateRecurring(r);
   for (const p of state.planning.plans) {

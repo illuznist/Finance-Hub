@@ -38,11 +38,25 @@ import {
   scheduleAllNotifications,
   setupNotificationHandler,
 } from "@/utils/notifications";
+import { formatAppNumber, translateAppPlural, translateAppText, type LocalizedPluralForms } from "@/i18n/localization";
 
 SplashScreen.preventAutoHideAsync();
-setupNotificationHandler().catch(() => {});
 
 const queryClient = new QueryClient();
+const RESET_NOTIFICATION_FORMS: LocalizedPluralForms = {
+  en: {
+    one: "One recurring expense was reset for {month}.",
+    other: "{count} recurring expenses were reset for {month}.",
+  },
+  ar: {
+    zero: "No recurring expenses were reset for {month}.",
+    one: "One recurring expense was reset for {month}.",
+    two: "Two recurring expenses were reset for {month}.",
+    few: "{count} recurring expenses were reset for {month} (few).",
+    many: "{count} recurring expenses were reset for {month} (many).",
+    other: "{count} recurring expenses were reset for {month} (other).",
+  },
+};
 
 // ── AuthGate ──
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -54,13 +68,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 28, backgroundColor: colors.background }}>
         <Feather name="shield" size={30} color={colors.primary} />
         <Text style={{ color: colors.foreground, fontSize: 19, fontWeight: "700", marginTop: 16, textAlign: "center" }}>
-          Account security data is unavailable
+          {translateAppText("Account security data is unavailable")}
         </Text>
         <Text style={{ color: colors.mutedForeground, fontSize: 14, lineHeight: 21, marginTop: 8, textAlign: "center" }}>
-          Your saved records have not been changed. Retry safely; do not clear app storage.
+          {translateAppText("Your saved records have not been changed. Retry safely; do not clear app storage.")}
         </Text>
         <Pressable onPress={auth.retryAuthStorage} style={{ backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, marginTop: 20 }}>
-          <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>Retry safely</Text>
+          <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>{translateAppText("Retry safely")}</Text>
         </Pressable>
       </View>
     );
@@ -98,14 +112,18 @@ function ResetNotifier() {
     if (!finance.notificationSettings.enabled) return;
     sentRef.current = true;
 
-    import("@/utils/notifications").then(({ requestNotificationPermissions }) => {
+    import("@/utils/notifications").then(async ({ requestNotificationPermissions }) => {
+      await setupNotificationHandler();
       requestNotificationPermissions().then((granted) => {
         if (!granted) return;
         const Notifications = require("expo-notifications");
         Notifications.scheduleNotificationAsync({
           content: {
-            title: `${info.month} tracker reset`,
-            body: `${info.count} recurring ${info.count === 1 ? "expense" : "expenses"} marked unpaid for ${info.month}. Start tracking your new month.`,
+            title: translateAppText("{month} tracker reset", { month: info.month }),
+            body: translateAppPlural(RESET_NOTIFICATION_FORMS, info.count, {
+              count: formatAppNumber(info.count),
+              month: info.month,
+            }),
             data: { type: "reset" },
             sound: "default",
           },
@@ -127,7 +145,9 @@ function NotificationScheduler() {
 
   useEffect(() => {
     if (!finance.isReady || finance.storageError) return;
-    scheduleAllNotifications(finance).catch(error => console.warn("Payment reminders could not be updated:", error));
+    setupNotificationHandler()
+      .then(() => scheduleAllNotifications(finance))
+      .catch(error => console.warn("Payment reminders could not be updated:", error));
   }, [
     finance.isReady,
     finance.storageError,
@@ -168,7 +188,7 @@ function RootLayoutNav() {
       <ResetNotifier />
       <NotificationScheduler />
       <StorageRecoveryNotifier />
-      <Stack screenOptions={{ headerBackTitle: "Back" }}>
+      <Stack screenOptions={{ headerShown: false, headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="forecast" options={{ headerShown: false, presentation: "card" }} />

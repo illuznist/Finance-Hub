@@ -16,6 +16,8 @@ import {
 } from "@/finance/forecast";
 import { useColors } from "@/hooks/useColors";
 import { parseLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatAppDate, formatAppNumber, translatePlural, type LocalizedPluralForms } from "@/i18n/localization";
 
 const PRESETS: { key: ForecastPreset; label: string }[] = [
   { key: "7", label: "7 days" }, { key: "30", label: "30 days" },
@@ -32,36 +34,50 @@ const SCENARIOS: { key: ForecastScenario["kind"]; label: string }[] = [
   { key: "savings_contribution", label: "Savings contribution" },
 ];
 const UNALLOCATED = "__unallocated__";
+const FORECAST_ITEM_FORMS: LocalizedPluralForms = {
+  en: { one: "{count} item", other: "{count} items" },
+  ar: {
+    zero: "No forecast items",
+    one: "One forecast item",
+    two: "Two forecast items",
+    few: "{count} forecast items (few)",
+    many: "{count} forecast items (many)",
+    other: "{count} forecast items (other)",
+  },
+};
 
 function Stat({ label, value, colors, tone }: { label: string; value: string; colors: Colors; tone?: string }) {
+  const { t } = usePreferences();
   return (
     <View style={{ flex: 1, minWidth: 130, paddingVertical: 8 }}>
-      <Text style={[ui.label, { color: colors.mutedForeground }]}>{label}</Text>
+       <Text style={[ui.label, { color: colors.mutedForeground }]}>{t(label)}</Text>
       <Text adjustsFontSizeToFit numberOfLines={1} style={[ui.bodyStrong, ui.num, { color: tone ?? colors.foreground, marginTop: 4 }]}>{value}</Text>
     </View>
   );
 }
 
 function ConfidenceNote({ mode, colors, startsLater }: { mode: ForecastMode; colors: Colors; startsLater: boolean }) {
+  const { t } = usePreferences();
   return (
     <Text style={[ui.small, { color: colors.mutedForeground, lineHeight: 19 }]}>
-      Current balances come from recorded transactions. Scheduled payments use known dates and remaining amounts.
-      {mode === "expected" ? " Expected mode also includes explicitly dated expected income." : " Conservative mode excludes expected income."}
-      {startsLater ? " Known events before this window are reflected in its projected starting balance." : ""}
-      {" "}Projections are estimates, not guaranteed balances.
+      {t("Current balances come from recorded transactions. Scheduled payments use known dates and remaining amounts.")}
+      {mode === "expected" ? ` ${t("Expected mode also includes explicitly dated expected income.")}` : ` ${t("Conservative mode excludes expected income.")}`}
+      {startsLater ? ` ${t("Known events before this window are reflected in its projected starting balance.")}` : ""}
+      {" "}{t("Projections are estimates, not guaranteed balances.")}
     </Text>
   );
 }
 
 function ForecastSummary({ forecast, colors }: { forecast: CashFlowForecast; colors: Colors }) {
+  const { t } = usePreferences();
   return (
     <View testID="forecast-summary" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]}>
-      <Text style={[ui.label, { color: colors.primary }]}>PROJECTED ENDING BALANCE</Text>
+       <Text style={[ui.label, { color: colors.primary }]}>{t("PROJECTED ENDING BALANCE")}</Text>
       <Text adjustsFontSizeToFit numberOfLines={1} style={[ui.hero, ui.num, { color: forecast.projectedEndingBalance < 0 ? colors.destructive : colors.foreground }]}>
         {money(forecast.projectedEndingBalance, forecast.currency)}
       </Text>
       <Text style={[ui.small, { color: colors.mutedForeground }]}>
-        {shortDate(forecast.range.from)} to {shortDate(forecast.range.to)} · {forecast.currency} only
+         {t("{from} to {to} · {currency} only", { from: shortDate(forecast.range.from), to: shortDate(forecast.range.to), currency: forecast.currency })}
       </Text>
       <View style={[ui.sep, { backgroundColor: colors.border, marginVertical: 4 }]} />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -75,7 +91,7 @@ function ForecastSummary({ forecast, colors }: { forecast: CashFlowForecast; col
         <View style={[ui.row, { borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: 0, alignItems: "flex-start" }]}>
           <Feather name="calendar" size={17} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={[ui.label, { color: colors.mutedForeground }]}>NEXT SCHEDULED OUTFLOW</Text>
+             <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("NEXT SCHEDULED OUTFLOW")}</Text>
             <Text style={[ui.bodyStrong, { color: colors.foreground, marginTop: 3 }]}>{forecast.nextPayment.name}</Text>
             <Text style={[ui.small, { color: colors.mutedForeground }]}>{shortDate(forecast.nextPayment.date)} · {money(forecast.nextPayment.amount, forecast.currency)}</Text>
           </View>
@@ -86,11 +102,12 @@ function ForecastSummary({ forecast, colors }: { forecast: CashFlowForecast; col
 }
 
 function BudgetCard({ outlook, colors }: { outlook: ReturnType<typeof buildBudgetOutlook> | null; colors: Colors }) {
+  const { t } = usePreferences();
   if (!outlook) {
     return (
       <View testID="forecast-budget" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 6 }]}>
-        <Text style={[ui.cardTitle, { color: colors.foreground }]}>Budget outlook</Text>
-        <Text style={[ui.small, { color: colors.mutedForeground }]}>Your budget could not be calculated right now. The cash forecast is unchanged.</Text>
+         <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t("Budget outlook")}</Text>
+         <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Your budget could not be calculated right now. The cash forecast is unchanged.")}</Text>
       </View>
     );
   }
@@ -98,36 +115,36 @@ function BudgetCard({ outlook, colors }: { outlook: ReturnType<typeof buildBudge
   return (
     <View testID="forecast-budget" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}>
       <View style={ui.between}>
-        <Text style={[ui.cardTitle, { color: colors.foreground }]}>Budget outlook</Text>
-        <Text style={[ui.small, { color: colors.mutedForeground }]}>{outlook.month}</Text>
+         <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t("Budget outlook")}</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground }]}>{formatAppDate(`${outlook.month}-01`, { month: "long", year: "numeric" })}</Text>
       </View>
       <View style={ui.between}>
-        <Text style={[ui.small, { color: colors.mutedForeground }]}>Limit</Text>
-        <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{outlook.limit > 0 ? money(outlook.limit, outlook.currency) : "Not set"}</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Limit")}</Text>
+         <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{outlook.limit > 0 ? money(outlook.limit, outlook.currency) : t("Not set")}</Text>
       </View>
       <View style={ui.between}>
-        <Text style={[ui.small, { color: colors.mutedForeground }]}>Actual spending</Text>
+         <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Actual spending")}</Text>
         <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{money(outlook.actual, outlook.currency)}</Text>
       </View>
       <View style={ui.between}>
-        <Text style={[ui.small, { color: colors.mutedForeground }]}>Known scheduled spending</Text>
+         <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Known scheduled spending")}</Text>
         <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{money(outlook.scheduled, outlook.currency)}</Text>
       </View>
       <View style={[ui.sep, { backgroundColor: colors.border }]} />
       <View style={ui.between}>
-        <Text style={[ui.bodyStrong, { color: colors.foreground }]}>Projected use</Text>
+         <Text style={[ui.bodyStrong, { color: colors.foreground }]}>{t("Projected use")}</Text>
         <Text style={[ui.bodyStrong, ui.num, { color }]}>{money(outlook.projected, outlook.currency)}</Text>
       </View>
       {outlook.limit > 0 ? (
         <Text style={[ui.small, { color: outlook.projectedRemaining < 0 ? colors.destructive : colors.mutedForeground }]}>
-          {outlook.projectedRemaining < 0
-            ? `${money(Math.abs(outlook.projectedRemaining), outlook.currency)} over the limit if known commitments occur.`
-            : `${money(outlook.projectedRemaining, outlook.currency)} remaining after known commitments.`}
+           {outlook.projectedRemaining < 0
+             ? t("{amount} over the limit if known commitments occur.", { amount: money(Math.abs(outlook.projectedRemaining), outlook.currency) })
+             : t("{amount} remaining after known commitments.", { amount: money(outlook.projectedRemaining, outlook.currency) })}
         </Text>
       ) : null}
       {outlook.overLimitCategories.length ? (
         <View style={{ gap: 4 }}>
-          <Text style={[ui.label, { color: colors.destructive }]}>CATEGORIES ABOVE LIMIT</Text>
+           <Text style={[ui.label, { color: colors.destructive }]}>{t("CATEGORIES ABOVE LIMIT")}</Text>
           {outlook.overLimitCategories.map(category => (
             <View key={category.id} style={ui.between}>
               <Text style={[ui.small, { color: colors.foreground }]}>{category.name}</Text>
@@ -136,7 +153,7 @@ function BudgetCard({ outlook, colors }: { outlook: ReturnType<typeof buildBudge
           ))}
         </View>
       ) : null}
-      <Text style={[ui.small, { color: colors.mutedForeground }]}>Actual and scheduled spending are separate; only confirmed transactions count as actual.</Text>
+       <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Actual and scheduled spending are separate; only confirmed transactions count as actual.")}</Text>
     </View>
   );
 }
@@ -157,6 +174,7 @@ function eventDestination(event: CashFlowForecast["events"][number]) {
 
 export default function ForecastScreen() {
   const colors = useColors();
+  const { t, isRTL, language } = usePreferences();
   const finance = useFinance();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -266,17 +284,17 @@ export default function ForecastScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenHeader
-        title="Forecast"
-        subtitle={baseline ? `${baseline.currency} · ${shortDate(baseline.range.from)} to ${shortDate(baseline.range.to)}` : "Plan with your recorded data"}
+        title={t("Forecast")}
+        subtitle={baseline ? t("{currency} · {from} to {to}", { currency: baseline.currency, from: shortDate(baseline.range.from), to: shortDate(baseline.range.to) }) : t("Plan with your recorded data")}
         topInset={topInset}
         colors={colors}
-        leading={<HeaderAction icon="arrow-left" label="Back to Home" variant="neutral" testID="forecast-back"
+        leading={<HeaderAction icon={isRTL ? "arrow-right" : "arrow-left"} label={t("Back to Home")} variant="neutral" testID="forecast-back"
           onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} />}
       />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 + bottomInset, gap: 16 }}
         showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={{ gap: 4 }}>
-          <Text style={[ui.label, { color: colors.mutedForeground }]}>FORECAST PERIOD</Text>
+          <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("FORECAST PERIOD")}</Text>
           <Chips prefix="forecast-range" value={preset} onChange={setPreset} items={PRESETS} />
           {preset === "custom" ? (
             <View style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", gap: 10, paddingTop: 0 }]}>
@@ -288,13 +306,13 @@ export default function ForecastScreen() {
 
         {currencies.length > 1 ? (
           <View>
-            <Text style={[ui.label, { color: colors.mutedForeground }]}>CURRENCY VIEW</Text>
+            <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("CURRENCY VIEW")}</Text>
             <Chips prefix="forecast-currency" value={currency} onChange={setCurrency} items={currencies.map(code => ({ key: code, label: code }))} />
           </View>
         ) : null}
 
         <View>
-          <Text style={[ui.label, { color: colors.mutedForeground }]}>INCOME ASSUMPTION</Text>
+          <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("INCOME ASSUMPTION")}</Text>
           <Chips prefix="forecast-mode" value={mode} onChange={setMode} items={[
             { key: "conservative", label: "Conservative" }, { key: "expected", label: "Expected" },
           ]} />
@@ -302,7 +320,7 @@ export default function ForecastScreen() {
 
         {forecastError ? (
           <View testID="forecast-error" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[ui.body, { color: colors.destructive }]}>{forecastError}</Text>
+            <Text style={[ui.body, { color: colors.destructive }]}>{t(forecastError)}</Text>
           </View>
         ) : null}
 
@@ -313,8 +331,8 @@ export default function ForecastScreen() {
             <ConfidenceNote mode={mode} colors={colors} startsLater={baseline.range.from > localDate()} />
 
             <View style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]} testID="forecast-chart">
-              <Text style={[ui.cardTitle, { color: colors.foreground }]}>Projected balance</Text>
-              <Text style={[ui.small, { color: colors.mutedForeground }]}>Combined tracked accounts in {currency}; currencies are never converted.</Text>
+              <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t("Projected balance")}</Text>
+              <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Combined tracked accounts in {currency}; currencies are never converted.", { currency })}</Text>
               <ForecastChart points={baseline.points} scenarioPoints={scenarioResult?.points} width={contentWidth - 32} colors={colors} />
             </View>
 
@@ -322,29 +340,29 @@ export default function ForecastScreen() {
               <View testID="forecast-shortfall" style={[ui.card, { backgroundColor: colors.errorLight, borderColor: colors.destructive + "55", gap: 6 }]}>
                 <View style={[ui.row, { paddingVertical: 0 }]}>
                   <Feather name="alert-circle" size={18} color={colors.destructive} />
-                  <Text style={[ui.cardTitle, { color: colors.destructive }]}>Projected balance below zero</Text>
+                  <Text style={[ui.cardTitle, { color: colors.destructive }]}>{t("Projected balance below zero")}</Text>
                 </View>
                 <Text style={[ui.body, { color: colors.foreground }]}>
-                  {baseline.shortfall.accountName} may fall below zero on {shortDate(baseline.shortfall.date)}.
-                  {" "}About {money(baseline.shortfall.amountRequired, currency)} would cover the projected gap.
+                  {t("{account} may fall below zero on {date}.", { account: baseline.shortfall.accountName, date: shortDate(baseline.shortfall.date) })}
+                  {" "}{t("About {amount} would cover the projected gap.", { amount: money(baseline.shortfall.amountRequired, currency) })}
                 </Text>
                 <Text style={[ui.small, { color: colors.mutedForeground }]}>
                   {baseline.shortfall.contributingEvents.length
-                    ? `Known commitments affecting this account: ${baseline.shortfall.contributingEvents.map(e => e.name).join(", ")}.`
-                    : "The account is already below zero in its recorded balance."}
+                    ? t("Known commitments affecting this account: {events}.", { events: baseline.shortfall.contributingEvents.map(e => e.name).join(", ") })
+                    : t("The account is already below zero in its recorded balance.")}
                 </Text>
               </View>
             ) : null}
 
             {scenarioResult ? (
               <View testID="forecast-scenario-comparison" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 5 }]}>
-                <Text style={[ui.label, { color: colors.accent }]}>SIMULATION ONLY</Text>
-                <Text style={[ui.cardTitle, { color: colors.foreground }]}>Scenario ending balance</Text>
+                <Text style={[ui.label, { color: colors.accent }]}>{t("SIMULATION ONLY")}</Text>
+                <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t("Scenario ending balance")}</Text>
                 <Text style={[ui.hero, ui.num, { color: scenarioResult.projectedEndingBalance >= baseline.projectedEndingBalance ? colors.success : colors.destructive }]}>
                   {money(scenarioResult.projectedEndingBalance, currency)}
                 </Text>
                 <Text style={[ui.small, { color: colors.mutedForeground }]}>
-                  {money(Math.abs(scenarioResult.projectedEndingBalance - baseline.projectedEndingBalance), currency)} {scenarioResult.projectedEndingBalance >= baseline.projectedEndingBalance ? "higher" : "lower"} than baseline. Actual records are unchanged.
+                  {t("{amount} {direction} than baseline. Actual records are unchanged.", { amount: money(Math.abs(scenarioResult.projectedEndingBalance - baseline.projectedEndingBalance), currency), direction: t(scenarioResult.projectedEndingBalance >= baseline.projectedEndingBalance ? "higher" : "lower") })}
                 </Text>
               </View>
             ) : null}
@@ -353,15 +371,19 @@ export default function ForecastScreen() {
 
             <View testID="forecast-timeline" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 4 }]}>
               <View style={ui.between}>
-                <Text style={[ui.cardTitle, { color: colors.foreground }]}>Upcoming timeline</Text>
-                <Text style={[ui.small, { color: colors.mutedForeground }]}>{displayed?.events.length ?? 0} items</Text>
+                <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t("Upcoming timeline")}</Text>
+                 <Text style={[ui.small, { color: colors.mutedForeground }]}>
+                   {translatePlural(FORECAST_ITEM_FORMS, language, displayed?.events.length ?? 0, {
+                     count: formatAppNumber(displayed?.events.length ?? 0),
+                   })}
+                 </Text>
               </View>
-              <Text style={[ui.small, { color: colors.mutedForeground, marginBottom: 4 }]}>Unallocated items are shown but do not change a wallet projection.</Text>
+              <Text style={[ui.small, { color: colors.mutedForeground, marginBottom: 4 }]}>{t("Unallocated items are shown but do not change a wallet projection.")}</Text>
               {eventDays.length === 0 ? (
                 <View style={[ui.empty, { borderColor: colors.border }]}>
                   <Feather name="calendar" size={22} color={colors.mutedForeground} />
-                  <Text style={[ui.bodyStrong, { color: colors.foreground }]}>No scheduled movements</Text>
-                  <Text style={[ui.small, { color: colors.mutedForeground, textAlign: "center" }]}>The projection stays at current tracked balances for this period.</Text>
+                  <Text style={[ui.bodyStrong, { color: colors.foreground }]}>{t("No scheduled movements")}</Text>
+                  <Text style={[ui.small, { color: colors.mutedForeground, textAlign: "center" }]}>{t("The projection stays at current tracked balances for this period.")}</Text>
                 </View>
               ) : eventDays.map(([date, events]) => (
                 <View key={date} testID={`forecast-day-${date}`}>
@@ -372,7 +394,7 @@ export default function ForecastScreen() {
                     const isInflow = event.direction === "in";
                     return (
                       <Pressable key={event.id} testID={`forecast-event-${event.id}`} accessibilityRole="button"
-                        accessibilityLabel={`${event.name}, ${shortDate(event.date)}, ${money(event.amount, currency)}${destination ? ", open source record" : ", hypothetical"}`}
+                         accessibilityLabel={t("{name}, {date}, {amount}{status}", { name: event.name, date: shortDate(event.date), amount: money(event.amount, currency), status: destination ? `, ${t("open source record")}` : `, ${t("hypothetical")}` })}
                         onPress={() => openEvent(event)} disabled={!destination}
                         style={({ pressed }) => [ui.row, { borderBottomWidth: 1, borderBottomColor: colors.border, opacity: pressed ? 0.72 : 1 }]}>
                         <View style={[ui.icon, { backgroundColor: event.confidence === "hypothetical" ? colors.accent + "18" : colors.secondary }]}>
@@ -380,9 +402,9 @@ export default function ForecastScreen() {
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text numberOfLines={1} style={[ui.bodyStrong, { color: colors.foreground }]}>{event.name}</Text>
-                          <Text numberOfLines={1} style={[ui.small, { color: colors.mutedForeground }]}>{event.source} · {event.category} · {event.accountName ?? "Unallocated"}</Text>
+                           <Text numberOfLines={1} style={[ui.small, { color: colors.mutedForeground }]}>{t(event.source)} · {t(event.category)} · {event.accountName ?? t("Unallocated")}</Text>
                           <Text style={[ui.small, { color: colors.mutedForeground }]}>
-                            {event.accountName ? `${event.accountName} after day: ${money(event.projectedBalanceAfter ?? 0, currency)}` : "No wallet balance assumed"}
+                             {event.accountName ? t("{account} after day: {amount}", { account: event.accountName, amount: money(event.projectedBalanceAfter ?? 0, currency) }) : t("No wallet balance assumed")}
                           </Text>
                         </View>
                         <Text adjustsFontSizeToFit numberOfLines={1} style={[ui.bodyStrong, ui.num, { color: isInflow ? colors.success : colors.foreground, maxWidth: 112 }]}>
@@ -397,21 +419,21 @@ export default function ForecastScreen() {
 
             <View testID="forecast-scenarios" style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]}>
               <View style={ui.between}>
-                <Text style={[ui.cardTitle, { color: colors.foreground }]}>What if?</Text>
+                 <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t("What if?")}</Text>
                 {scenarios.length ? <Pressable testID="forecast-scenario-reset" accessibilityRole="button" onPress={resetScenarios}>
-                  <Text style={[ui.link, { color: colors.primary }]}>Reset</Text>
+                  <Text style={[ui.link, { color: colors.primary }]}>{t("Reset")}</Text>
                 </Pressable> : null}
               </View>
-              <Text style={[ui.small, { color: colors.mutedForeground }]}>Simulations never change your ledger, payment history, or wallet balances.</Text>
+              <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Simulations never change your ledger, payment history, or wallet balances.")}</Text>
               <Chips prefix="forecast-scenario-kind" value={scenarioKind} onChange={setScenarioKind} items={SCENARIOS} />
               {scenarioKind === "delay_expected_income" ? (
                 <>
                   {datedExpectedIncomes.length ? (
                     <Chips prefix="forecast-delay-income" value={delayIncomeId || datedExpectedIncomes[0].id}
                       onChange={setDelayIncomeId} items={datedExpectedIncomes.map(i => ({ key: i.id, label: i.name }))} />
-                  ) : <Text style={[ui.small, { color: colors.mutedForeground }]}>Add an expected income with a specific date to simulate a delay.</Text>}
+                    ) : <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Add an expected income with a specific date to simulate a delay.")}</Text>}
                   <Field label="Delay by days"><Input testID="forecast-delay-days" value={delayDays} onChangeText={setDelayDays} keyboardType="number-pad" maxLength={3} /></Field>
-                  <Text style={[ui.small, { color: colors.mutedForeground }]}>This simulation applies only in Expected mode.</Text>
+                   <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("This simulation applies only in Expected mode.")}</Text>
                 </>
               ) : (
                 <>
@@ -419,28 +441,32 @@ export default function ForecastScreen() {
                     <View style={{ flex: 1 }}><Field label="Amount"><Input testID="forecast-scenario-amount" value={scenarioAmount} onChangeText={setScenarioAmount} keyboardType="decimal-pad" maxLength={14} /></Field></View>
                     <View style={{ flex: 1 }}><Field label={scenarioKind.includes("monthly") ? "First date" : "Date"}><Input testID="forecast-scenario-date" value={scenarioDate} onChangeText={setScenarioDate} maxLength={10} autoCapitalize="none" /></Field></View>
                   </View>
-                  <Text style={[ui.label, { color: colors.mutedForeground }]}>AFFECTED ACCOUNT</Text>
+                   <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("AFFECTED ACCOUNT")}</Text>
                   <Chips prefix="forecast-scenario-account" value={scenarioAccountId} onChange={setScenarioAccountId}
                     items={[{ key: UNALLOCATED, label: "Unallocated" }, ...accounts.map(a => ({ key: a.id, label: a.name }))]} />
                 </>
               )}
-              {scenarioError ? <Text testID="forecast-scenario-error" style={[ui.small, { color: colors.destructive }]}>{scenarioError}</Text> : null}
+              {scenarioError ? <Text testID="forecast-scenario-error" style={[ui.small, { color: colors.destructive }]}>{t(scenarioError)}</Text> : null}
               <Button label="Add simulation" testID="forecast-scenario-add" onPress={addScenario} />
               {scenarios.length ? (
                 <View style={{ gap: 2, marginTop: 4 }}>
-                  <Text style={[ui.label, { color: colors.mutedForeground }]}>ACTIVE SIMULATIONS</Text>
+                   <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("ACTIVE SIMULATIONS")}</Text>
                   {scenarios.map(scenario => {
-                    const detail = scenario.kind === "delay_expected_income"
-                      ? `${datedExpectedIncomes.find(i => i.id === scenario.incomeId)?.name ?? "Expected income"} delayed ${scenario.delayDays} days`
-                      : `${money(scenario.amount ?? 0, scenario.currency)}${scenario.date ? ` · ${shortDate(scenario.date)}` : ""}${scenario.accountId ? ` · ${accounts.find(a => a.id === scenario.accountId)?.name ?? "Account"}` : " · Unallocated"}`;
+                     const detail = scenario.kind === "delay_expected_income"
+                       ? t("{income} delayed {days} days", { income: datedExpectedIncomes.find(i => i.id === scenario.incomeId)?.name ?? t("Expected income"), days: formatAppNumber(scenario.delayDays ?? 0) })
+                       : t("{amount}{date}{account}", {
+                         amount: money(scenario.amount ?? 0, scenario.currency),
+                         date: scenario.date ? ` · ${shortDate(scenario.date)}` : "",
+                         account: scenario.accountId ? ` · ${accounts.find(a => a.id === scenario.accountId)?.name ?? t("Account")}` : ` · ${t("Unallocated")}`,
+                       });
                     return (
                       <View key={scenario.id} style={[ui.between, { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 8 }]}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[ui.bodyStrong, { color: colors.foreground }]}>{ScenarioName(scenario.kind)}</Text>
+                           <Text style={[ui.bodyStrong, { color: colors.foreground }]}>{t(ScenarioName(scenario.kind))}</Text>
                           <Text style={[ui.small, { color: colors.mutedForeground }]}>{detail}</Text>
                         </View>
                         <Pressable testID={`forecast-scenario-remove-${scenario.id}`} accessibilityRole="button"
-                          accessibilityLabel={`Remove ${ScenarioName(scenario.kind)}`} onPress={() => removeScenario(scenario.id)}>
+                           accessibilityLabel={t("Remove {scenario}", { scenario: t(ScenarioName(scenario.kind)) })} onPress={() => removeScenario(scenario.id)}>
                           <Feather name="x" size={18} color={colors.mutedForeground} />
                         </Pressable>
                       </View>
@@ -451,7 +477,7 @@ export default function ForecastScreen() {
             </View>
 
             <Text style={[ui.small, { color: colors.mutedForeground, textAlign: "center" }]}>
-              Forecasts are based on known records only. Missing due dates stay unprojected; no exchange rates or future transactions are invented.
+              {t("Forecasts are based on known records only. Missing due dates stay unprojected; no exchange rates or future transactions are invented.")}
             </Text>
           </>
         ) : null}

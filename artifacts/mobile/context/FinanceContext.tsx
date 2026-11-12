@@ -473,9 +473,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setIsReady(true);
       setStorageError(null);
       setState(loaded);
-    })().catch(error => {
+    })().catch(() => {
       readyRef.current = false;
-      setStorageError(error instanceof Error ? error.message : "Saved data could not be loaded. No records have been reset.");
+      setStorageError("Saved data could not be loaded. No records have been reset.");
     }).finally(() => { loadingRef.current = false; });
   }, [queueWrite]);
   useEffect(load, [load]);
@@ -487,9 +487,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     )), localDate().slice(0, 7)));
     stateRef.current = next;
     setState(next);
-    queueWrite(next).catch(error => {
+    queueWrite(next).catch(() => {
       readyRef.current = false;
-      setStorageError(`Changes could not be saved: ${error instanceof Error ? error.message : "storage unavailable"}. Keep the app open and retry.`);
+      setStorageError("Changes could not be saved. Your records are unchanged; keep the app open and retry safely.");
     });
   }, [queueWrite]);
 
@@ -500,9 +500,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (recovery !== "none") { load(); return; }
       await queueWrite(stateRef.current);
       readyRef.current = true; setStorageError(null);
-    } catch (error) {
+    } catch {
       readyRef.current = false;
-      setStorageError(error instanceof Error ? error.message : "Saved data could not be retried safely.");
+      setStorageError("Saved data could not be retried safely.");
     }
   }, [load, queueWrite]);
 

@@ -5,6 +5,7 @@ import { shortDate, ui } from "@/components/PlanningUI";
 import { TYPOGRAPHY } from "@/constants/typography";
 import type { ForecastPoint } from "@/finance/forecast";
 import type { Colors } from "@/components/PlanningUI";
+import { usePreferences } from "@/context/PreferencesContext";
 
 function valueAt(points: ForecastPoint[], date: string) {
   let value = points[0]?.balance ?? 0;
@@ -21,6 +22,7 @@ export function ForecastChart({ points, scenarioPoints, width, colors }: {
   width: number;
   colors: Colors;
 }) {
+  const { t } = usePreferences();
   const height = 178, paddingX = 12, paddingY = 16;
   const dates = [...new Set([...points.map(p => p.date), ...(scenarioPoints ?? []).map(p => p.date)])].sort();
   if (!dates.length) return null;
@@ -37,7 +39,7 @@ export function ForecastChart({ points, scenarioPoints, width, colors }: {
   const zeroY = zeroVisible ? y(0) : undefined;
 
   return (
-    <View accessibilityLabel="Projected account balances over time">
+    <View accessibilityLabel={t("Projected account balances over time")}>
       <Svg width={width} height={height} accessibilityRole="image">
         {[0, 0.5, 1].map((portion, index) => {
           const yPos = paddingY + portion * chartHeight;
@@ -53,12 +55,12 @@ export function ForecastChart({ points, scenarioPoints, width, colors }: {
       <View style={[ui.row, { justifyContent: "center", marginTop: 8, gap: 18 }]}>
         <View style={[ui.row, { gap: 6 }]}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
-          <Text style={[ui.small, { color: colors.mutedForeground }]}>Baseline</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Baseline")}</Text>
         </View>
         {scenarioPoints ? (
           <View style={[ui.row, { gap: 6 }]}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent }} />
-            <Text style={[ui.small, { color: colors.mutedForeground }]}>Simulation</Text>
+            <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Simulation")}</Text>
           </View>
         ) : null}
       </View>

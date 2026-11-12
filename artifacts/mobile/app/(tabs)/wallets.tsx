@@ -32,7 +32,8 @@ import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { localDate, validLocalDate, newId } from "@/finance/ledger";
 import { financialAlert as Alert } from "@/utils/financialAlert";
 import { router } from "expo-router";
-import { formatAppCurrency, parseLocalizedNumberInput } from "@/i18n/localization";
+import { formatAppCurrency, formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 function fmt(amount: number, currency: string): string {
   return formatAppCurrency(amount, currency, { maximumFractionDigits: 0 });
@@ -58,6 +59,7 @@ function AccountCard({
   onDelete: () => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const icon = ACCOUNT_ICONS[account.type] || "credit-card";
 
   return (
@@ -77,7 +79,7 @@ function AccountCard({
       </View>
       <Text style={styles.accountName}>{account.name}</Text>
       <Text style={styles.accountType}>
-        {account.type.charAt(0).toUpperCase() + account.type.slice(1)} Account
+        {t("{type} Account", { type: t(account.type.charAt(0).toUpperCase() + account.type.slice(1)) })}
       </Text>
       <Text style={styles.accountBalance}>{fmt(account.balance, currency)}</Text>
     </LinearGradient>
@@ -98,6 +100,7 @@ function IncomeRow({
   onEdit: () => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const icon =
     income.type === "salary"
       ? "briefcase"
@@ -120,21 +123,23 @@ function IncomeRow({
           {income.name}
         </Text>
         <Text style={[styles.rowMeta, { color: colors.mutedForeground }]}>
-          {income.kind === "received" ? `Received · ${income.date ?? ""}` : `${income.type.charAt(0).toUpperCase() + income.type.slice(1)} · Expected monthly`}
+          {income.kind === "received"
+            ? t("Received · {date}", { date: income.date ?? "" })
+            : t("{type} · Expected monthly", { type: t(income.type.charAt(0).toUpperCase() + income.type.slice(1)) })}
         </Text>
       </View>
       <Text style={[styles.incomeAmount, { color: colors.success }]}>
         +{fmt(income.amount, currency)}
       </Text>
       <TouchableOpacity
-        accessibilityLabel={`Edit income ${income.name}`}
+        accessibilityLabel={t("Edit income {name}", { name: income.name })}
         onPress={onEdit}
         style={styles.deleteSmall}
       >
         <Feather name="edit-2" size={14} color={colors.primary} />
       </TouchableOpacity>
       <TouchableOpacity
-        accessibilityLabel={`Remove income ${income.name}`}
+        accessibilityLabel={t("Remove income {name}", { name: income.name })}
         onPress={onDelete}
         style={[styles.deleteSmall, { backgroundColor: colors.errorLight }]}
       >
@@ -158,6 +163,7 @@ function SavingsGoalRow({
   onDelete: () => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const [showAdd, setShowAdd] = useState(false);
   const [addAmt, setAddAmt] = useState("");
   const [accountId, setAccountId] = useState<string | undefined>();
@@ -187,14 +193,14 @@ function SavingsGoalRow({
           <View style={styles.goalRowHeader}>
             <Text style={[styles.goalRowName, { color: colors.foreground }]}>{goal.name}</Text>
             <Text style={[styles.goalRowPct, { color: colors.mutedForeground }]}>
-              {Math.round(progress * 100)}%
+              {formatAppNumber(Math.round(progress * 100))}٪
             </Text>
           </View>
           <View style={[styles.goalMiniTrack, { backgroundColor: colors.muted }]}>
             <View style={[styles.goalMiniFill, { width: `${Math.min(100, progress * 100)}%`, backgroundColor: goal.color }]} />
           </View>
           <Text style={[styles.goalRowSub, { color: colors.mutedForeground }]}>
-            {fmt(goal.savedAmount, currency)} of {fmt(goal.targetAmount, currency)}
+            {t("Saved {saved} of {target}", { saved: fmt(goal.savedAmount, currency), target: fmt(goal.targetAmount, currency) })}
             {goal.deadline ? `  ·  ${goal.deadline}` : ""}
           </Text>
         </View>
@@ -223,12 +229,12 @@ function SavingsGoalRow({
       {showAdd && (
         <View>
         <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
-        <TextInput accessibilityLabel="Contribution date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD"
+        <TextInput accessibilityLabel={t("Contribution date")} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD"
           style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} />
         <View style={[styles.addFundsRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <TextInput
             style={[styles.addFundsInput, { color: colors.foreground }]}
-            placeholder={`Add amount (${currency})`}
+            placeholder={t("Add amount ({currency})", { currency })}
             placeholderTextColor={colors.mutedForeground}
             keyboardType="numeric"
             value={addAmt}
@@ -249,6 +255,7 @@ function SavingsGoalRow({
 
 function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const [name, setName] = useState("");
   const [balance, setBalance] = useState("0");
@@ -272,28 +279,28 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
       <View style={styles.modalOverlay}>
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Account</Text>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Account Name</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Al Rajhi Bank" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Type</Text>
+          <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Add Account")}</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Account Name")}</Text>
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder={t("e.g. Al Rajhi Bank")} placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Type")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-            {ACCOUNT_TYPES.map((t) => (
-              <Pressable key={t} onPress={() => setType(t)} style={[styles.chip, { backgroundColor: type === t ? colors.primary : colors.muted, borderColor: type === t ? colors.primary : colors.border }]}>
-                <Text style={[styles.chipText, { color: type === t ? colors.primaryForeground : colors.mutedForeground }]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
+            {ACCOUNT_TYPES.map((typeOption) => (
+              <Pressable key={typeOption} onPress={() => setType(typeOption)} style={[styles.chip, { backgroundColor: type === typeOption ? colors.primary : colors.muted, borderColor: type === typeOption ? colors.primary : colors.border }]}>
+                <Text style={[styles.chipText, { color: type === typeOption ? colors.primaryForeground : colors.mutedForeground }]}>{t(typeOption.charAt(0).toUpperCase() + typeOption.slice(1))}</Text>
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Opening balance ({finance.currency})</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Opening balance")} ({finance.currency})</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={balance} onChangeText={setBalance} />
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Color</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Color")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
             {PALETTE.map((col, i) => (
               <Pressable key={col} onPress={() => setColorIdx(i)} style={[styles.colorDot, { backgroundColor: col, borderWidth: colorIdx === i ? 3 : 0, borderColor: "#FFFFFF" }]} />
             ))}
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text></Pressable>
-            <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>Add</Text></Pressable>
+            <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text></Pressable>
+            <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("Add")}</Text></Pressable>
           </View>
         </View>
       </View>
@@ -303,6 +310,7 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
 
 function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClose: () => void; editing?: Income }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -331,7 +339,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
     const parsedAmount = parseLocalizedNumberInput(amount);
     if (!name.trim() || !amount.trim() || parsedAmount === null || parsedAmount <= 0 ||
       (kind === "received" && !validLocalDate(date)) || (kind === "expected" && !!expectedDate && !validLocalDate(expectedDate))) {
-      setError("Enter a name, positive amount and valid date."); return;
+       setError("Enter a name, positive amount and valid date."); return;
     }
     submitted.current = true;
     try {
@@ -351,45 +359,45 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
       <View style={styles.modalOverlay}>
         <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30} style={{ flexGrow: 0, maxHeight: "85%" }} contentContainerStyle={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editing ? "Edit Income" : "Add Income"}</Text>
+          <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t(editing ? "Edit Income" : "Add Income")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-            {(["expected", "received"] as const).map(k => <Pressable key={k} disabled={editing?.kind === "received" && k === "expected"} onPress={() => setKind(k)} style={[styles.chip, { opacity: editing?.kind === "received" && k === "expected" ? 0.4 : 1, backgroundColor: kind === k ? colors.primary : colors.muted }]}><Text style={{ color: kind === k ? colors.primaryForeground : colors.foreground }}>{k === "expected" ? "Expected monthly" : "Received"}</Text></Pressable>)}
+            {(["expected", "received"] as const).map(k => <Pressable key={k} disabled={editing?.kind === "received" && k === "expected"} onPress={() => setKind(k)} style={[styles.chip, { opacity: editing?.kind === "received" && k === "expected" ? 0.4 : 1, backgroundColor: kind === k ? colors.primary : colors.muted }]}><Text style={{ color: kind === k ? colors.primaryForeground : colors.foreground }}>{t(k === "expected" ? "Expected monthly" : "Received")}</Text></Pressable>)}
           </View>
           {kind === "received" ? (
             <>
               <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
-              <TextInput accessibilityLabel="Income received date" value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
+              <TextInput accessibilityLabel={t("Income received date")} value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
             </>
           ) : (
             <>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Next expected date (optional)</Text>
-              <TextInput testID="income-expected-date" accessibilityLabel="Next expected income date" value={expectedDate} onChangeText={setExpectedDate}
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Next expected date (optional)")}</Text>
+              <TextInput testID="income-expected-date" accessibilityLabel={t("Next expected income date")} value={expectedDate} onChangeText={setExpectedDate}
                 style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
               <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting, marginTop: -8, marginBottom: 12 }}>
-                Only a specific date is included in cash forecasts; the monthly plan remains an estimate.
+                {t("Only a specific date is included in cash forecasts; the monthly plan remains an estimate.")}
               </Text>
               {!!expectedDate ? <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} /> : null}
             </>
           )}
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Monthly Salary" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Type</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Name")}</Text>
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder={t("e.g. Monthly Salary")} placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Type")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-            {INCOME_TYPES.map((t) => (
-              <Pressable key={t} onPress={() => setType(t)} style={[styles.chip, { backgroundColor: type === t ? colors.primary : colors.muted, borderColor: type === t ? colors.primary : colors.border }]}>
-                <Text style={[styles.chipText, { color: type === t ? colors.primaryForeground : colors.mutedForeground }]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
+            {INCOME_TYPES.map((incomeType) => (
+              <Pressable key={incomeType} onPress={() => setType(incomeType)} style={[styles.chip, { backgroundColor: type === incomeType ? colors.primary : colors.muted, borderColor: type === incomeType ? colors.primary : colors.border }]}>
+                <Text style={[styles.chipText, { color: type === incomeType ? colors.primaryForeground : colors.mutedForeground }]}>{t(incomeType.charAt(0).toUpperCase() + incomeType.slice(1))}</Text>
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
-          <TextInput accessibilityLabel="Income category" value={category} onChangeText={setCategory} placeholder={type} placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} />
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Amount ({currency})</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Category")}</Text>
+          <TextInput accessibilityLabel={t("Income category")} value={category} onChangeText={setCategory} placeholder={t(type.charAt(0).toUpperCase() + type.slice(1))} placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} />
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Amount")} ({currency})</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={amount} onChangeText={setAmount} />
           <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
-            <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text></Pressable>
-            <Pressable testID="income-save" onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{editing ? "Save" : "Add"}</Text></Pressable>
+            <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text></Pressable>
+            <Pressable testID="income-save" onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t(editing ? "Save changes" : "Add")}</Text></Pressable>
           </View>
-          {!!error && <Text accessibilityRole="alert" style={{ color: colors.destructive, marginTop: 12 }}>{error}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={{ color: colors.destructive, marginTop: 12 }}>{t(error)}</Text>}
         </KeyboardAwareScrollViewCompat>
       </View>
     </Modal>
@@ -398,6 +406,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
 
 function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
@@ -428,30 +437,30 @@ function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => v
       <View style={styles.modalOverlay}>
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>New Savings Goal</Text>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Goal Name</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="e.g. Emergency Fund" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
+          <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("New Savings Goal")}</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Goal Name")}</Text>
+          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder={t("e.g. Emergency Fund")} placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
           <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Target ({finance.currency})</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Target")} ({finance.currency})</Text>
               <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="45000" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={target} onChangeText={setTarget} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Already saved</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Already saved")}</Text>
               <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={saved} onChangeText={setSaved} />
             </View>
           </View>
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Deadline (YYYY-MM, optional)</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Deadline (YYYY-MM, optional)")}</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="2026-06" placeholderTextColor={colors.mutedForeground} value={deadline} onChangeText={setDeadline} />
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Color</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Color")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
             {PALETTE.map((col, i) => (
               <Pressable key={col} onPress={() => setColorIdx(i)} style={[styles.colorDot, { backgroundColor: col, borderWidth: colorIdx === i ? 3 : 0, borderColor: "#FFFFFF" }]} />
             ))}
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text></Pressable>
-            <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>Create Goal</Text></Pressable>
+            <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text></Pressable>
+            <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("Create Goal")}</Text></Pressable>
           </View>
         </View>
       </View>
@@ -463,6 +472,7 @@ function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => v
 
 export default function WalletsScreen() {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
@@ -497,10 +507,10 @@ export default function WalletsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
-        title="Wallets"
+        title={t("Wallets")}
         topInset={topPad}
         colors={colors}
-        trailing={<HeaderAction icon="list" label="Transactions and transfers" variant="neutral" testID="wallet-transactions-button" onPress={() => router.push("/transactions")} />}
+        trailing={<HeaderAction icon="list" label={t("Transactions and transfers")} variant="neutral" testID="wallet-transactions-button" onPress={() => router.push("/transactions")} />}
       />
 
       <ScrollView
@@ -517,26 +527,26 @@ export default function WalletsScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <Text style={styles.totalLabel}>Total Balance</Text>
+          <Text style={styles.totalLabel}>{t("Total Balance")}</Text>
           <Text style={styles.totalAmount}>{fmt(finance.totalBalance, finance.currency)}</Text>
           <View style={styles.totalRow}>
             <View style={styles.totalItem}>
-              <Text style={styles.totalItemLabel}>{finance.accounts.length} accounts</Text>
+              <Text style={styles.totalItemLabel}>{t("{count} accounts", { count: formatAppNumber(finance.accounts.length) })}</Text>
             </View>
             <View style={styles.totalSep} />
             <View style={styles.totalItem}>
-              <Text style={styles.totalItemLabel}>+{fmt(finance.totalMonthlyIncome, finance.currency)}/mo</Text>
+              <Text style={styles.totalItemLabel}>+{fmt(finance.totalMonthlyIncome, finance.currency)} {t("per month")}</Text>
             </View>
             <View style={styles.totalSep} />
             <View style={styles.totalItem}>
-              <Text style={styles.totalItemLabel}>{fmt(finance.totalSavings, finance.currency)} saved</Text>
+              <Text style={styles.totalItemLabel}>{t("{amount} saved", { amount: fmt(finance.totalSavings, finance.currency) })}</Text>
             </View>
           </View>
         </LinearGradient>
 
         {/* Accounts */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Accounts</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Accounts")}</Text>
           <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowAddAccount(true); }} style={[styles.addSmallBtn, { backgroundColor: colors.primary }]}>
             <Feather name="plus" size={16} color={colors.primaryForeground} />
           </Pressable>
@@ -545,26 +555,26 @@ export default function WalletsScreen() {
           {finance.accounts.map((acc) => (
             <AccountCard key={acc.id} account={acc} currency={acc.currency ?? finance.currency}
               onDelete={() => {
-                Alert.alert("Remove account?", `Remove ${acc.name}? Its opening balance will leave FinanceApp totals. Existing transactions and payment-history records keep an account from being removed. This does not close or change your actual bank account.`, [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Remove account", style: "destructive", onPress: () => {
-                    if (finance.deleteAccount(acc.id)) toast.show("Account removed");
-                    else toast.show("Account kept because it is referenced by financial history");
+                Alert.alert(t("Remove account?"), t("Remove {name}? Its opening balance will leave FinanceApp totals. Existing transactions and payment-history records keep an account from being removed. This does not close or change your actual bank account.", { name: acc.name }), [
+                  { text: t("Cancel"), style: "cancel" },
+                  { text: t("Remove account"), style: "destructive", onPress: () => {
+                    if (finance.deleteAccount(acc.id)) toast.show(t("Account removed"));
+                    else toast.show(t("Account kept because it is referenced by financial history"));
                   } },
                 ]);
               }}
             />
           ))}
-          {finance.accounts.length === 0 && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No accounts added</Text>}
+          {finance.accounts.length === 0 && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>{t("No accounts added")}</Text>}
         </ScrollView>
 
         {/* Savings Goals */}
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Savings Goals</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Savings Goals")}</Text>
             {totalGoalTarget > 0 && (
               <Text style={[styles.goalsSubtitle, { color: colors.mutedForeground }]}>
-                {fmt(totalGoalSaved, finance.currency)} of {fmt(totalGoalTarget, finance.currency)} · {Math.round(overallGoalProgress * 100)}% overall
+                {t("Saved {saved} of {target}", { saved: fmt(totalGoalSaved, finance.currency), target: fmt(totalGoalTarget, finance.currency) })} · {formatAppNumber(Math.round(overallGoalProgress * 100))}٪ {t("overall")}
               </Text>
             )}
           </View>
@@ -590,13 +600,13 @@ export default function WalletsScreen() {
                   currency={goal.currency ?? finance.currency}
                   onAddFunds={(amount, accountId, date, operationId) => {
                     const ok = finance.contributeToSavings({ id: operationId ?? newId(), goalId: goal.id, amount, accountId, date: date ?? localDate() });
-                    if (ok) toast.show("Contribution recorded");
+                    if (ok) toast.show(t("Contribution recorded"));
                     return ok;
                   }}
                   onDelete={() =>
-                    Alert.alert("Delete goal?", `Remove "${goal.name}"? Its recorded contributions and account balances will remain unchanged.`, [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => { finance.deleteSavingsGoal(goal.id); toast.show("Goal removed"); } },
+                    Alert.alert(t("Delete goal?"), t('Remove "{name}"? Its recorded contributions and account balances will remain unchanged.', { name: goal.name }), [
+                      { text: t("Cancel"), style: "cancel" },
+                      { text: t("Delete"), style: "destructive", onPress: () => { finance.deleteSavingsGoal(goal.id); toast.show(t("Goal removed")); } },
                     ])
                   }
                 />
@@ -610,14 +620,14 @@ export default function WalletsScreen() {
         {finance.savingsGoals.length === 0 && (
           <View style={styles.emptyState}>
             <Feather name="target" size={36} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No savings goals yet</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>{t("No savings goals yet")}</Text>
           </View>
         )}
 
         {/* Income sources */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Income Sources</Text>
-          <Pressable accessibilityLabel="Add income" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setEditingIncome(undefined); setShowAddIncome(true); }} style={[styles.addSmallBtn, { backgroundColor: colors.success }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Income Sources")}</Text>
+          <Pressable accessibilityLabel={t("Add income")} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setEditingIncome(undefined); setShowAddIncome(true); }} style={[styles.addSmallBtn, { backgroundColor: colors.success }]}>
             <Feather name="plus" size={16} color="#FFFFFF" />
           </Pressable>
         </View>
@@ -625,20 +635,20 @@ export default function WalletsScreen() {
           {finance.incomes.map((inc) => (
             <IncomeRow key={inc.id} income={inc} currency={inc.currency ?? finance.currency}
               onEdit={() => { setEditingIncome(inc); setShowAddIncome(true); }}
-              onDelete={() => Alert.alert("Remove income?", `Remove ${inc.name}?${inc.kind === "received" ? " Its actual transaction and account balance will be retained. Reverse an incorrect payment in Transactions instead." : ""}`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => { finance.deleteIncome(inc.id); toast.show("Income source removed"); } }])}
+              onDelete={() => Alert.alert(t("Remove income?"), t("Remove {name}? {details}", { name: inc.name, details: inc.kind === "received" ? t("Its actual transaction and account balance will be retained. Reverse an incorrect payment in Transactions instead.") : "" }), [{ text: t("Cancel"), style: "cancel" }, { text: t("Remove"), style: "destructive", onPress: () => { finance.deleteIncome(inc.id); toast.show(t("Income source removed")); } }])}
             />
           ))}
           {finance.incomes.length === 0 && (
             <View style={styles.emptyState}>
               <Feather name="dollar-sign" size={36} color={colors.mutedForeground} />
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No income sources added</Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>{t("No income sources added")}</Text>
             </View>
           )}
         </View>
 
         {/* Monthly overview */}
         <View style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 16 }]}>Recorded This Month</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 16, textAlign: isRTL ? "right" : "left" }]}>{t("Recorded This Month")}</Text>
           {[
             { icon: "arrow-down-circle", label: "Money in", value: `+${fmt(finance.actualMonthlyIncome, finance.currency)}`, color: colors.success },
             { icon: "arrow-up-circle", label: "Money out", value: `-${fmt(finance.actualMonthlyOutflow, finance.currency)}`, color: colors.destructive },
@@ -647,7 +657,7 @@ export default function WalletsScreen() {
             <React.Fragment key={row.label}>
               <View style={styles.overviewRow}>
                 <Feather name={row.icon as any} size={18} color={row.color} />
-                <Text style={[styles.overviewLabel, { color: i === arr.length - 1 ? colors.foreground : colors.mutedForeground }]}>{row.label}</Text>
+                <Text style={[styles.overviewLabel, { color: i === arr.length - 1 ? colors.foreground : colors.mutedForeground }]}>{t(row.label)}</Text>
                 <Text style={[styles.overviewValue, { color: row.color }]}>{row.value}</Text>
               </View>
               {i < arr.length - 1 && <View style={[styles.overviewDivider, { backgroundColor: colors.border }]} />}

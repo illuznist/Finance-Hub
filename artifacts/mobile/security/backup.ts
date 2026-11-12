@@ -13,6 +13,7 @@ import {
   type RandomBytes,
 } from "./crypto.ts";
 import { gcm } from "@noble/ciphers/aes.js";
+import { translateAppText } from "../i18n/localization.ts";
 
 export const BACKUP_MAGIC = "FINANCE_HUB_ENCRYPTED_BACKUP";
 export const BACKUP_FORMAT_VERSION = 1;
@@ -96,7 +97,7 @@ export async function createFinanceBackup(
   createdAt = new Date().toISOString(),
 ): Promise<string> {
   if (passwordCodePoints(password) < MIN_BACKUP_PASSWORD_LENGTH) {
-    throw new Error(`Choose a backup password with at least ${MIN_BACKUP_PASSWORD_LENGTH} characters.`);
+    throw new Error(translateAppText("Choose a backup password with at least {count} characters.", { count: MIN_BACKUP_PASSWORD_LENGTH }));
   }
   const serializedState = JSON.stringify(financeState);
   if (!serializedState) throw new Error("The finance records could not be prepared for backup.");

@@ -31,6 +31,7 @@ import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { formatAppCurrency, parseLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -62,6 +63,7 @@ function CategoryFilter({
   onSelect: (c: string) => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <ScrollView
       horizontal
@@ -93,7 +95,7 @@ function CategoryFilter({
                 { color: active ? colors.background : colors.mutedForeground },
               ]}
             >
-              {cat}
+              {t(cat)}
             </Text>
           </Pressable>
         );
@@ -112,6 +114,7 @@ function AddExpenseModal({
   editing: Expense | null;
 }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const toast = useToast();
   const router = useRouter();
@@ -154,11 +157,11 @@ function AddExpenseModal({
       });
     } catch (error) {
       submitted.current = false;
-      toast.show(error instanceof Error ? error.message : "Expense could not be saved.");
+      toast.show(error instanceof Error ? t(error.message) : t("Expense could not be saved."));
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    toast.show(editing ? "Expense updated" : "Expense added");
+    toast.show(editing ? t("Expense updated") : t("Expense added"));
     setName("");
     setAmount("");
     setDueDate("1");
@@ -172,18 +175,18 @@ function AddExpenseModal({
       <View style={styles.modalOverlay}>
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editing ? "Edit Expense" : "Add Expense"}</Text>
+          <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t(editing ? "Edit Expense" : "Add Expense")}</Text>
 
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t("Name")}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
-            placeholder="Expense name"
+            placeholder={t("Expense name")}
             placeholderTextColor={colors.mutedForeground}
             value={name}
             onChangeText={setName}
           />
 
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t("Category")}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
             {[...new Set([...CATEGORIES.filter((c) => c !== "All"), ...(editing ? [editing.category] : [])])].map((cat) => (
               <Pressable
@@ -195,7 +198,7 @@ function AddExpenseModal({
                 ]}
               >
                 <Text style={[styles.catChipText, { color: category === cat ? colors.primaryForeground : colors.mutedForeground }]}>
-                  {cat}
+                  {t(cat)}
                 </Text>
               </Pressable>
             ))}
@@ -204,7 +207,7 @@ function AddExpenseModal({
           <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
-                Amount ({finance.currency})
+                {t("Amount")} ({finance.currency})
               </Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
@@ -216,7 +219,7 @@ function AddExpenseModal({
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Due Day</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t("Due Day")}</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
                 placeholder="1-31"
@@ -228,7 +231,7 @@ function AddExpenseModal({
             </View>
           </View>
 
-          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Icon</Text>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t("Icon")}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, marginBottom: 20 }}>
             {ICON_OPTIONS.map((ic) => (
               <Pressable
@@ -256,7 +259,7 @@ function AddExpenseModal({
             >
               <Feather name="repeat" size={16} color={colors.primary} />
               <Text style={[styles.recurringHintText, { color: colors.foreground }]}>
-                Repeats every month or week? Set it up as a recurring expense instead.
+                {t("Repeats every month or week? Set it up as a recurring expense instead.")}
               </Text>
               <Feather name="chevron-right" size={16} color={colors.primary} />
             </Pressable>
@@ -267,14 +270,14 @@ function AddExpenseModal({
               onPress={onClose}
               style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}
             >
-              <Text style={[styles.btnText, { color: colors.mutedForeground }]}>Cancel</Text>
+              <Text style={[styles.btnText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text>
             </Pressable>
             <Pressable
               testID="expense-form-save"
               onPress={submit}
               style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}
             >
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{editing ? "Save changes" : "Add"}</Text>
+              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t(editing ? "Save changes" : "Add")}</Text>
             </Pressable>
           </View>
         </View>
@@ -285,6 +288,7 @@ function AddExpenseModal({
 
 export default function ExpensesScreen() {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
@@ -319,17 +323,17 @@ export default function ExpensesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
-        title="Expenses"
+        title={t("Expenses")}
         topInset={topPad}
         colors={colors}
         trailing={
           <View style={{ flexDirection: "row", gap: 8 }}>
-          <HeaderAction icon="calendar" label="Open upcoming payments" variant="neutral" testID="expense-upcoming-button"
+          <HeaderAction icon="calendar" label={t("Open upcoming payments")} variant="neutral" testID="expense-upcoming-button"
             onPress={() => router.push("/upcoming")} />
-          <HeaderAction icon="repeat" label="Open recurring expenses" variant="neutral" testID="expense-recurring-button"
+          <HeaderAction icon="repeat" label={t("Open recurring expenses")} variant="neutral" testID="expense-recurring-button"
             onPress={() => router.push("/recurring")} />
           <HeaderAction
-            label="Add expense"
+            label={t("Add expense")}
             testID="expense-add-button"
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -346,7 +350,7 @@ export default function ExpensesScreen() {
         <Feather name="search" size={16} color={colors.mutedForeground} />
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder="Search"
+          placeholder={t("Search")}
           placeholderTextColor={colors.mutedForeground}
           value={search}
           onChangeText={setSearch}
@@ -363,9 +367,9 @@ export default function ExpensesScreen() {
       <CategoryFilter selected={selectedCat} onSelect={setSelectedCat} />
 
       {/* Filtered total */}
-      <View style={styles.summaryBlock} accessible accessibilityLabel={`${search.trim() ? "Matching expenses" : selectedCat === "All" ? "Total expenses" : selectedCat + " total"} ${fmt(totalFiltered, finance.currency)}`}>
-        <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>
-          {search.trim() ? "Matching expenses" : selectedCat === "All" ? "Total expenses" : `${selectedCat} total`}
+      <View style={styles.summaryBlock} accessible accessibilityLabel={`${t(search.trim() ? "Matching expenses" : selectedCat === "All" ? "Total expenses" : "{category} total", { category: t(selectedCat) })} ${fmt(totalFiltered, finance.currency)}`}>
+        <Text style={[styles.summaryLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>
+          {search.trim() ? t("Matching expenses") : selectedCat === "All" ? t("Total expenses") : t("{category} total", { category: t(selectedCat) })}
         </Text>
         <Text
           numberOfLines={1}
@@ -399,7 +403,7 @@ export default function ExpensesScreen() {
               <Feather name="inbox" size={22} color={colors.primary} />
             </View>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              {search.trim() ? "No matching expenses" : "Nothing here yet"}
+              {search.trim() ? t("No matching expenses") : t("Nothing here yet")}
             </Text>
           </View>
         )}
@@ -414,18 +418,18 @@ export default function ExpensesScreen() {
             }}
             onToggle={() => {
               if (!exp.isPaid) setPayingExpense(exp);
-              else Alert.alert("Mark unpaid?", "This removes the current payment and restores its account balance.", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Mark unpaid", style: "destructive", onPress: () => finance.setExpensePaid(exp.id, false) },
+              else Alert.alert(t("Mark unpaid?"), t("This removes the current payment and restores its account balance."), [
+                { text: t("Cancel"), style: "cancel" },
+                { text: t("Mark unpaid"), style: "destructive", onPress: () => finance.setExpensePaid(exp.id, false) },
               ]);
             }}
             onDelete={() => {
-              Alert.alert("Delete", `Remove ${exp.name}?${exp.isPaid ? " Its recorded payment and account balance will be retained. Mark unpaid or reverse it in Transactions to undo a payment." : ""}`, [
-                { text: "Cancel", style: "cancel" },
+              Alert.alert(t("Delete"), t("Remove {name}?", { name: exp.name }) + (exp.isPaid ? ` ${t("Its recorded payment and account balance will be retained. Mark unpaid or reverse it in Transactions to undo a payment.")}` : ""), [
+                { text: t("Cancel"), style: "cancel" },
                 {
-                  text: "Delete",
+                  text: t("Delete"),
                   style: "destructive",
-                  onPress: () => { finance.deleteExpense(exp.id); toast.show("Expense removed"); },
+                  onPress: () => { finance.deleteExpense(exp.id); toast.show(t("Expense removed")); },
                 },
               ]);
             }}
@@ -458,6 +462,7 @@ function ExpenseCard({
   onDelete: () => void;
 }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const swipeRef = useRef<SwipeableMethods | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
@@ -480,7 +485,7 @@ function ExpenseCard({
         style={styles.swipeDelete}
       >
         <Feather name="trash-2" size={20} color="#fff" />
-        <Text style={styles.swipeDeleteLabel}>Delete</Text>
+        <Text style={styles.swipeDeleteLabel}>{t("Delete")}</Text>
       </Pressable>
     );
   }
@@ -504,11 +509,11 @@ function ExpenseCard({
           {expense.name}
         </Text>
         <Text style={[styles.expMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
-          {expense.category} · Due {expense.dueDate}{suffix}
+          {t(expense.category)} · {t("Due {date}", { date: `${expense.dueDate}${isRTL ? "" : suffix}` })}
         </Text>
         {expense.recurrence && expense.recurrence !== "none" ? (
           <Text style={[styles.expMeta, { color: colors.mutedForeground }]} numberOfLines={2} testID={`legacy-recurrence-${expense.id}`}>
-            Older {expense.recurrence} flag kept as is. No schedule is inferred; add it in Recurring to track due dates.
+            {t("Older {recurrence} flag kept as is. No schedule is inferred; add it in Recurring to track due dates.", { recurrence: expense.recurrence })}
           </Text>
         ) : null}
       </View>
@@ -523,7 +528,7 @@ function ExpenseCard({
               onToggle();
             }}
             accessibilityRole="button"
-            accessibilityLabel={expense.isPaid ? `Mark ${expense.name} as due` : `Mark ${expense.name} as paid`}
+            accessibilityLabel={expense.isPaid ? t("Mark {name} as due", { name: expense.name }) : t("Mark {name} as paid", { name: expense.name })}
             hitSlop={8}
             style={[
               styles.statusBtn,
@@ -536,7 +541,7 @@ function ExpenseCard({
                 { color: expense.isPaid ? colors.success : colors.foreground },
               ]}
             >
-              {expense.isPaid ? "Paid" : "Mark paid"}
+              {t(expense.isPaid ? "Paid" : "Mark paid")}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -546,7 +551,7 @@ function ExpenseCard({
               onEdit();
             }}
             accessibilityRole="button"
-            accessibilityLabel={`Edit expense ${expense.name}`}
+            accessibilityLabel={t("Edit expense {name}", { name: expense.name })}
             hitSlop={8}
             style={[styles.editExpenseBtn, { backgroundColor: colors.secondary }]}
           >
@@ -554,7 +559,7 @@ function ExpenseCard({
           </TouchableOpacity>
         </View>
       </View>
-      {Platform.OS === "web" && <Pressable accessibilityRole="button" accessibilityLabel={`Delete expense ${expense.name}`}
+      {Platform.OS === "web" && <Pressable accessibilityRole="button" accessibilityLabel={t("Delete expense {name}", { name: expense.name })}
         onPress={onDelete} hitSlop={8} style={{ padding: 8 }}>
         <Feather name="trash-2" size={16} color={colors.mutedForeground} />
       </Pressable>}

@@ -58,15 +58,15 @@ export default function BudgetScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScreenHeader title="Budget" subtitle={`Confirmed spending in ${cur}`} topInset={topInset} colors={colors}
-        leading={<HeaderAction icon="arrow-left" label="Go back" variant="neutral" testID="back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
-        trailing={<HeaderAction icon="edit-2" label={`Edit ${monthTitle(month)} budget`} testID="edit-budget" onPress={() => setEditing(true)} />} />
+      <ScreenHeader title={t("Budget")} subtitle={t("Confirmed spending in {currency}", { currency: cur })} topInset={topInset} colors={colors}
+        leading={<HeaderAction icon={isRTL ? "arrow-right" : "arrow-left"} label={t("Go back")} variant="neutral" testID="back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
+        trailing={<HeaderAction icon="edit-2" label={t("Edit {month} budget", { month: monthTitle(month) })} testID="edit-budget" onPress={() => setEditing(true)} />} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }}>
         <View style={[ui.between, { marginBottom: 16 }]}>
           <Pressable testID="month-prev" accessibilityLabel={t("Previous month")} hitSlop={8} onPress={() => setMonth(m => shiftMonth(m, -1))} style={[ui.icon, { backgroundColor: colors.muted }]}>
             <Feather name={isRTL ? "chevron-right" : "chevron-left"} size={18} color={colors.foreground} />
           </Pressable>
-          <Pressable onPress={() => setMonth(current)} testID="month-current" accessibilityLabel="Go to current month" style={{ alignItems: "center" }}>
+          <Pressable onPress={() => setMonth(current)} testID="month-current" accessibilityLabel={t("Go to current month")} style={{ alignItems: "center" }}>
             <Text style={[ui.cardTitle, { color: colors.foreground }]}>{monthTitle(month)}</Text>
             <Text style={[ui.small, { color: month === current ? colors.primary : colors.mutedForeground }]}>{relation}{month !== current ? ` · ${t("tap for current")}` : ""}</Text>
           </Pressable>
@@ -91,8 +91,8 @@ export default function BudgetScreen() {
               </Text>
               <View style={{ marginTop: 14 }}><Progress pct={view.percentage} color={tone.color} /></View>
               <View style={[ui.between, { marginTop: 12 }]}>
-                <Stat label={`Spent (${cur})`} value={formatAppNumber(view.spent, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
-                <Stat label={`Budget (${cur})`} value={view.period.limit !== 0 ? formatAppNumber(view.period.limit, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Not set"} />
+                <Stat label="Spent" value={formatAppNumber(view.spent, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
+                <Stat label="Budget" value={view.period.limit !== 0 ? formatAppNumber(view.period.limit, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : t("Not set")} />
                 <Stat label="Used" value={`${formatAppNumber(view.percentage, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`} />
               </View>
               <View style={[ui.sep, { backgroundColor: colors.border, marginVertical: 12 }]} />
@@ -102,29 +102,33 @@ export default function BudgetScreen() {
               </View>
               {prev ? (
                 <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 12 }]} testID="budget-compare">
-                  {monthTitle(shiftMonth(month, -1))}: {money(prev.spent, cur)} spent.{" "}
-                  {diff === 0 ? "Same as this month." : `${money(Math.abs(diff), cur)} ${diff > 0 ? "more" : "less"} this month.`}
+                  {t("{month}: {amount} spent.", { month: monthTitle(shiftMonth(month, -1)), amount: money(prev.spent, cur) })}{" "}
+                  {diff === 0 ? t("Same as this month.") : t("{amount} {direction} this month.", { amount: money(Math.abs(diff), cur), direction: t(diff > 0 ? "more" : "less") })}
                 </Text>
               ) : null}
               {(view.period.carryFrom && Object.values(view.period.carryAmounts).some(v => v !== 0)) ? (
-                <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]}>Limits include rollover carried from last month.</Text>
+                <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]}>{t("Limits include rollover carried from last month.")}</Text>
               ) : null}
             </View>
 
             <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 10 }]}>
-              Counts confirmed expenses. Transfers and income never count.
-              {" "}EMI and balloon payments {view.period.includeEMI ? "are" : "are not"} included; loan repayments {view.period.includeLoans ? "are" : "are not"}; savings {view.period.includeSavings ? "are" : "are not"}.
+              {t("Counts confirmed expenses. Transfers and income never count.")}
+              {" "}{t("EMI and balloon payments {emi}; loan repayments {loans}; savings contributions {savings}.", {
+                emi: t(view.period.includeEMI ? "are included" : "are not included"),
+                loans: t(view.period.includeLoans ? "are included" : "are not included"),
+                savings: t(view.period.includeSavings ? "are included" : "are not included"),
+              })}
             </Text>
 
             {attention.length > 0 ? (
               <>
                 <Text style={[ui.section, { color: colors.foreground }]}>{t("Needs attention")}</Text>
                 {attention.map(c => {
-                  const t = statusTone(c.status, colors);
+                  const tone = statusTone(c.status, colors);
                   return (
                     <View key={c.id} style={[ui.between, { paddingVertical: 6 }]}>
-                      <Text style={[ui.body, { color: colors.foreground, flex: 1 }]}>{c.name}</Text>
-                      <Text style={[ui.pillText, { color: t.color }]}>{t.label} · {Math.round(c.percentage)}%</Text>
+                      <Text style={[ui.body, { color: colors.foreground, flex: 1 }]}>{t(c.name)}</Text>
+                      <Text style={[ui.pillText, { color: tone.color }]}>{t(tone.label)} · {formatAppNumber(Math.round(c.percentage))}٪</Text>
                     </View>
                   );
                 })}
@@ -137,7 +141,7 @@ export default function BudgetScreen() {
                 <Button label="Set category limits" onPress={() => setEditing(true)} testID="empty-edit-budget" />
               </EmptyBlock>
             ) : listed.map((c, i) => {
-              const t = statusTone(c.status, colors);
+              const tone = statusTone(c.status, colors);
               return (
                 <View key={c.id} testID={`budget-category-${c.id}`}>
                   {i > 0 ? <View style={[ui.sep, { backgroundColor: colors.border }]} /> : null}
@@ -147,21 +151,21 @@ export default function BudgetScreen() {
                         <View style={[ui.icon, { backgroundColor: c.color + "1F", width: 30, height: 30, borderRadius: 9 }]}>
                           <Feather name={c.icon as never} size={15} color={c.color} />
                         </View>
-                        <Text style={[ui.bodyStrong, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{c.name}</Text>
+                        <Text style={[ui.bodyStrong, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{t(c.name)}</Text>
                       </View>
                       <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{money(c.spent, cur)}</Text>
                     </View>
                     {c.limit > 0 ? (
                       <>
-                        <View style={{ marginTop: 8 }}><Progress pct={c.percentage} color={t.color} /></View>
+                        <View style={{ marginTop: 8 }}><Progress pct={c.percentage} color={tone.color} /></View>
                         <View style={[ui.between, { marginTop: 6 }]}>
-                          <Text style={[ui.small, { color: colors.mutedForeground }]}>of {money(c.limit, cur)} · {Math.round(c.percentage)}%</Text>
+                          <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("of {amount} · {percent}%", { amount: money(c.limit, cur), percent: formatAppNumber(Math.round(c.percentage)) })}</Text>
                           <Text style={[ui.small, { color: c.remaining < 0 ? colors.destructive : colors.mutedForeground }]}>
-                            {c.remaining < 0 ? `${money(-c.remaining, cur)} over` : `${money(c.remaining, cur)} left`}
+                            {c.remaining < 0 ? t("{amount} over", { amount: money(-c.remaining, cur) }) : t("{amount} left", { amount: money(c.remaining, cur) })}
                           </Text>
                         </View>
                       </>
-                    ) : <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 4 }]}>No limit set</Text>}
+                    ) : <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 4 }]}>{t("No limit set")}</Text>}
                   </View>
                 </View>
               );
@@ -237,23 +241,23 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
     const total = limit.trim() ? parseSigned(limit) : 0;
     if (total === null) return setError("Enter a monthly budget with up to two decimals.");
     if (minorUnits(total) < minorUnits(totalCarry)) return setError(totalCarry < 0
-      ? `The total can't go below the carried deficit of ${money(totalCarry, p.currency)}.`
-      : `The total can't be below the carried ${money(totalCarry, p.currency)}.`);
+      ? t("The total can't go below the carried deficit of {amount}.", { amount: money(totalCarry, p.currency) })
+      : t("The total can't be below the carried {amount}.", { amount: money(totalCarry, p.currency) }));
     const out: BudgetCategory[] = [];
     for (const c of cats) {
       const v = c.limitText.trim() ? parseSigned(c.limitText) : 0;
-      if (v === null) return setError(`Check the limit for ${c.name}.`);
+      if (v === null) return setError(t("Check the limit for {name}.", { name: t(c.name) }));
       const carry = p.carryAmounts[c.id] ?? 0;
-      if (minorUnits(v) < minorUnits(carry)) return setError(`${c.name} can't go below its carried ${money(carry, p.currency)}.`);
+      if (minorUnits(v) < minorUnits(carry)) return setError(t("{name} can't go below its carried {amount}.", { name: t(c.name), amount: money(carry, p.currency) }));
       const { limitText: _l, ...rest } = c;
       out.push({ ...rest, limit: v });
     }
     const plan: BudgetPlan = { currency: p.currency, startMonth: p.startMonth, mode, limit: total, categories: out,
       includeEMI, includeLoans, includeSavings, carryDeficit, alerts, thresholds: [...thresholds].sort((a, b) => a - b) };
     if (month < current) {
-      const msg = `You are editing ${monthTitle(month)}, a past month. Only that month changes; the current budget stays as it is.`;
+      const msg = t("You are editing {month}, a past month. Only that month changes; the current budget stays as it is.", { month: monthTitle(month) });
       if (Platform.OS === "web") { if (typeof window !== "undefined" && window.confirm(msg)) commit(plan); }
-      else Alert.alert("Edit a past month?", msg, [{ text: "Cancel", style: "cancel" }, { text: `Save ${monthTitle(month)}`, onPress: () => commit(plan) }]);
+      else Alert.alert(t("Edit a past month?"), msg, [{ text: t("Cancel"), style: "cancel" }, { text: t("Save {month}", { month: monthTitle(month) }), onPress: () => commit(plan) }]);
       return;
     }
     commit(plan);
@@ -262,13 +266,13 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
   return (
     <FormModal title={`${t("Budget")} · ${monthTitle(month)}`} topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="budget-form"
       footer={<>
-        {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 16 }]} testID="budget-form-error">{error}</Text> : null}
-        <Button label={`Save ${monthTitle(month)}`} onPress={save} testID="budget-form-save" style={{ marginTop: 20 }} />
+        {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 16 }]} testID="budget-form-error">{t(error)}</Text> : null}
+        <Button label={t("Save {month}", { month: monthTitle(month) })} onPress={save} testID="budget-form-save" style={{ marginTop: 20 }} />
       </>}>
       <View style={[ui.card, { backgroundColor: month < current ? colors.warningLight : colors.secondary, borderColor: colors.border }]}>
-        <Text style={[ui.bodyStrong, { color: colors.foreground }]}>Editing {monthTitle(month)}</Text>
+        <Text style={[ui.bodyStrong, { color: colors.foreground }]}>{t("Editing {month}", { month: monthTitle(month) })}</Text>
         <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>
-          {month < current ? "Past month. Saving changes only this period." : "Changes apply to this month and become the template for later months."}
+          {t(month < current ? "Past month. Saving changes only this period." : "Changes apply to this month and become the template for later months.")}
         </Text>
       </View>
       <Field label="Budget behavior" hint={mode === "fixed" ? "Same limit every month." : mode === "custom" ? "New months start at zero so you set each one." : "Unused category money carries into next month for categories with rollover on."}>
@@ -280,17 +284,17 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
         <Input testID="budget-limit" value={limit} onChangeText={setLimit} keyboardType={totalCarry < 0 ? "numbers-and-punctuation" : "decimal-pad"} placeholder="0.00" />
       </Field>
 
-      <Text style={[ui.section, { color: colors.foreground }]}>Included in spending</Text>
+      <Text style={[ui.section, { color: colors.foreground }]}>{t("Included in spending")}</Text>
       <Text style={[ui.small, { color: colors.mutedForeground, marginBottom: 4 }]} testID="budget-debt-explainer">
-        By default, debt is left out: EMI, balloon and loan repayments and savings contributions don't count as spending. Turn on a switch below to include that type. Each payment is only ever counted once.
-        {" "}Exception: if a category named "Debt repayments" (or one matching a loan payment's category) has a limit, loan repayments count toward that category and the total even when the loan switch is off.
+        {t("By default, debt is left out: EMI, balloon and loan repayments and savings contributions don't count as spending. Turn on a switch below to include that type. Each payment is only ever counted once.")}
+        {" "}{t("Exception: if a category named Debt repayments (or one matching a loan payment category) has a limit, loan repayments count toward that category and the total even when the loan switch is off.")}
       </Text>
       <ToggleRow label="EMI and balloon payments" hint="Each payment is counted once." value={includeEMI} onChange={setIncludeEMI} testID="toggle-emi" />
       <ToggleRow label="Loan repayments" value={includeLoans} onChange={setIncludeLoans} testID="toggle-loans" />
       <ToggleRow label="Savings contributions" value={includeSavings} onChange={setIncludeSavings} testID="toggle-savings" />
       {mode === "rollover" ? <ToggleRow label="Carry overspending forward" hint="Off: only unused money rolls over." value={carryDeficit} onChange={setCarryDeficit} testID="toggle-deficit" /> : null}
 
-      <Text style={[ui.section, { color: colors.foreground }]}>Alerts</Text>
+      <Text style={[ui.section, { color: colors.foreground }]}>{t("Alerts")}</Text>
       <ToggleRow label="Budget alerts" hint="Sent once per threshold per month." value={alerts} onChange={setAlerts} testID="toggle-alerts" />
       {alerts ? (
         <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
@@ -307,7 +311,7 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
         </View>
       ) : null}
 
-      <Text style={[ui.section, { color: colors.foreground }]}>Category limits</Text>
+      <Text style={[ui.section, { color: colors.foreground }]}>{t("Category limits")}</Text>
       {cats.map(c => (
         <View key={c.id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }} testID={`cat-edit-${c.id}`}>
           <View style={[ui.between]}>
@@ -329,7 +333,7 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
           </View>
           {(p.carryAmounts[c.id] ?? 0) !== 0 ? (
             <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]} testID={`cat-carry-${c.id}`}>
-              Includes {money(p.carryAmounts[c.id], p.currency)} carried{p.carryAmounts[c.id] < 0 ? " deficit" : ""}. Minimum {money(p.carryAmounts[c.id], p.currency)}.
+              {t("Includes {amount} carried{deficit}. Minimum {minimum}.", { amount: money(p.carryAmounts[c.id], p.currency), deficit: p.carryAmounts[c.id] < 0 ? t(" deficit") : "", minimum: money(p.carryAmounts[c.id], p.currency) })}
             </Text>
           ) : null}
           {styling === c.id ? (
@@ -359,13 +363,14 @@ function AppearancePicker({ icon, color, prefix, onIcon, onColor }: {
   icon: string; color: string; prefix: string; onIcon: (v: string) => void; onColor: (v: string) => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const icons = ICONS.includes(icon) ? ICONS : [icon, ...ICONS];
   const swatches = SWATCHES.includes(color) ? SWATCHES : [color, ...SWATCHES];
   return (
     <View style={{ marginBottom: 12 }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 10 }}>
         {icons.map(ic => (
-          <Pressable key={ic} testID={`${prefix}-icon-${ic}`} accessibilityLabel={`Icon ${ic}`} accessibilityState={{ selected: icon === ic }} onPress={() => onIcon(ic)}
+          <Pressable key={ic} testID={`${prefix}-icon-${ic}`} accessibilityLabel={t("Icon {icon}", { icon: ic })} accessibilityState={{ selected: icon === ic }} onPress={() => onIcon(ic)}
             style={[ui.icon, { borderWidth: 1, borderColor: icon === ic ? colors.primary : colors.border, backgroundColor: icon === ic ? colors.secondary : colors.card }]}>
             <Feather name={ic as never} size={16} color={icon === ic ? colors.primary : colors.mutedForeground} />
           </Pressable>
@@ -373,7 +378,7 @@ function AppearancePicker({ icon, color, prefix, onIcon, onColor }: {
       </ScrollView>
       <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
         {swatches.map(s => (
-          <Pressable key={s} testID={`${prefix}-color-${s}`} accessibilityLabel={`Color ${s}`} accessibilityState={{ selected: color === s }} onPress={() => onColor(s)}
+          <Pressable key={s} testID={`${prefix}-color-${s}`} accessibilityLabel={t("Color {color}", { color: s })} accessibilityState={{ selected: color === s }} onPress={() => onColor(s)}
             style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: s, borderWidth: 2, borderColor: color === s ? colors.foreground : "transparent" }} />
         ))}
       </View>
@@ -383,11 +388,12 @@ function AppearancePicker({ icon, color, prefix, onIcon, onColor }: {
 
 function MiniCheck({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <Pressable testID={testID} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={onPress} hitSlop={6}
       style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
       <Feather name={on ? "check-square" : "square"} size={15} color={on ? colors.primary : colors.mutedForeground} />
-      <Text style={[ui.small, { color: colors.foreground }]}>{label}</Text>
+      <Text style={[ui.small, { color: colors.foreground }]}>{t(label)}</Text>
     </Pressable>
   );
 }

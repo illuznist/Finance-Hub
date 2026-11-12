@@ -30,7 +30,7 @@ export function Section({ eyebrow, title, children, note, testID }: { eyebrow: s
           <Text style={[ui.cardTitle, { color: colors.foreground, marginTop: 2 }]}>{t(title)}</Text>
         </View>
         {note ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={open ? "Hide explanation" : "How this is calculated"} hitSlop={8}
+          <Pressable accessibilityRole="button" accessibilityLabel={t(open ? "Hide explanation" : "How this is calculated")} hitSlop={8}
             testID={testID ? `${testID}-explain` : undefined}
             onPress={() => { tap(); setOpen(o => !o); }}
             style={[s.infoBtn, { backgroundColor: open ? colors.secondary : "transparent", borderColor: colors.border }]}>
@@ -54,10 +54,10 @@ export function DrillRow({ label, sub, value, valueColor, onPress, testID, accen
   label: string; sub?: string; value: string; valueColor?: string; onPress?: () => void; testID?: string; accent?: string; share?: number;
 }) {
   const colors = useColors();
-  const { isRTL } = usePreferences();
+  const { isRTL, t } = usePreferences();
   return (
     <Pressable testID={testID} disabled={!onPress} accessibilityRole={onPress ? "button" : "text"}
-      accessibilityLabel={`${label}, ${value}${sub ? `, ${sub}` : ""}`}
+      accessibilityLabel={t("{label}, {value}{sub}", { label, value, sub: sub ? `, ${sub}` : "" })}
       onPress={() => { tap(); onPress?.(); }}
       style={({ pressed }) => [s.drill, { opacity: pressed ? 0.6 : 1 }]}>
       <View style={ui.between}>
@@ -86,6 +86,7 @@ export function CashFlowChart({ points, currency, selected, onSelect }: {
   points: CashFlowPoint[]; currency: string; selected: string | null; onSelect: (k: string) => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const top = Math.max(0, ...points.flatMap(p => [p.income, p.expenses, p.net]));
   const bottom = Math.min(0, ...points.map(p => p.net));
   const span = top - bottom || 1;
@@ -99,7 +100,7 @@ export function CashFlowChart({ points, currency, selected, onSelect }: {
     <View>
       <View style={s.legend}>
         {[["Income", colors.primary], ["Expenses", colors.mutedForeground], ["Net", colors.accent]].map(([l, c]) => (
-          <View key={l} style={s.legendItem}><View style={[s.dot, { backgroundColor: c }]} /><Text style={[ui.small, { color: colors.mutedForeground }]}>{l}</Text></View>
+          <View key={l} style={s.legendItem}><View style={[s.dot, { backgroundColor: c }]} /><Text style={[ui.small, { color: colors.mutedForeground }]}>{t(l)}</Text></View>
         ))}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
@@ -109,7 +110,7 @@ export function CashFlowChart({ points, currency, selected, onSelect }: {
             const active = selected === p.key, faded = selected !== null && !active;
             return (
               <Pressable key={p.key} testID={`analytics-chart-${p.key}`} accessibilityRole="button" accessibilityState={{ selected: active }}
-                accessibilityLabel={`${p.label}${p.partial ? " partial" : ""}: income ${money(p.income, currency)}, expenses ${money(p.expenses, currency)}, net ${money(p.net, currency)}`}
+                 accessibilityLabel={t("{period}{partial}: income {income}, expenses {expenses}, net {net}", { period: p.label, partial: p.partial ? ` ${t("partial")}` : "", income: money(p.income, currency), expenses: money(p.expenses, currency), net: money(p.net, currency) })}
                 onPress={() => { tap(); onSelect(p.key); }} style={[s.group, active && { backgroundColor: colors.secondary }]}>
                 <View style={{ height: BAR_H, width: 36, flexDirection: "row", justifyContent: "center", gap: 2 }}>
                   <View style={s.slot}>{bar(p.income, colors.primary, faded)}</View>
@@ -122,7 +123,7 @@ export function CashFlowChart({ points, currency, selected, onSelect }: {
           })}
         </View>
       </ScrollView>
-      {points.some(p => p.partial) ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]}>* Partial period: clipped by your range, history start or today.</Text> : null}
+      {points.some(p => p.partial) ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]}>{t("* Partial period: clipped by your range, history start or today.")}</Text> : null}
     </View>
   );
 }
@@ -130,17 +131,18 @@ export function CashFlowChart({ points, currency, selected, onSelect }: {
 /** Observed snapshots only, plotted on real calendar time. */
 export function NetWorthLine({ history, currency }: { history: NetWorthSnapshot[]; currency: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const [w, setW] = useState(0);
   const H = 110, pad = 8;
-  const t = history.map(h => Date.parse(`${h.date}T00:00:00`));
+  const timestamps = history.map(h => Date.parse(`${h.date}T00:00:00`));
   const vals = history.map(h => h.netWorth);
   const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), span = hi - lo || 1;
-  const t0 = t[0], tSpan = (t[t.length - 1] - t0) || 1;
-  const x = (i: number) => pad + (t[i] - t0) / tSpan * (w - pad * 2);
+  const t0 = timestamps[0], tSpan = (timestamps[timestamps.length - 1] - t0) || 1;
+  const x = (i: number) => pad + (timestamps[i] - t0) / tSpan * (w - pad * 2);
   const y = (v: number) => pad + (hi - v) / span * (H - pad * 2);
   const last = history[history.length - 1];
   return (
-    <View accessible accessibilityLabel={`Net worth history from ${shortDate(history[0].date)} to ${shortDate(last.date)}, ${history.length} observed snapshots, latest ${money(last.netWorth, currency)}`}
+    <View accessible accessibilityLabel={t("Net worth history from {from} to {to}, {count} observed snapshots, latest {amount}", { from: shortDate(history[0].date), to: shortDate(last.date), count: formatAppNumber(history.length), amount: money(last.netWorth, currency) })}
       onLayout={e => setW(e.nativeEvent.layout.width)} style={{ height: H, marginTop: 8 }}>
       {w > 0 ? (
         <Svg width={w} height={H}>
@@ -163,32 +165,33 @@ export function NetWorthModal({ open, title, items, excluded, currency, onClose,
   open: boolean; title: string; items: NetWorthItem[]; excluded?: { id: string; name: string; reason: string }[];
   currency: string; onClose: () => void; onItem: (i: NetWorthItem) => void; topInset: number; colors: Colors;
 }) {
+  const { t } = usePreferences();
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose} transparent>
       <View style={[s.backdrop]}>
         <View testID="analytics-networth-modal" style={[s.sheet, { backgroundColor: colors.background, marginTop: topInset + 40 }]}>
           <View style={[ui.between, { marginBottom: 8 }]}>
             <Text style={[ui.cardTitle, { color: colors.foreground, fontSize: TYPOGRAPHY.dialogTitle }]}>{title}</Text>
-            <Pressable testID="analytics-networth-close" accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8}
+            <Pressable testID="analytics-networth-close" accessibilityRole="button" accessibilityLabel={t("Close")} onPress={onClose} hitSlop={8}
               style={[s.infoBtn, { borderColor: colors.border, width: 36, height: 36, borderRadius: 18 }]}>
               <Feather name="x" size={18} color={colors.foreground} />
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-            {items.length === 0 ? <Text style={[ui.small, { color: colors.mutedForeground, paddingVertical: 12 }]}>Nothing recorded in {currency}.</Text> : null}
+            {items.length === 0 ? <Text style={[ui.small, { color: colors.mutedForeground, paddingVertical: 12 }]}>{t("Nothing recorded in {currency}.", { currency })}</Text> : null}
             {items.map((i, n) => (
               <View key={`${i.kind}-${i.id}`}>
                 {n ? <Sep /> : null}
-                <DrillRow testID={`analytics-networth-item-${i.id}`} label={i.name} sub={KIND_LABEL[i.kind]} value={money(i.amount, currency)} onPress={() => onItem(i)} />
+                <DrillRow testID={`analytics-networth-item-${i.id}`} label={i.name} sub={t(KIND_LABEL[i.kind])} value={money(i.amount, currency)} onPress={() => onItem(i)} />
               </View>
             ))}
             {excluded?.length ? (
               <>
-                <Text style={[s.eyebrow, { color: colors.mutedForeground, marginTop: 20, marginBottom: 6 }]}>Excluded from total</Text>
+                <Text style={[s.eyebrow, { color: colors.mutedForeground, marginTop: 20, marginBottom: 6 }]}>{t("Excluded from total")}</Text>
                 {excluded.map(e => (
                   <View key={e.id} style={{ paddingVertical: 8 }}>
                     <Text style={[ui.bodyStrong, { color: colors.foreground }]}>{e.name}</Text>
-                    <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>{e.reason}</Text>
+                    <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>{t(e.reason)}</Text>
                   </View>
                 ))}
               </>

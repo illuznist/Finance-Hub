@@ -3,7 +3,7 @@ import { getUpcoming } from "./upcoming";
 import { addDays, parseLocal } from "./calendar";
 import { getBudgetView } from "./budgets";
 import { localDate } from "./ledger";
-import { formatAppCurrency, formatAppNumber, translateAppText } from "../i18n/localization";
+import { formatAppCurrency, formatAppDate, formatAppNumber, translateAppText } from "../i18n/localization";
 export interface PlannedReminder {
   id: string; title: string; body: string; timestamp: number;
   data: Record<string, string>;
@@ -33,8 +33,11 @@ export function buildReminderPlan(state: FinanceState, receipts: Set<string>, no
     const date = parseLocal(addDays(payment.dueDate, -offset)); date.setHours(9, 0, 0, 0);
     if (date.getTime() <= now.getTime()) continue;
     items.push({ id: `finance:v2:due:${payment.id}`, timestamp: date.getTime(),
-      title: `${payment.name} · ${translateAppText("Payment reminder")}`,
-      body: `${formatAppCurrency(payment.amount, payment.currency)} ${translateAppText("due")} ${payment.dueDate}`,
+      title: translateAppText("{name} payment reminder", { name: payment.name }),
+      body: translateAppText("{amount} due {date}", {
+        amount: formatAppCurrency(payment.amount, payment.currency),
+        date: formatAppDate(payment.dueDate, { day: "numeric", month: "short", year: "numeric" }),
+      }),
       data: { owner: "finance-v2", type: payment.type, sourceId: payment.sourceId, occurrenceId: payment.id, dueDate: payment.dueDate } });
   }
   const alerts: PlannedReminder[] = [];
@@ -48,8 +51,14 @@ export function buildReminderPlan(state: FinanceState, receipts: Set<string>, no
         const key = `${view.period.id}:${target.id}:${threshold}`;
         if (!target.enabled || target.limit <= 0 || target.spent / target.limit * 100 < threshold || receipts.has(key)) continue;
         alerts.push({ id: `finance:v2:budget:${key}`, alertKey: key, timestamp: now.getTime() + 5000,
-          title: `${target.name} · ${formatAppNumber(threshold)}% ${translateAppText("used")}`,
-          body: `${formatAppCurrency(target.spent, plan.currency)} ${translateAppText("spent of")} ${formatAppCurrency(target.limit, plan.currency)}.`,
+          title: translateAppText("{name} · {threshold}% used", {
+            name: target.id === "overall" ? translateAppText(target.name) : target.name,
+            threshold: formatAppNumber(threshold),
+          }),
+          body: translateAppText("{spent} spent of {limit}.", {
+            spent: formatAppCurrency(target.spent, plan.currency),
+            limit: formatAppCurrency(target.limit, plan.currency),
+          }),
           data: { owner: "finance-v2", type: "budget", alertKey: key, currency: plan.currency, month: view.period.month, categoryId: target.id } });
       }
     }

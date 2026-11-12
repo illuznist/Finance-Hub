@@ -6,6 +6,7 @@ import { I18nManager, Platform } from "react-native";
 import {
   type AppLanguage,
   type DisplayCalendar,
+  type TranslationValues,
   isRightToLeftLanguage,
   parseDisplayPreferences,
   setActiveDisplayPreferences,
@@ -28,7 +29,7 @@ interface PreferencesContextValue {
   isRTL: boolean;
   setLanguage: (language: AppLanguage) => Promise<void>;
   setCalendar: (calendar: DisplayCalendar) => Promise<void>;
-  t: (key: string) => string;
+  t: (key: string, values?: TranslationValues) => string;
 }
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
@@ -98,7 +99,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     isRTL: isRightToLeftLanguage(language),
     setLanguage,
     setCalendar,
-    t: key => translate(key, language),
+    t: (key, values) => translate(key, language, values),
   }), [calendar, isReady, language, setCalendar, setLanguage]);
 
   if (!isReady) return null;

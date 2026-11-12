@@ -1,5 +1,15 @@
 # FinanceApp changelog
 
+## 1.1.1
+
+- Fixed the PIN setup flow and retained safe password recovery without changing existing finance records.
+- Fixed responsive Savings card layout for narrow screens and larger accessibility text.
+- Added independent Gregorian and Umm al-Qura Hijri display-calendar preferences.
+- Completed English and Arabic localization across app-owned screens, forms, errors, alerts, reminders, and empty states.
+- Refined Arabic right-to-left layout, back navigation, and Arabic-Indic number formatting.
+- Added Arabic-aware plural forms and interpolation for count-based messages.
+- Refined UI consistency and performance without changing ledger or forecast calculations.
+
 ## 1.1.0
 
 - Fixed PIN setup so saving a new PIN does not immediately lock the active session.

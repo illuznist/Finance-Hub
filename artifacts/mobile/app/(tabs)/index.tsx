@@ -26,27 +26,26 @@ import { addDays } from "@/finance/calendar";
 import { localDate } from "@/finance/ledger";
 import type { UpcomingPayment } from "@/finance/planningTypes";
 import { usePreferences } from "@/context/PreferencesContext";
-import { formatCurrency, formatDisplayDate, formatNumber, type AppLanguage } from "@/i18n/localization";
+import { formatCurrency, formatDisplayDate, formatNumber, translatePlural, type AppLanguage, type LocalizedPluralForms } from "@/i18n/localization";
 import { useStackedSavingsHeader } from "@/finance/presentationLayout";
 
 const TAB_BAR_HEIGHT = 90;
+const RESET_SUMMARY_FORMS: LocalizedPluralForms = {
+  en: { one: "One expense reset and ready to track", other: "{count} expenses reset and ready to track" },
+  ar: {
+    zero: "No recurring expenses were reset for {month}.",
+    one: "One recurring expense was reset for {month}.",
+    two: "Two recurring expenses were reset for {month}.",
+    few: "{count} recurring expenses were reset for {month} (few).",
+    many: "{count} recurring expenses were reset for {month} (many).",
+    other: "{count} recurring expenses were reset for {month} (other).",
+  },
+};
 
-function greeting(name: string, language: AppLanguage): string {
+function greeting(name: string, t: (key: string, values?: Record<string, string | number>) => string): string {
   const hour = new Date().getHours();
-  const suffix = name.trim() ? `, ${name}` : "";
-  if (hour < 12) return `${translate("Good Morning", language)}${suffix}`;
-  if (hour < 17) return `${translate("Good Afternoon", language)}${suffix}`;
-  return `${translate("Good Evening", language)}${suffix}`;
-}
-
-function translate(key: string, language: AppLanguage): string {
-  return language === "ar"
-    ? ({
-      "Good Morning": "صباح الخير",
-      "Good Afternoon": "مساء الخير",
-      "Good Evening": "مساء الخير",
-    }[key] ?? key)
-    : key;
+  const period = hour < 12 ? "Good morning, {name}" : hour < 17 ? "Good afternoon, {name}" : "Good evening, {name}";
+  return t(name.trim() ? period : period.replace(", {name}", ""), { name: name.trim() });
 }
 
 
@@ -70,7 +69,7 @@ function BudgetAlertBanner({
   overspend: number;
   currency: string;
   language: AppLanguage;
-  t: (key: string) => string;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }) {
   const colors = useColors();
   const [dismissedDay, setDismissedDay] = useState<string | null>(null);
@@ -105,7 +104,7 @@ function BudgetAlertBanner({
       icon: "alert-triangle" as const,
       color: colors.warning,
       title: t("Heads up"),
-      body: `${t("You've used")} ${formatNumber(Math.round(spentPerc * 100), language)}% ${t("of your monthly budget")}`,
+      body: t("You've used {percent}% of your monthly budget", { percent: formatNumber(Math.round(spentPerc * 100), language) }),
     },
     danger: {
       bg: colors.warningLight,
@@ -113,7 +112,7 @@ function BudgetAlertBanner({
       icon: "alert-circle" as const,
       color: colors.warning,
       title: t("Low budget"),
-      body: `${t("Only")} ${formatCurrency(remaining, currency, language)} ${t("left this month")}`,
+      body: t("Only {amount} left this month", { amount: formatCurrency(remaining, currency, language) }),
     },
     exceeded: {
       bg: colors.errorLight,
@@ -121,7 +120,7 @@ function BudgetAlertBanner({
       icon: "x-circle" as const,
       color: colors.destructive,
       title: t("Budget exceeded"),
-      body: `${t("Over by")} ${formatCurrency(overspend, currency, language)} — ${t("review your spending")}`,
+      body: t("Over by {amount} — review your spending", { amount: formatCurrency(overspend, currency, language) }),
     },
   }[level];
 
@@ -200,10 +199,13 @@ function ResetBanner() {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.alertTitle, { color: colors.primary }]}>
-          {info.month} {t("is here")}
+          {t("{month} begins", { month: info.month })}
         </Text>
         <Text style={[styles.alertBody, { color: colors.mutedForeground }]}>
-          {formatNumber(info.count, language)} {t(info.count === 1 ? "expense reset and ready to track" : "expenses reset and ready to track")}
+          {translatePlural(RESET_SUMMARY_FORMS, language, info.count, {
+            count: formatNumber(info.count, language),
+            month: info.month,
+          })}
         </Text>
       </View>
       <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10}>
@@ -345,7 +347,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
             <Text style={[styles.greetingText, { color: colors.foreground }]}>
-              {greeting(finance.userName, language)}
+              {greeting(finance.userName, t)}
             </Text>
           </View>
         </View>
@@ -728,7 +730,7 @@ export default function DashboardScreen() {
                           { color: colors.foreground },
                         ]}
                       >
-                        {formatCurrency(emi.monthlyAmount, finance.currency, language)}/mo
+                {t("{amount} / month", { amount: formatCurrency(emi.monthlyAmount, finance.currency, language) })}
                       </Text>
                     </View>
                     <View
@@ -758,8 +760,11 @@ export default function DashboardScreen() {
                         { color: colors.mutedForeground },
                       ]}
                     >
-                      {emi.paidInstallments}/{emi.totalInstallments} paid ·{" "}
-                      {rem} left
+                      {t("{paid} / {total} paid · {remaining} left", {
+                        paid: formatNumber(emi.paidInstallments, language),
+                        total: formatNumber(emi.totalInstallments, language),
+                        remaining: formatNumber(rem, language),
+                      })}
                     </Text>
                   </View>
                 </View>

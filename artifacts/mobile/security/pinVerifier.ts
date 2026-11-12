@@ -3,6 +3,7 @@ import {
   verifyPasswordVerifier,
   type RandomBytes,
 } from "./crypto.ts";
+import { translateAppText } from "../i18n/localization.ts";
 
 export const PIN_VERIFIER_KEY = "finance_pin_verifier_v2";
 export const PIN_ATTEMPTS_KEY = "finance_pin_attempts_v1";
@@ -28,7 +29,7 @@ export async function savePinVerifier(
   randomBytes: RandomBytes,
 ): Promise<void> {
   if (!new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin)) {
-    throw new Error(`Enter a ${PIN_LENGTH}-digit PIN.`);
+    throw new Error(translateAppText("Enter a {count}-digit PIN.", { count: PIN_LENGTH }));
   }
   const verifier = await createPasswordVerifier(pin, randomBytes);
   await secrets.set(PIN_VERIFIER_KEY, JSON.stringify({ version: 1, ...verifier }));

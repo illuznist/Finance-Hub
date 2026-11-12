@@ -51,6 +51,7 @@ export function Chips<T extends string>({ items, value, onChange, prefix }: {
   items: { key: T; label: string }[]; value: T; onChange: (v: T) => void; prefix: string;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ui.chips}>
       {items.map(i => {
@@ -59,7 +60,7 @@ export function Chips<T extends string>({ items, value, onChange, prefix }: {
           <Pressable key={i.key} testID={`${prefix}-${i.key}`} accessibilityRole="button" accessibilityState={{ selected: active }}
             onPress={() => onChange(i.key)}
             style={[ui.chip, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}>
-            <Text style={[ui.chipText, { color: active ? colors.primaryForeground : colors.foreground }]}>{i.label}</Text>
+            <Text style={[ui.chipText, { color: active ? colors.primaryForeground : colors.foreground }]}>{t(i.label)}</Text>
           </Pressable>
         );
       })}
@@ -85,8 +86,9 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 
 export function Input(props: React.ComponentProps<typeof TextInput>) {
   const colors = useColors();
+  const { t } = usePreferences();
   const { style, ...rest } = props;
-  return <TextInput placeholderTextColor={colors.mutedForeground} {...rest}
+  return <TextInput placeholderTextColor={colors.mutedForeground} {...rest} placeholder={rest.placeholder ? t(rest.placeholder) : undefined}
     style={[ui.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }, style]} />;
 }
 
@@ -99,7 +101,7 @@ export function ToggleRow({ label, hint, value, onChange, testID }: { label: str
         <Text style={[ui.body, { color: colors.foreground }]}>{t(label)}</Text>
         {hint ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>{t(hint)}</Text> : null}
       </View>
-      <Switch testID={testID} accessibilityLabel={label} value={value} onValueChange={onChange}
+      <Switch testID={testID} accessibilityLabel={t(label)} value={value} onValueChange={onChange}
         trackColor={{ true: colors.primary, false: colors.muted }} thumbColor={colors.card} />
     </View>
   );
@@ -129,15 +131,16 @@ export function Progress({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-export function FormModal({ title, topInset, bottomInset, onClose, testID, children, footer, translateTitle = false }: {
+export function FormModal({ title, topInset, bottomInset, onClose, testID, children, footer }: {
   title: string; topInset: number; bottomInset: number; onClose: () => void; testID: string; children: React.ReactNode; footer?: React.ReactNode; translateTitle?: boolean;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <Modal visible animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: colors.background }} testID={testID}>
-        <ScreenHeader title={title} translateTitle={translateTitle} topInset={topInset} colors={colors}
-          leading={<HeaderAction icon="x" label="Cancel" variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />} />
+        <ScreenHeader title={t(title)} topInset={topInset} colors={colors}
+          leading={<HeaderAction icon="x" label={t("Cancel")} variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />} />
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
           {children}
           {footer}

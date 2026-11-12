@@ -184,7 +184,7 @@ function PinEntry({
 
       {!!message && <Text style={[styles.error, { color: colors.destructive }]}>{message}</Text>}
       {remainingSeconds > 0 && (
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{t("Try again in")} {formatNumber(remainingSeconds, language)}s</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{t("Try again in {seconds} seconds", { seconds: formatNumber(remainingSeconds, language) })}</Text>
       )}
       {!!privacyWarning && <Text style={[styles.privacyWarning, { color: colors.mutedForeground }]}>{t(privacyWarning)}</Text>}
       {!!notice && <Text style={[styles.privacyWarning, { color: colors.mutedForeground }]}>{notice}</Text>}

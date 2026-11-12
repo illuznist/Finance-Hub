@@ -28,7 +28,8 @@ import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { newId } from "@/finance/ledger";
 import { financialAlert as Alert } from "@/utils/financialAlert";
-import { formatAppCurrency, formatAppDate, parseLocalizedNumberInput } from "@/i18n/localization";
+import { formatAppCurrency, formatAppDate, formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 const TAB_BAR_HEIGHT = 90;
 const DONUT_SIZE = 106;
@@ -39,7 +40,7 @@ const CENTER = DONUT_SIZE / 2;
 const CATEGORIES = [
   { id: "vehicle", label: "Vehicle" },
   { id: "personal", label: "Personal" },
-  { id: "home", label: "Home" },
+  { id: "home", label: "Home financing" },
   { id: "other", label: "Other" },
 ] as const;
 
@@ -152,12 +153,13 @@ function DonutChart({ progress, color, bgColor }: { progress: number; color: str
 
 function SummaryMetric({ label, value, icon, color }: { label: string; value: string; icon: React.ComponentProps<typeof Feather>["name"]; color: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <View style={styles.metric}>
       <View style={[styles.metricIcon, { backgroundColor: color + "20" }]}>
         <Feather name={icon} size={14} color={color} />
       </View>
-      <Text numberOfLines={1} style={[styles.metricLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.metricLabel, { color: colors.mutedForeground }]}>{t(label)}</Text>
       <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.metricValue, { color: colors.foreground }]}>{value}</Text>
     </View>
   );
@@ -171,6 +173,7 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
   onQuickPay: () => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(10)).current;
   const paidCount = emiPaidCount(emi);
@@ -194,7 +197,7 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
       <View style={[styles.emiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open ${emi.name} details`}
+        accessibilityLabel={t("Open {name} details", { name: emi.name })}
         testID={`emi-card-${emi.id}`}
         onPress={onOpen}
         style={{ gap: 12 }}
@@ -207,7 +210,7 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={[styles.emiName, { color: colors.foreground }]}>{emi.name}</Text>
               <Text numberOfLines={1} style={[styles.emiDue, { color: colors.mutedForeground }]}>
-                {emi.financeProvider || "Finance plan"} · {CATEGORIES.find((item) => item.id === emi.category)?.label ?? "Other"}
+                {emi.financeProvider || t("Finance plan")} · {t(CATEGORIES.find((item) => item.id === emi.category)?.label ?? "Other")}
               </Text>
             </View>
           </View>
@@ -225,11 +228,11 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.donutAmount, { color: colors.foreground }]}>
                 {fmt(monthlyAmount, currency)}
               </Text>
-              <Text style={[styles.donutLabel, { color: colors.mutedForeground }]}>monthly</Text>
+              <Text style={[styles.donutLabel, { color: colors.mutedForeground }]}>{t("monthly")}</Text>
             </View>
           </View>
           <View style={styles.emiStats}>
-            <StatRow label="Installments" value={`${paidCount} / ${duration} paid`} />
+            <StatRow label="Installments" value={t("{paid} / {total} paid", { paid: formatAppNumber(paidCount), total: formatAppNumber(duration) })} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <StatRow label="Monthly balance" value={fmt(monthlyRemaining(emi), currency)} />
             {balloonBalance > 0 && (
@@ -249,23 +252,23 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
             {emi.autoDebitEnabled && (
               <View style={[styles.badge, { backgroundColor: colors.successLight }]}>
                 <Feather name="repeat" size={11} color={colors.success} />
-                <Text style={[styles.badgeText, { color: colors.success }]}>Auto-debit</Text>
+                <Text style={[styles.badgeText, { color: colors.success }]}>{t("Auto-debit")}</Text>
               </View>
             )}
             {balloonBalance > 0 && (
               <View style={[styles.badge, { backgroundColor: colors.warningLight }]}>
                 <Feather name="flag" size={11} color={colors.warning} />
-                <Text style={[styles.badgeText, { color: colors.warning }]}>Balloon</Text>
+                <Text style={[styles.badgeText, { color: colors.warning }]}>{t("Balloon")}</Text>
               </View>
             )}
           </View>
           <Text numberOfLines={1} style={[styles.nextDate, { color: colors.mutedForeground }]}>
-            {monthlyComplete ? "Monthly plan complete" : `Next ${displayDate(nextDate)}`}
+            {monthlyComplete ? t("Monthly plan complete") : t("Next {date}", { date: displayDate(nextDate) })}
           </Text>
         </View>
         {account && emi.autoDebitEnabled && (
           <Text style={[styles.accountCaption, { color: colors.mutedForeground }]}>
-            Deducts {fmt(monthlyAmount, currency)} from {account.name}
+            {t("Deducts {amount} from {account}", { amount: fmt(monthlyAmount, currency), account: account.name })}
           </Text>
         )}
       </Pressable>
@@ -280,7 +283,7 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
             style={[styles.quickPay, { backgroundColor: colors.successLight, borderColor: colors.success + "40" }]}
           >
             <Feather name="check-circle" size={16} color={colors.success} />
-            <Text style={[styles.quickPayText, { color: colors.success }]}>Confirm monthly payment</Text>
+            <Text style={[styles.quickPayText, { color: colors.success }]}>{t("Confirm monthly payment")}</Text>
           </Pressable>
         )}
       </View>
@@ -290,9 +293,10 @@ function EMICard({ emi, currency, account, onOpen, onQuickPay }: {
 
 function StatRow({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <View style={styles.statRow}>
-      <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{t(label)}</Text>
       <Text numberOfLines={1} style={[styles.statValue, { color: highlight ?? colors.foreground }]}>{value}</Text>
     </View>
   );
@@ -308,9 +312,10 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, multilin
   testID?: string;
 }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   return (
     <View style={styles.fieldWrap}>
-      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[styles.fieldLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t(label)}</Text>
       <TextInput
         testID={testID}
         style={[
@@ -318,7 +323,7 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, multilin
           multiline && styles.multilineInput,
           { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" },
         ]}
-        placeholder={placeholder}
+        placeholder={placeholder ? t(placeholder) : undefined}
         placeholderTextColor={colors.mutedForeground}
         value={value}
         onChangeText={onChangeText}
@@ -333,16 +338,18 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, multilin
 
 function SectionLabel({ title }: { title: string }) {
   const colors = useColors();
-  return <Text style={[styles.sectionLabel, { color: colors.foreground }]}>{title}</Text>;
+  const { t } = usePreferences();
+  return <Text style={[styles.sectionLabel, { color: colors.foreground }]}>{t(title)}</Text>;
 }
 
 function ToggleRow({ label, detail, value, onToggle }: { label: string; detail: string; value: boolean; onToggle: () => void }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <Pressable accessibilityRole="switch" accessibilityState={{ checked: value }} onPress={onToggle} style={styles.toggleRow}>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.toggleLabel, { color: colors.foreground }]}>{label}</Text>
-        <Text style={[styles.toggleDetail, { color: colors.mutedForeground }]}>{detail}</Text>
+        <Text style={[styles.toggleLabel, { color: colors.foreground }]}>{t(label)}</Text>
+        <Text style={[styles.toggleDetail, { color: colors.mutedForeground }]}>{t(detail)}</Text>
       </View>
       <View style={[styles.toggleTrack, { backgroundColor: value ? colors.primary : colors.border }]}>
         <View style={[styles.toggleThumb, { alignSelf: value ? "flex-end" : "flex-start", backgroundColor: colors.primaryForeground }]} />
@@ -353,6 +360,7 @@ function ToggleRow({ label, detail, value, onToggle }: { label: string; detail: 
 
 function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose: () => void; editing?: EMI }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const toast = useToast();
   const initialStart = editing?.startDate ?? todayString();
@@ -423,14 +431,14 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
 
     if (editing) {
       finance.updateEMI(editing.id, shared);
-      toast.show("EMI plan updated");
+      toast.show(t("EMI plan updated"));
     } else {
       finance.addEMI({
         ...shared,
         paymentHistory: [],
         createdAt: new Date().toISOString(),
       });
-      toast.show("EMI plan added");
+      toast.show(t("EMI plan added"));
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onClose();
@@ -442,8 +450,8 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
         <View style={[styles.formSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editing ? "Edit EMI plan" : "Add EMI plan"}</Text>
-            <Pressable accessibilityLabel="Close form" testID="emi-form-close" onPress={onClose} hitSlop={10}>
+            <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t(editing ? "Edit EMI plan" : "Add EMI plan")}</Text>
+            <Pressable accessibilityLabel={t("Close form")} testID="emi-form-close" onPress={onClose} hitSlop={10}>
               <Feather name="x" size={21} color={colors.mutedForeground} />
             </Pressable>
           </View>
@@ -457,13 +465,13 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
             <SectionLabel title="Financing details" />
             <Field label="EMI / loan name" value={name} onChangeText={setName} placeholder="e.g. Vehicle finance" />
             <Field label="Bank or finance provider" value={provider} onChangeText={setProvider} placeholder="e.g. Al Rajhi" />
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Financing category</Text>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Financing category")}</Text>
             <View style={styles.chipRow}>
               {CATEGORIES.map((item) => {
                 const selected = category === item.id;
                 return (
                   <Pressable key={item.id} onPress={() => setCategory(item.id)} style={[styles.choiceChip, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.secondary : colors.muted }]}>
-                    <Text style={[styles.choiceText, { color: selected ? colors.primary : colors.mutedForeground }]}>{item.label}</Text>
+                    <Text style={[styles.choiceText, { color: selected ? colors.primary : colors.mutedForeground }]}>{t(item.label)}</Text>
                   </Pressable>
                 );
               })}
@@ -492,9 +500,9 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
             <ToggleRow label="Auto-debit tracking" detail="Track an expected bank deduction; confirm it manually" value={autoDebit} onToggle={() => setAutoDebit((value) => !value)} />
             {autoDebit && (
               <View style={styles.accountChoices}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Linked bank account or wallet</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Linked bank account or wallet")}</Text>
                 {selectableAccounts.length === 0 ? (
-                  <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Add a bank account or wallet in Wallets first.</Text>
+                  <Text style={[styles.helperText, { color: colors.mutedForeground }]}>{t("Add a bank account or wallet in Wallets first.")}</Text>
                 ) : selectableAccounts.map((account) => {
                   const selected = accountId === account.id;
                   return (
@@ -510,13 +518,13 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
 
             <SectionLabel title="Additional details" />
             <Field label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Add a note" multiline />
-            {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
+            {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{t(error)}</Text>}
             <View style={styles.modalActions}>
               <Pressable onPress={onClose} style={[styles.actionButton, { backgroundColor: colors.muted }]}>
-                <Text style={[styles.actionText, { color: colors.mutedForeground }]}>Cancel</Text>
+                <Text style={[styles.actionText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text>
               </Pressable>
               <Pressable testID="emi-form-submit" onPress={submit} style={[styles.actionButton, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{editing ? "Save changes" : "Add EMI"}</Text>
+                <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{t(editing ? "Save changes" : "Add EMI")}</Text>
               </Pressable>
             </View>
           </KeyboardAwareScrollViewCompat>
@@ -534,6 +542,7 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   paymentType: EMIPayment["paymentType"];
 }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const toast = useToast();
   const currency = emi.currency ?? finance.currency;
@@ -549,16 +558,16 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   function submit() {
     const parsedAmount = parseLocalizedNumberInput(amount) ?? NaN;
     if (submitted.current) return;
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return setError("Enter a payment amount greater than zero.");
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return setError("Enter a payment amount greater than zero.");
     if (!isValidDate(date)) return setError("Enter a valid date in YYYY-MM-DD format.");
     if (editing) {
       const ok = finance.updateEMIPayment(emi.id, editing.id, { amount: parsedAmount, date, accountId, notes: notes.trim() || undefined });
       if (!ok) return setError("Payment was not changed. Check the scheduled amount, payment date, account currency and remaining balance.");
-      toast.show("Payment updated");
+      toast.show(t("Payment updated"));
     } else {
       const ok = finance.recordEMIPayment(emi.id, { amount: parsedAmount, date, paymentType, accountId, operationId: operationId.current, notes: notes.trim() || undefined });
       if (!ok) return setError(paymentType === "monthly_emi" ? "Monthly payment must match the scheduled EMI amount." : "Payment exceeds the remaining balloon balance.");
-      toast.show(paymentType === "balloon" ? "Balloon payment recorded" : "Monthly payment confirmed");
+      toast.show(paymentType === "balloon" ? t("Balloon payment recorded") : t("Monthly payment confirmed"));
     }
     submitted.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -572,27 +581,29 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
           style={{ flexGrow: 0, maxHeight: "90%" }} contentContainerStyle={[styles.paymentSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-              {editing ? "Correct payment" : paymentType === "balloon" ? "Record balloon payment" : "Confirm monthly payment"}
+            <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>
+              {t(editing ? "Correct payment" : paymentType === "balloon" ? "Record balloon payment" : "Confirm monthly payment")}
             </Text>
-            <Pressable accessibilityLabel="Close payment form" onPress={onClose} hitSlop={10}><Feather name="x" size={21} color={colors.mutedForeground} /></Pressable>
+            <Pressable accessibilityLabel={t("Close payment form")} onPress={onClose} hitSlop={10}><Feather name="x" size={21} color={colors.mutedForeground} /></Pressable>
           </View>
           <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-            {paymentType === "balloon" ? `Remaining balloon balance: ${fmt(balloonRemaining(emi), currency)}` : `Scheduled amount: ${fmt(emiMonthly(emi), currency)}`}
+            {paymentType === "balloon"
+              ? `${t("Remaining balloon balance")}: ${fmt(balloonRemaining(emi), currency)}`
+              : `${t("Scheduled amount")}: ${fmt(emiMonthly(emi), currency)}`}
           </Text>
           <Field label={`Amount (${currency})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           <Field label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder="2026-04-10" />
           {editing?.legacy || editing?.id.startsWith("imported-")
-            ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Historical record: corrections do not change account balances. Review balances in Transactions.</Text>
+            ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>{t("Historical record: corrections do not change account balances. Review balances in Transactions.")}</Text>
             : <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={emi.currency} />}
           <Field label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Add a note" multiline />
-          {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{t(error)}</Text>}
           <View style={styles.modalActions}>
             <Pressable onPress={onClose} style={[styles.actionButton, { backgroundColor: colors.muted }]}>
-              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>Cancel</Text>
+              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text>
             </Pressable>
             <Pressable testID="emi-payment-submit" onPress={submit} style={[styles.actionButton, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{editing ? "Save correction" : "Record payment"}</Text>
+              <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{t(editing ? "Save correction" : "Record payment")}</Text>
             </Pressable>
           </View>
         </KeyboardAwareScrollViewCompat>
@@ -603,9 +614,10 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
 
 function InfoRow({ label, value, color }: { label: string; value: string; color?: string }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   return (
     <View style={styles.infoRow}>
-      <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[styles.infoLabel, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t(label)}</Text>
       <Text style={[styles.infoValue, { color: color ?? colors.foreground }]}>{value}</Text>
     </View>
   );
@@ -620,6 +632,7 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
   onRecordPayment: (type: EMIPayment["paymentType"], payment?: EMIPayment) => void;
 }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const finance = useFinance();
   const toast = useToast();
   const currency = emi.currency ?? finance.currency;
@@ -634,17 +647,17 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
   function confirmPaymentDelete(payment: EMIPayment) {
     const linked = finance.transactions.some(t => t.referenceType === "emi" && t.referenceId === emi.id && t.paymentId === payment.id);
     if (!linked) {
-      Alert.alert("Historical payment kept", "No linked ledger transaction exists. This history was preserved and the account balance was not changed.");
+      Alert.alert(t("Historical payment kept"), t("No linked ledger transaction exists. This history was preserved and the account balance was not changed."));
       return;
     }
-    Alert.alert("Reverse recorded EMI payment?", "This removes the linked transaction and updates your FinanceApp account balance. It does not reverse any payment with your bank.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("Reverse recorded EMI payment?"), t("This removes the linked transaction and updates your FinanceApp account balance. It does not reverse any payment with your bank."), [
+      { text: t("Cancel"), style: "cancel" },
       {
-        text: "Reverse payment",
+        text: t("Reverse payment"),
         style: "destructive",
         onPress: () => {
-          if (finance.deleteEMIPayment(emi.id, payment.id)) toast.show("Payment reversed; account balance updated");
-          else toast.show("Payment was kept; no linked transaction could be reversed");
+          if (finance.deleteEMIPayment(emi.id, payment.id)) toast.show(t("Payment reversed; account balance updated"));
+          else toast.show(t("Payment was kept; no linked transaction could be reversed"));
         },
       },
     ]);
@@ -658,24 +671,24 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
           <View style={styles.detailHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.detailTitle, { color: colors.foreground }]}>{emi.name}</Text>
-              <Text style={[styles.detailSubTitle, { color: colors.mutedForeground }]}>{emi.financeProvider || "Finance provider"}</Text>
+              <Text style={[styles.detailSubTitle, { color: colors.mutedForeground }]}>{emi.financeProvider || t("Finance provider")}</Text>
             </View>
-            <Pressable accessibilityLabel="Edit EMI plan" testID="emi-detail-edit" onPress={onEdit} style={styles.headerIcon}><Feather name="edit-2" size={17} color={colors.primary} /></Pressable>
-            <Pressable accessibilityLabel="Delete EMI plan" testID="emi-detail-delete" onPress={onDelete} style={styles.headerIcon}><Feather name="trash-2" size={17} color={colors.destructive} /></Pressable>
-            <Pressable accessibilityLabel="Close EMI details" onPress={onClose} style={styles.headerIcon}><Feather name="x" size={19} color={colors.mutedForeground} /></Pressable>
+            <Pressable accessibilityLabel={t("Edit EMI plan")} testID="emi-detail-edit" onPress={onEdit} style={styles.headerIcon}><Feather name="edit-2" size={17} color={colors.primary} /></Pressable>
+            <Pressable accessibilityLabel={t("Delete EMI plan")} testID="emi-detail-delete" onPress={onDelete} style={styles.headerIcon}><Feather name="trash-2" size={17} color={colors.destructive} /></Pressable>
+            <Pressable accessibilityLabel={t("Close EMI details")} onPress={onClose} style={styles.headerIcon}><Feather name="x" size={19} color={colors.mutedForeground} /></Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
             <View style={[styles.detailHero, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.heroCaption, { color: colors.mutedForeground }]}>Total remaining commitment</Text>
+              <Text style={[styles.heroCaption, { color: colors.mutedForeground }]}>{t("Total remaining commitment")}</Text>
               <Text style={[styles.heroAmount, { color: colors.foreground }]}>{fmt(totalRemaining, currency)}</Text>
               <View style={styles.detailHeroStats}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.heroStatLabel, { color: colors.mutedForeground }]}>Monthly balance</Text>
+                  <Text style={[styles.heroStatLabel, { color: colors.mutedForeground }]}>{t("Monthly balance")}</Text>
                   <Text style={[styles.heroStatValue, { color: colors.foreground }]}>{fmt(monthlyBalance, currency)}</Text>
                 </View>
                 <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.heroStatLabel, { color: colors.mutedForeground }]}>Balloon balance</Text>
+                  <Text style={[styles.heroStatLabel, { color: colors.mutedForeground }]}>{t("Balloon balance")}</Text>
                   <Text style={[styles.heroStatValue, { color: colors.warning }]}>{fmt(balloonBalance, currency)}</Text>
                 </View>
               </View>
@@ -685,9 +698,9 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
               <SectionLabel title="Repayment overview" />
               <InfoRow label="Original financed amount" value={fmt(emi.financedAmount ?? emi.totalAmount, currency)} />
               <InfoRow label="Monthly EMI" value={fmt(emiMonthly(emi), currency)} />
-              <InfoRow label="Duration" value={`${emiDuration(emi)} months`} />
-              <InfoRow label="Installments paid" value={`${monthlyPayments} / ${emiDuration(emi)}`} />
-              <InfoRow label="Installments remaining" value={`${Math.max(0, emiDuration(emi) - monthlyPayments)}`} />
+              <InfoRow label="Duration" value={t("{count} months", { count: formatAppNumber(emiDuration(emi)) })} />
+              <InfoRow label="Installments paid" value={`${formatAppNumber(monthlyPayments)} / ${formatAppNumber(emiDuration(emi))}`} />
+              <InfoRow label="Installments remaining" value={formatAppNumber(Math.max(0, emiDuration(emi) - monthlyPayments))} />
               <InfoRow label="Scheduled monthly repayment" value={fmt(scheduledMonthly, currency)} />
               <InfoRow label="Total scheduled repayment" value={fmt(scheduledMonthly + (emi.balloonPaymentAmount ?? 0), currency)} />
               <InfoRow label="Total amount paid" value={fmt(allPaid(emi), currency)} color={colors.success} />
@@ -707,7 +720,7 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
                   <InfoRow label="Remaining balloon balance" value={fmt(balloonBalance, currency)} color={colors.warning} />
                 {balloonBalance > 0 && (
                   <Pressable testID="emi-record-balloon" onPress={() => onRecordPayment("balloon")} style={[styles.actionButton, styles.detailAction, { backgroundColor: colors.warningLight }]}>
-                    <Text style={[styles.actionText, { color: colors.warning }]}>Record balloon payment</Text>
+                    <Text style={[styles.actionText, { color: colors.warning }]}>{t("Record balloon payment")}</Text>
                   </Pressable>
                 )}
               </View>
@@ -715,8 +728,8 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
 
             <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <SectionLabel title="Bank deduction" />
-              <InfoRow label="Auto-debit tracking" value={emi.autoDebitEnabled ? "Enabled — manual confirmation required" : "Off"} color={emi.autoDebitEnabled ? colors.success : undefined} />
-              <InfoRow label="Linked account" value={account?.name ?? (emi.autoDebitEnabled ? "Account unavailable" : "Not linked")} />
+              <InfoRow label="Auto-debit tracking" value={t(emi.autoDebitEnabled ? "Enabled — manual confirmation required" : "Off")} color={emi.autoDebitEnabled ? colors.success : undefined} />
+              <InfoRow label="Linked account" value={account?.name ?? t(emi.autoDebitEnabled ? "Account unavailable" : "Not linked")} />
               {emi.autoDebitEnabled && <InfoRow label="Expected monthly deduction" value={fmt(emiMonthly(emi), currency)} />}
             </View>
 
@@ -733,33 +746,33 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
                 {emiPaidCount(emi) < emiDuration(emi) && (
                   <Pressable testID="emi-record-monthly" onPress={() => onRecordPayment("monthly_emi")} style={styles.historyAdd}>
                     <Feather name="plus" size={15} color={colors.primary} />
-                    <Text style={[styles.historyAddText, { color: colors.primary }]}>Monthly</Text>
+                    <Text style={[styles.historyAddText, { color: colors.primary }]}>{t("Monthly")}</Text>
                   </Pressable>
                 )}
               </View>
               {payments.length === 0 ? (
-                <Text style={[styles.helperText, { color: colors.mutedForeground }]}>No confirmed payments yet.</Text>
+                <Text style={[styles.helperText, { color: colors.mutedForeground }]}>{t("No confirmed payments yet.")}</Text>
               ) : [...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => (
                 <View key={payment.id} style={[styles.paymentRow, { borderTopColor: colors.border }]}>
                   <View style={[styles.paymentTypeIcon, { backgroundColor: payment.paymentType === "balloon" ? colors.warningLight : colors.successLight }]}>
                     <Feather name={payment.paymentType === "balloon" ? "flag" : "check"} size={13} color={payment.paymentType === "balloon" ? colors.warning : colors.success} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.paymentTitle, { color: colors.foreground }]}>{payment.paymentType === "balloon" ? "Balloon payment" : "Monthly EMI"}</Text>
+                    <Text style={[styles.paymentTitle, { color: colors.foreground }]}>{t(payment.paymentType === "balloon" ? "Balloon payment" : "Monthly EMI")}</Text>
                     <Text style={[styles.paymentMeta, { color: colors.mutedForeground }]}>{displayDate(payment.date)}{payment.notes ? ` · ${payment.notes}` : ""}</Text>
                   </View>
                   <Text style={[styles.paymentAmount, { color: colors.foreground }]}>{fmt(payment.amount, finance.currency)}</Text>
-                  <Pressable testID={`emi-payment-edit-${payment.id}`} accessibilityLabel="Correct payment" onPress={() => onRecordPayment(payment.paymentType, payment)} style={styles.paymentControl}>
+                  <Pressable testID={`emi-payment-edit-${payment.id}`} accessibilityLabel={t("Correct payment")} onPress={() => onRecordPayment(payment.paymentType, payment)} style={styles.paymentControl}>
                     <Feather name="edit-2" size={14} color={colors.primary} />
                   </Pressable>
-                  <Pressable testID={`emi-payment-delete-${payment.id}`} accessibilityLabel="Delete payment" onPress={() => confirmPaymentDelete(payment)} style={styles.paymentControl}>
+                  <Pressable testID={`emi-payment-delete-${payment.id}`} accessibilityLabel={t("Delete payment")} onPress={() => confirmPaymentDelete(payment)} style={styles.paymentControl}>
                     <Feather name="trash-2" size={14} color={colors.destructive} />
                   </Pressable>
                 </View>
               ))}
             </View>
             <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
-              Auto-debit dates and amounts are estimates for tracking only. The app does not access your bank or confirm deductions automatically.
+              {t("Auto-debit dates and amounts are estimates for tracking only. The app does not access your bank or confirm deductions automatically.")}
             </Text>
           </ScrollView>
         </View>
@@ -770,6 +783,7 @@ function EMIDetailModal({ visible, onClose, emi, onEdit, onDelete, onRecordPayme
 
 export default function EMIsScreen() {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
@@ -811,15 +825,15 @@ export default function EMIsScreen() {
   }
 
   function confirmDelete(emi: EMI) {
-    Alert.alert("Delete EMI plan?", `Remove ${emi.name} and its payment-history details? Every confirmed payment will remain in Transactions and account balances will not change.`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("Delete EMI plan?"), t("Delete {name} and its payment-history details? Every confirmed payment will remain in Transactions and account balances will not change.", { name: emi.name }), [
+      { text: t("Cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("Delete"),
         style: "destructive",
         onPress: () => {
           finance.deleteEMI(emi.id);
           setSelectedEMI(undefined);
-          toast.show("EMI plan removed");
+          toast.show(t("EMI plan deleted"));
         },
       },
     ]);
@@ -837,12 +851,12 @@ export default function EMIsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
-        title="EMI plans"
+        title={t("EMI plans")}
         topInset={topPad}
         colors={colors}
         trailing={
           <HeaderAction
-            label="Add EMI plan"
+            label={t("Add EMI plan")}
             testID="emi-add-button"
             onPress={() => openEdit()}
           />
@@ -874,10 +888,10 @@ export default function EMIsScreen() {
           <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.monthlyHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <View style={styles.heroTop}>
               <View style={styles.heroIcon}><Feather name="repeat" size={17} color="#FFFFFF" /></View>
-              <Text style={styles.heroLabel}>Monthly EMI commitment</Text>
+              <Text style={styles.heroLabel}>{t("Monthly EMI commitment")}</Text>
             </View>
             <Text style={styles.monthlyHeroValue}>{fmt(totals.monthly, finance.currency)}</Text>
-            <Text style={styles.heroFootnote}>{totals.activeCount} active repayment {totals.activeCount === 1 ? "plan" : "plans"}</Text>
+            <Text style={styles.heroFootnote}>{t("{count} active repayment plans", { count: formatAppNumber(totals.activeCount) })}</Text>
           </LinearGradient>
 
           <View style={[styles.metricsGrid, { backgroundColor: colors.card }]}>
@@ -889,17 +903,17 @@ export default function EMIsScreen() {
           {activeEMIs.length === 0 && completedEMIs.length === 0 && (
             <View style={styles.emptyState}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name="credit-card" size={21} color={colors.primary} /></View>
-              <Text style={[styles.emptyText, { color: colors.foreground }]}>No EMI plans yet</Text>
-              <Text style={[styles.helperText, { color: colors.mutedForeground }]}>Add a repayment plan to track monthly installments and final payments.</Text>
+              <Text style={[styles.emptyText, { color: colors.foreground }]}>{t("No EMI plans yet")}</Text>
+              <Text style={[styles.helperText, { color: colors.mutedForeground }]}>{t("Add a repayment plan to track monthly installments and final payments.")}</Text>
               <Pressable testID="emi-empty-add" onPress={() => openEdit()} style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 4 }]}>
-                <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Add EMI plan</Text>
+                <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{t("Add EMI plan")}</Text>
               </Pressable>
             </View>
           )}
 
           {activeEMIs.length > 0 && (
             <>
-              <Text style={[styles.listHeading, { color: colors.foreground }]}>Active plans</Text>
+              <Text style={[styles.listHeading, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Active plans")}</Text>
               {activeEMIs.map((emi) => (
                 <EMICard
                   key={emi.id}
@@ -915,7 +929,7 @@ export default function EMIsScreen() {
 
           {completedEMIs.length > 0 && (
             <>
-              <Text style={[styles.listHeading, { color: colors.mutedForeground }]}>Completed</Text>
+              <Text style={[styles.listHeading, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t("Completed")}</Text>
               {completedEMIs.map((emi) => (
                 <EMICard
                   key={emi.id}

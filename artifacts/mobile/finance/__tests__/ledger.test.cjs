@@ -12,6 +12,7 @@ require.extensions[".ts"] = (module, filename) => {
 const L = require("../ledger.ts");
 const S = require("../service.ts");
 const M = require("../migration.ts");
+const { setActiveDisplayPreferences } = require("../../i18n/localization.ts");
 
 const empty = () => ({
   userName: "", currency: "SAR", monthlyBudget: 0, expenses: [], emis: [], loans: [],
@@ -245,6 +246,17 @@ test("backup restore rejects missing current collections before migration can de
     () => M.assertBackupFinanceCompleteness({ ...complete, planning: { plans: [], periods: [], recurring: [] } }),
     /missing current budget or recurring records/,
   );
+});
+test("migration validation errors follow Arabic display language without changing recovery behavior", () => {
+  setActiveDisplayPreferences({ language: "ar", calendar: "gregorian" });
+  try {
+    assert.throws(
+      () => M.migrateFinanceState(JSON.stringify({ accounts: {} }), empty()),
+      /تعذّرت قراءة الحسابات المحفوظة/,
+    );
+  } finally {
+    setActiveDisplayPreferences({ language: "en", calendar: "gregorian" });
+  }
 });
 test("fresh installations have no fictional financial records", () => {
   const s = M.migrateFinanceState(null, empty());

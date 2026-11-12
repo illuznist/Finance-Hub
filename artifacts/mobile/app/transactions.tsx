@@ -32,7 +32,8 @@ import {
   type Transaction,
 } from "@/finance/ledger";
 import { useColors } from "@/hooks/useColors";
-import { formatAppCurrency, formatAppDate, normalizeLocalizedNumberInput } from "@/i18n/localization";
+import { formatAppCurrency, formatAppDate, formatAppNumber, normalizeLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 type Colors = ReturnType<typeof useColors>;
 type TypeFilter = "all" | "income" | "expenses" | "transfers" | "repayments";
@@ -99,6 +100,7 @@ function matchesType(t: Transaction, f: TypeFilter): boolean {
 
 export default function TransactionsScreen() {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const finance = useFinance();
@@ -122,15 +124,15 @@ export default function TransactionsScreen() {
   const [reconcileOpen, setReconcileOpen] = useState(false);
 
   const currencyTx = useMemo(() => transactions.filter(t => t.currency === currency), [transactions, currency]);
-  const accountName = (id?: string) => (id ? accounts.find(a => a.id === id)?.name ?? "Removed account" : "Unassigned");
+  const accountName = (id?: string) => (id ? accounts.find(a => a.id === id)?.name ?? t("Removed account") : t("Unassigned"));
 
 
   const rangeResult = useMemo((): { from: string; to: string } | { error: string } => {
     if (range === "this") return monthRange(0);
     if (range === "previous") return monthRange(-1);
     if (range === "last3") return { from: monthRange(-2).from, to: monthRange(0).to };
-    if (!validLocalDate(customFrom) || !validLocalDate(customTo)) return { error: "Enter dates as YYYY-MM-DD." };
-    if (customFrom > customTo) return { error: "Start date must be on or before end date." };
+     if (!validLocalDate(customFrom) || !validLocalDate(customTo)) return { error: "Enter dates as YYYY-MM-DD." };
+     if (customFrom > customTo) return { error: "Start date must be on or before end date." };
     return { from: customFrom, to: customTo };
   }, [range, customFrom, customTo]);
 
@@ -152,41 +154,41 @@ export default function TransactionsScreen() {
   const header = (
     <View>
       {reportDrill && <View style={[styles.notice, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-        <Text style={[styles.small, { color: colors.foreground }]}>Analytics details · {currency} · {reportDrill.type}{reportDrill.categoryKey ? " · Selected category" : ""}{reportDrill.sourceKey ? " · Selected source" : ""}</Text>
-        <Pressable accessibilityRole="button" onPress={() => setReportDrill(null)}><Text style={[styles.small, { color: colors.primary }]}>Show all transaction types</Text></Pressable>
+        <Text style={[styles.small, { color: colors.foreground }]}>{t("Analytics details")} · {currency} · {t(reportDrill.type)}{reportDrill.categoryKey ? ` · ${t("Selected category")}` : ""}{reportDrill.sourceKey ? ` · ${t("Selected source")}` : ""}</Text>
+        <Pressable accessibilityRole="button" onPress={() => setReportDrill(null)}><Text style={[styles.small, { color: colors.primary }]}>{t("Show all transaction types")}</Text></Pressable>
       </View>}
       {analyticsCurrencies(finance).length > 1 && <Chips items={analyticsCurrencies(finance).map(c => ({ key: c, label: c }))} value={currency} onChange={setReportCurrency} colors={colors} prefix="transactions-currency" />}
       {finance.reconciliationRequired ? (
         <View style={[styles.notice, { backgroundColor: colors.warningLight, borderColor: colors.warning }]} testID="reconcile-notice">
           <Feather name="alert-circle" size={18} color={colors.warning} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.noticeTitle, { color: colors.foreground }]}>Account balances need review</Text>
+            <Text style={[styles.noticeTitle, { color: colors.foreground }]}>{t("Account balances need review")}</Text>
             <Text style={[styles.small, { color: colors.mutedForeground }]}>
-              Some earlier records could not be matched to dated payments. Confirm each account's actual balance.
+              {t("Some earlier records could not be matched to dated payments. Confirm each account's actual balance.")}
             </Text>
           </View>
           <Pressable testID="open-reconcile" onPress={() => setReconcileOpen(true)} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.smallBtnText, { color: colors.primaryForeground }]}>Reconcile</Text>
+            <Text style={[styles.smallBtnText, { color: colors.primaryForeground }]}>{t("Reconcile")}</Text>
           </Pressable>
         </View>
       ) : null}
 
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="month-summary">
-        <Text style={[styles.label, { color: colors.mutedForeground }]}>{"error" in rangeResult ? "Selected period" : `${rangeResult.from} – ${rangeResult.to}`} · {currency}</Text>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("error" in rangeResult ? "Selected period" : `${rangeResult.from} – ${rangeResult.to}`)} · {currency}</Text>
         <View style={styles.summaryRow}>
           <SummaryItem label="Money in" value={money(summary.moneyIn, currency)} color={colors.success} colors={colors} />
           <SummaryItem label="Money out" value={money(summary.moneyOut, currency)} color={colors.destructive} colors={colors} />
         </View>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <View style={styles.between}>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>Net cash flow</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>{t("Net cash flow")}</Text>
           <Text style={[styles.netValue, { color: summary.net < 0 ? colors.destructive : colors.foreground }]}>
             {summary.net < 0 ? "-" : ""}{money(Math.abs(summary.net), currency)}
           </Text>
         </View>
       </View>
       {!finance.reconciliationRequired && accounts.length > 0 && <Pressable testID="review-balances" onPress={() => setReconcileOpen(true)} style={{ paddingVertical: 10 }}>
-        <Text style={[styles.small, { color: colors.primary }]}>Review account balances</Text>
+        <Text style={[styles.small, { color: colors.primary }]}>{t("Review account balances")}</Text>
       </Pressable>}
 
       <View style={[styles.search, { backgroundColor: colors.input, borderColor: colors.border }]}>
@@ -195,12 +197,12 @@ export default function TransactionsScreen() {
           testID="search-input"
           value={query}
           onChangeText={setQuery}
-          placeholder="Search description or category"
+          placeholder={t("Search description or category")}
           placeholderTextColor={colors.mutedForeground}
           style={[styles.searchInput, { color: colors.foreground }]}
         />
         {query ? (
-          <Pressable onPress={() => setQuery("")} hitSlop={8} accessibilityLabel="Clear search">
+          <Pressable onPress={() => setQuery("")} hitSlop={8} accessibilityLabel={t("Clear search")}>
             <Feather name="x" size={16} color={colors.mutedForeground} />
           </Pressable>
         ) : null}
@@ -216,10 +218,10 @@ export default function TransactionsScreen() {
         </View>
       ) : null}
       {"error" in rangeResult ? (
-        <Text style={[styles.small, { color: colors.destructive, marginTop: 8 }]}>{rangeResult.error}</Text>
+        <Text style={[styles.small, { color: colors.destructive, marginTop: 8 }]}>{t(rangeResult.error)}</Text>
       ) : null}
-      <Text style={[styles.label, { color: colors.mutedForeground, marginTop: 18, marginBottom: 8 }]}>
-        {visible.length} {visible.length === 1 ? "transaction" : "transactions"}
+        <Text style={[styles.label, { color: colors.mutedForeground, marginTop: 18, marginBottom: 8 }]}>
+        {t("{count} transactions", { count: formatAppNumber(visible.length) })}
       </Text>
     </View>
   );
@@ -227,12 +229,12 @@ export default function TransactionsScreen() {
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <ScreenHeader
-        title="Transactions"
-        subtitle={`Actual money movements in ${currency}`}
+        title={t("Transactions")}
+        subtitle={t("Actual money movements in {currency}", { currency })}
         topInset={topInset}
         colors={colors}
-        leading={<HeaderAction icon="arrow-left" label="Go back" variant="neutral" testID="back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
-        trailing={<HeaderAction icon="plus" label="Add transaction" testID="add-transaction" onPress={() => setForm({ mode: "add" })} />}
+        leading={<HeaderAction icon={isRTL ? "arrow-right" : "arrow-left"} label={t("Go back")} variant="neutral" testID="back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
+        trailing={<HeaderAction icon="plus" label={t("Add transaction")} testID="add-transaction" onPress={() => setForm({ mode: "add" })} />}
       />
       <FlatList
         data={visible}
@@ -245,12 +247,12 @@ export default function TransactionsScreen() {
           <View style={[styles.empty, { borderColor: colors.border }]} testID="empty-state">
             <Feather name="list" size={22} color={colors.mutedForeground} />
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-              {transactions.length === 0 ? "No transactions yet" : "Nothing matches these filters"}
+              {t(transactions.length === 0 ? "No transactions yet" : "Nothing matches these filters")}
             </Text>
             <Text style={[styles.small, { color: colors.mutedForeground, textAlign: "center" }]}>
               {transactions.length === 0
-                ? "Paid expenses, received income, EMI and loan payments, and transfers will appear here."
-                : "Try another period, type or search term."}
+                ? t("Paid expenses, received income, EMI and loan payments, and transfers will appear here.")
+                : t("Try another period, type or search term.")}
             </Text>
           </View>
         }
@@ -279,11 +281,11 @@ export default function TransactionsScreen() {
                 : "The original transaction record will be removed.";
             const run = () => { if (finance.deleteTransaction(selected.id)) setSelectedId(null); };
             if (Platform.OS === "web") {
-              if (typeof window !== "undefined" && window.confirm(`Reverse this recorded transaction?\n\n${balanceImpact} ${linked}`)) run();
+              if (typeof window !== "undefined" && window.confirm(`${t("Reverse this recorded transaction?")}\n\n${t(balanceImpact)} ${t(linked)}`)) run();
             } else {
-              Alert.alert("Reverse recorded transaction?", `${balanceImpact} ${linked}`, [
-                { text: "Cancel", style: "cancel" },
-                { text: "Reverse transaction", style: "destructive", onPress: run },
+              Alert.alert(t("Reverse recorded transaction?"), `${t(balanceImpact)} ${t(linked)}`, [
+                { text: t("Cancel"), style: "cancel" },
+                { text: t("Reverse transaction"), style: "destructive", onPress: run },
               ]);
             }
           }}
@@ -310,11 +312,12 @@ export default function TransactionsScreen() {
 }
 
 function SummaryItem({ label, value, color, colors }: { label: string; value: string; color: string; colors: Colors }) {
+  const { t } = usePreferences();
   return (
     <View style={styles.flex}>
       <View style={styles.inline}>
         <View style={[styles.dot, { backgroundColor: color }]} />
-        <Text style={[styles.small, { color: colors.mutedForeground }]}>{label}</Text>
+        <Text style={[styles.small, { color: colors.mutedForeground }]}>{t(label)}</Text>
       </View>
       <Text style={[styles.summaryValue, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </View>
@@ -324,6 +327,7 @@ function SummaryItem({ label, value, color, colors }: { label: string; value: st
 function Chips<T extends string>({ items, value, onChange, colors, prefix }: {
   items: { key: T; label: string }[]; value: T; onChange: (v: T) => void; colors: Colors; prefix: string;
 }) {
+  const { t } = usePreferences();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
       {items.map(i => {
@@ -337,7 +341,7 @@ function Chips<T extends string>({ items, value, onChange, colors, prefix }: {
             onPress={() => onChange(i.key)}
             style={[styles.chip, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}
           >
-            <Text style={[styles.chipText, { color: active ? colors.primaryForeground : colors.foreground }]}>{i.label}</Text>
+            <Text style={[styles.chipText, { color: active ? colors.primaryForeground : colors.foreground }]}>{t(i.label)}</Text>
           </Pressable>
         );
       })}
@@ -346,6 +350,7 @@ function Chips<T extends string>({ items, value, onChange, colors, prefix }: {
 }
 
 function Row({ t, accountName, colors, onPress }: { t: Transaction; accountName: string; colors: Colors; onPress: () => void }) {
+  const { t: translate } = usePreferences();
   const incoming = t.direction === "in";
   const tone = t.type === "transfer" || t.type === "adjustment" ? colors.mutedForeground : incoming ? colors.success : colors.destructive;
   const icon = t.type === "transfer" ? "repeat" : incoming ? "arrow-down-left" : "arrow-up-right";
@@ -357,7 +362,7 @@ function Row({ t, accountName, colors, onPress }: { t: Transaction; accountName:
       <View style={styles.flex}>
         <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>{t.description}</Text>
         <Text numberOfLines={1} style={[styles.small, { color: colors.mutedForeground }]}>
-          {formatDate(t.date)} · {t.category} · {accountName}
+          {formatDate(t.date)} · {translate(t.category)} · {accountName}
         </Text>
       </View>
       <Text style={[styles.rowAmount, { color: tone }]}>
@@ -370,14 +375,15 @@ function Row({ t, accountName, colors, onPress }: { t: Transaction; accountName:
 function Sheet({ children, onClose, colors, bottomInset, title, testID }: {
   children: React.ReactNode; onClose: () => void; colors: Colors; bottomInset: number; title: string; testID: string;
 }) {
+  const { t } = usePreferences();
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("Close")} />
         <View testID={testID} style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: bottomInset + 16 }]}>
           <View style={styles.between}>
             <Text style={[styles.dialogTitle, { color: colors.foreground }]}>{title}</Text>
-            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" testID={`${testID}-close`}>
+            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel={t("Close")} testID={`${testID}-close`}>
               <Feather name="x" size={22} color={colors.mutedForeground} />
             </Pressable>
           </View>
@@ -392,18 +398,19 @@ function DetailSheet({ t, accountName, pairAccount, colors, bottomInset, onClose
   t: Transaction; accountName: string; pairAccount?: string; colors: Colors; bottomInset: number;
   onClose: () => void; onEdit: () => void; onDelete: () => void;
 }) {
+  const { t: translate } = usePreferences();
   const isTransfer = t.type === "transfer";
   const rows: [string, string][] = [
-    ["Type", TYPE_LABELS[t.type] ?? t.type],
-    ["Direction", t.direction === "in" ? "Money in" : "Money out"],
+     ["Type", translate(TYPE_LABELS[t.type] ?? t.type)],
+     ["Direction", translate(t.direction === "in" ? "Money in" : "Money out")],
     ["Date", formatDate(t.date)],
     ["Category", t.category],
-    [isTransfer ? (t.direction === "out" ? "From account" : "To account") : "Account", accountName],
+     [isTransfer ? (t.direction === "out" ? "From account" : "To account") : "Account", accountName],
   ];
   if (isTransfer && pairAccount) rows.push([t.direction === "out" ? "To account" : "From account", pairAccount]);
   if (t.notes) rows.push(["Notes", t.notes]);
   return (
-    <Sheet onClose={onClose} colors={colors} bottomInset={bottomInset} title="Transaction" testID="transaction-detail">
+    <Sheet onClose={onClose} colors={colors} bottomInset={bottomInset} title={translate("Transaction")} testID="transaction-detail">
       <Text style={[styles.cardTitle, { color: colors.foreground, marginTop: 12 }]}>{t.description}</Text>
       <Text style={[styles.detailAmount, { color: t.direction === "in" ? colors.success : colors.foreground }]}>
         {t.direction === "in" ? "+" : "-"}{money(t.amount, t.currency)}
@@ -411,26 +418,26 @@ function DetailSheet({ t, accountName, pairAccount, colors, bottomInset, onClose
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 0 }]}>
         {rows.map(([k, v]) => (
           <View key={k} style={[styles.between, { paddingVertical: 6 }]}>
-            <Text style={[styles.body, { color: colors.mutedForeground }]}>{k}</Text>
+            <Text style={[styles.body, { color: colors.mutedForeground }]}>{translate(k)}</Text>
             <Text style={[styles.body, { color: colors.foreground, flexShrink: 1, textAlign: "auto", marginStart: 12 }]}>{v}</Text>
           </View>
         ))}
       </View>
       {!t.accountId ? (
-        <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 10 }]}>Unassigned: this does not change any account balance.</Text>
+        <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 10 }]}>{translate("Unassigned: this does not change any account balance.")}</Text>
       ) : null}
       {isTransfer ? (
-        <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 10 }]}>Part of a paired transfer. Edits to amount, date and notes apply to both sides; deleting removes both.</Text>
+        <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 10 }]}>{translate("Part of a paired transfer. Edits to amount, date and notes apply to both sides; deleting removes both.")}</Text>
       ) : t.referenceType ? (
-        <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 10 }]}>Linked to a {t.referenceType.replace("_", " ")} record, which is kept in sync.</Text>
+        <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 10 }]}>{translate("Linked to a {type} record, which is kept in sync.", { type: translate(t.referenceType.replace("_", " ")) })}</Text>
       ) : null}
       <View style={[styles.customRow, { marginTop: 18 }]}>
         <Pressable testID="delete-transaction" onPress={onDelete} style={[styles.btn, styles.flex, { backgroundColor: colors.errorLight }]}>
-          <Text style={[styles.btnText, { color: colors.destructive }]}>Delete</Text>
+          <Text style={[styles.btnText, { color: colors.destructive }]}>{translate("Delete")}</Text>
         </Pressable>
         {t.type !== "adjustment" ? (
           <Pressable testID="edit-transaction" onPress={onEdit} style={[styles.btn, styles.flex, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Edit</Text>
+            <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{translate("Edit")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -439,30 +446,34 @@ function DetailSheet({ t, accountName, pairAccount, colors, bottomInset, onClose
 }
 
 function Field({ label, children, colors, hint }: { label: string; children: React.ReactNode; colors: Colors; hint?: string }) {
+  const { t } = usePreferences();
   return (
     <View style={{ marginTop: 14 }}>
-      <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 6 }]}>{label}</Text>
+      <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 6 }]}>{t(label)}</Text>
       {children}
-      {hint ? <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 6 }]}>{hint}</Text> : null}
+      {hint ? <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 6 }]}>{t(hint)}</Text> : null}
     </View>
   );
 }
 
 function Input(props: React.ComponentProps<typeof TextInput> & { colors: Colors }) {
+  const { t } = usePreferences();
   const { colors, style, ...rest } = props;
   return (
     <TextInput
       placeholderTextColor={colors.mutedForeground}
       {...rest}
+      placeholder={rest.placeholder ? t(rest.placeholder) : undefined}
       style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }, style]}
     />
   );
 }
 
 function DateField({ label, value, onChange, colors, testID }: { label: string; value: string; onChange: (v: string) => void; colors: Colors; testID: string }) {
+  const { t } = usePreferences();
   return (
     <View style={styles.flex}>
-      <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 6 }]}>{label}</Text>
+      <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 6 }]}>{t(label)}</Text>
       <Input colors={colors} testID={testID} value={value} onChangeText={onChange} placeholder="YYYY-MM-DD" autoCapitalize="none" maxLength={10} />
     </View>
   );
@@ -471,6 +482,7 @@ function DateField({ label, value, onChange, colors, testID }: { label: string; 
 function OptionList({ options, value, onChange, colors, testPrefix }: {
   options: { key: string; label: string }[]; value: string; onChange: (v: string) => void; colors: Colors; testPrefix: string;
 }) {
+  const { t } = usePreferences();
   return (
     <View style={styles.wrap}>
       {options.map(o => {
@@ -482,7 +494,7 @@ function OptionList({ options, value, onChange, colors, testPrefix }: {
             onPress={() => onChange(o.key)}
             style={[styles.chip, { backgroundColor: active ? colors.secondary : colors.card, borderColor: active ? colors.primary : colors.border }]}
           >
-            <Text style={[styles.chipText, { color: active ? colors.secondaryForeground : colors.foreground }]}>{o.label}</Text>
+            <Text style={[styles.chipText, { color: active ? colors.secondaryForeground : colors.foreground }]}>{t(o.label)}</Text>
           </Pressable>
         );
       })}
@@ -494,19 +506,20 @@ function FormShell({ title, colors, topInset, bottomInset, onClose, onSave, save
   title: string; colors: Colors; topInset: number; bottomInset: number; onClose: () => void; onSave: () => void;
   saveLabel: string; testID: string; children: React.ReactNode;
 }) {
+  const { t } = usePreferences();
   return (
     <Modal visible animationType="none" onRequestClose={onClose}>
       <View style={[styles.flex, { backgroundColor: colors.background }]} testID={testID}>
         <ScreenHeader
-          title={title}
+          title={t(title)}
           topInset={topInset}
           colors={colors}
-          leading={<HeaderAction icon="x" label="Cancel" variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />}
+          leading={<HeaderAction icon="x" label={t("Cancel")} variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />}
         />
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
           {children}
           <Pressable testID={`${testID}-save`} onPress={onSave} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 24 }]}>
-            <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{saveLabel}</Text>
+            <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t(saveLabel)}</Text>
           </Pressable>
         </KeyboardAwareScrollViewCompat>
       </View>
@@ -517,6 +530,7 @@ function FormShell({ title, colors, topInset, bottomInset, onClose, onSave, save
 function TransactionForm({ editing, initialCurrency, colors, topInset, bottomInset, onClose }: {
   editing: Transaction | null; initialCurrency: string; colors: Colors; topInset: number; bottomInset: number; onClose: () => void;
 }) {
+  const { t } = usePreferences();
   const finance = useFinance();
   const { accounts, transactions } = finance;
   const currency = editing?.currency ?? initialCurrency;
@@ -548,22 +562,22 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
     if (saving.current) return;
     setError(null);
     const value = parseAmount(amount);
-    if (value === null) return setError("Enter a positive amount with at most two decimals.");
-    if (!validLocalDate(date)) return setError("Enter a valid date as YYYY-MM-DD.");
-    if (kind !== "transfer" && !description.trim()) return setError("Add a description.");
-    if (kind !== "transfer" && !category && !categoryFixed) return setError("Choose a category.");
+     if (value === null) return setError("Enter a positive amount with at most two decimals.");
+     if (!validLocalDate(date)) return setError("Enter a valid date as YYYY-MM-DD.");
+     if (kind !== "transfer" && !description.trim()) return setError("Add a description.");
+     if (kind !== "transfer" && !category && !categoryFixed) return setError("Choose a category.");
     const cleanNotes = notes.trim() || undefined;
     saving.current = true;
     let ok = false;
     if (editing) {
-      if (isTransferEdit && !accountId) { saving.current = false; return setError("Choose an account for this side of the transfer."); }
+       if (isTransferEdit && !accountId) { saving.current = false; return setError("Choose an account for this side of the transfer."); }
       ok = finance.updateTransaction(editing.id, {
         amount: value, date, description: description.trim() || editing.description,
         category: categoryFixed ? editing.category : category, accountId: accountId || undefined, notes: cleanNotes,
       });
     } else if (kind === "transfer") {
-      if (!accountId || !destinationId) { saving.current = false; return setError("Choose a source and destination account."); }
-      if (accountId === destinationId) { saving.current = false; return setError("Choose two different accounts."); }
+       if (!accountId || !destinationId) { saving.current = false; return setError("Choose a source and destination account."); }
+       if (accountId === destinationId) { saving.current = false; return setError("Choose two different accounts."); }
       ok = finance.recordTransfer({ id: operationId, sourceId: accountId, destinationId, amount: value, date, description: description.trim() || undefined, notes: cleanNotes });
     } else {
       ok = finance.addTransaction({
@@ -572,14 +586,14 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
       });
     }
     if (ok) onClose();
-    else { saving.current = false; setError(finance.storageError ?? "This change could not be saved. Check the details and try again."); }
+     else { saving.current = false; setError(finance.storageError ?? "This change could not be saved. Check the details and try again."); }
   };
 
   return (
     <FormShell
-      title={editing ? "Edit transaction" : "Add transaction"}
+      title={t(editing ? "Edit transaction" : "Add transaction")}
       colors={colors} topInset={topInset} bottomInset={bottomInset} onClose={onClose} onSave={save}
-      saveLabel={editing ? "Save changes" : "Add transaction"} testID="transaction-form"
+      saveLabel={t(editing ? "Save changes" : "Add transaction")} testID="transaction-form"
     >
       {!editing ? (
         <Field label="Type" colors={colors} hint="EMI and loan payments are recorded from their own screens.">
@@ -591,7 +605,7 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
           />
         </Field>
       ) : (
-        <Text style={[styles.body, { color: colors.mutedForeground }]}>{TYPE_LABELS[editing.type] ?? editing.type}</Text>
+        <Text style={[styles.body, { color: colors.mutedForeground }]}>{t(TYPE_LABELS[editing.type] ?? editing.type)}</Text>
       )}
       <Field label={`Amount (${editing?.currency ?? currency})`} colors={colors}>
         <Input colors={colors} testID="form-amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" />
@@ -605,7 +619,7 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
         </Field>
       ) : null}
       {eligible.length === 0 && kind === "transfer" ? (
-        <Text style={[styles.small, { color: colors.destructive, marginTop: 14 }]}>Add at least two {currency} accounts to record a transfer.</Text>
+        <Text style={[styles.small, { color: colors.destructive, marginTop: 14 }]}>{t("Add at least two {currency} accounts to record a transfer.", { currency })}</Text>
       ) : (
         <Field
           label={kind === "transfer" ? (editing ? (editing.direction === "out" ? "From account" : "To account") : "From account") : "Account"}
@@ -626,12 +640,13 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
       <Field label="Notes (optional)" colors={colors}>
         <Input colors={colors} testID="form-notes" value={notes} onChangeText={setNotes} multiline style={{ minHeight: 72, textAlignVertical: "top" }} />
       </Field>
-      {error ? <Text testID="form-error" style={[styles.body, { color: colors.destructive, marginTop: 14 }]}>{error}</Text> : null}
+       {error ? <Text testID="form-error" style={[styles.body, { color: colors.destructive, marginTop: 14 }]}>{t(error)}</Text> : null}
     </FormShell>
   );
 }
 
 function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Colors; topInset: number; bottomInset: number; onClose: () => void }) {
+  const { t } = usePreferences();
   const finance = useFinance();
   const operationId = useRef(newId()).current;
   const saving = useRef(false);
@@ -656,12 +671,12 @@ function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Col
   };
 
   return (
-    <FormShell title="Reconcile balance" colors={colors} topInset={topInset} bottomInset={bottomInset} onClose={onClose} onSave={save} saveLabel="Confirm balance" testID="reconcile-form">
+    <FormShell title={t("Reconcile balance")} colors={colors} topInset={topInset} bottomInset={bottomInset} onClose={onClose} onSave={save} saveLabel={t("Confirm balance")} testID="reconcile-form">
       <Text style={[styles.body, { color: colors.mutedForeground }]}>
-        Enter the balance shown by your bank or wallet. A reconciliation entry records the difference; opening balances and history stay unchanged.
+        {t("Enter the balance shown by your bank or wallet. A reconciliation entry records the difference; opening balances and history stay unchanged.")}
       </Text>
       {finance.accounts.length === 0 ? (
-        <Text style={[styles.body, { color: colors.foreground, marginTop: 14 }]}>No accounts to reconcile.</Text>
+        <Text style={[styles.body, { color: colors.foreground, marginTop: 14 }]}>{t("No accounts to reconcile.")}</Text>
       ) : (
         <Field label="Account" colors={colors}>
           <OptionList options={finance.accounts.map(a => ({ key: a.id, label: a.name }))} value={accountId} onChange={setAccountId} colors={colors} testPrefix="reconcile-account" />
@@ -669,7 +684,7 @@ function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Col
       )}
       {account ? (
         <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 8 }]}>
-          Recorded balance: {money(account.balance, account.currency ?? finance.currency)}
+          {t("Recorded balance")}: {money(account.balance, account.currency ?? finance.currency)}
         </Text>
       ) : null}
       <Field label={`Actual balance (${account?.currency ?? finance.currency})`} colors={colors}>
@@ -681,7 +696,7 @@ function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Col
       <Field label="Notes (optional)" colors={colors}>
         <Input colors={colors} testID="reconcile-notes" value={notes} onChangeText={setNotes} multiline style={{ minHeight: 72, textAlignVertical: "top" }} />
       </Field>
-      {error ? <Text testID="reconcile-error" style={[styles.body, { color: colors.destructive, marginTop: 14 }]}>{error}</Text> : null}
+      {error ? <Text testID="reconcile-error" style={[styles.body, { color: colors.destructive, marginTop: 14 }]}>{t(error)}</Text> : null}
     </FormShell>
   );
 }

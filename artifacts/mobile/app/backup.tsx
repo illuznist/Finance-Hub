@@ -18,7 +18,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Constants from "expo-constants";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useFinance } from "@/context/FinanceContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -34,6 +33,7 @@ import {
   type OpenedFinanceBackup,
 } from "@/security/backup";
 import { utf8 } from "@/security/crypto";
+import { getApplicationVersion } from "@/utils/appVersion";
 
 const LAST_BACKUP_KEY = "@finance_last_backup_v1";
 
@@ -94,7 +94,7 @@ export default function BackupScreen() {
     setError("");
     setNotice("");
     if (password.length < MIN_BACKUP_PASSWORD_LENGTH) {
-      setError(`Use a backup password with at least ${MIN_BACKUP_PASSWORD_LENGTH} characters.`);
+      setError(t("Use a backup password with at least {count} characters.", { count: MIN_BACKUP_PASSWORD_LENGTH }));
       return;
     }
     if (password !== confirmation) {
@@ -108,7 +108,7 @@ export default function BackupScreen() {
         theme.mode,
         password,
         randomBytes,
-        Constants.expoConfig?.version ?? "unknown",
+        getApplicationVersion(),
       );
       if (Platform.OS === "web") {
         const blob = new Blob([serialized], { type: "application/json" });

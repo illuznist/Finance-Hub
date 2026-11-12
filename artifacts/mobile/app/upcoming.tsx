@@ -85,7 +85,7 @@ export default function UpcomingScreen() {
     return (
       <View key={i.id}>
         {idx > 0 ? <View style={[ui.sep, { backgroundColor: colors.border }]} /> : null}
-        <Pressable testID={`upcoming-${i.id}`} accessibilityRole="button" accessibilityLabel={`${i.name}, ${shortDate(i.dueDate)}, ${s.label}, ${money(i.amount, i.currency)}`}
+        <Pressable testID={`upcoming-${i.id}`} accessibilityRole="button" accessibilityLabel={t("{name}, {date}, {status}, {amount}", { name: i.name, date: shortDate(i.dueDate), status: t(s.label), amount: money(i.amount, i.currency) })}
           onPress={() => setSelected(i)} style={({ pressed }) => [ui.row, { opacity: pressed ? 0.7 : 1 }]}>
           <View style={{ width: 44, alignItems: "center" }}>
             <Text style={[ui.small, { color: colors.mutedForeground }]}>{formatAppDate(`${i.dueDate.slice(0, 7)}-01`, { month: "short" })}</Text>
@@ -94,7 +94,7 @@ export default function UpcomingScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[ui.bodyStrong, { color: colors.foreground }]} numberOfLines={1}>{i.name}</Text>
-            <Text style={[ui.small, { color: colors.mutedForeground }]} numberOfLines={1}>{TYPE_LABEL[i.type]} · {acctName(i.accountId)}</Text>
+            <Text style={[ui.small, { color: colors.mutedForeground }]} numberOfLines={1}>{t(TYPE_LABEL[i.type])} · {acctName(i.accountId)}</Text>
           </View>
           <View style={{ alignItems: "flex-end", gap: 4 }}>
             <Text style={[ui.bodyStrong, ui.num, { color: i.status === "skipped" ? colors.mutedForeground : colors.foreground }]}>{money(i.amount, i.currency)}</Text>
@@ -170,7 +170,7 @@ function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPaym
     if (date > localDate()) return setError("Payment date cannot be in the future.");
     const value = partial ? parseMoney(amount) : item.amount;
     if (value === null) return setError("Enter a positive amount with up to two decimals.");
-    if (partial && value > item.amount + 0.001) return setError(`Amount cannot exceed the remaining ${money(item.amount, item.currency)}.`);
+    if (partial && value > item.amount + 0.001) return setError(t("Amount cannot exceed the remaining {amount}.", { amount: money(item.amount, item.currency) }));
     lock.current = true; setBusy(true);
     if (finance.recordScheduledPayment(item, accountId, date, partial ? value : undefined, operationId)) onClose();
     else { lock.current = false; setBusy(false); setError(finance.storageError ?? "Payment could not be recorded. It may already be paid."); }
@@ -217,7 +217,7 @@ function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPaym
             </Field>
           ) : null}
           {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 12 }]} testID="pay-error">{t(error)}</Text> : null}
-          <Button label={busy ? "Recording..." : t("Confirm payment")} onPress={pay} disabled={busy} testID="pay-confirm" style={{ marginTop: 20 }} />
+          <Button label={busy ? t("Recording...") : t("Confirm payment")} onPress={pay} disabled={busy} testID="pay-confirm" style={{ marginTop: 20 }} />
           {item.type === "expense" && item.recurringId ? (
             <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
               <Button label="Skip" tone="neutral" style={{ flex: 1 }} onPress={() => skip(false)} testID="pay-skip" />

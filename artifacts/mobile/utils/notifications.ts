@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import type { FinanceState } from "@/context/FinanceContext";
 import { createReminderSynchronizer, type ReminderAdapter } from "@/finance/reminderPlan";
+import { translateAppText } from "@/i18n/localization";
 export const NOTIFICATION_CHANNEL = "finance-reminders";
 export async function setupNotificationHandler(): Promise<void> {
   if (Platform.OS === "web") return;
@@ -10,7 +11,7 @@ export async function setupNotificationHandler(): Promise<void> {
     handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
   });
   if (Platform.OS === "android") await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL, {
-    name: "Payment Reminders", importance: Notifications.AndroidImportance.DEFAULT, sound: "default",
+    name: translateAppText("Payment reminders"), importance: Notifications.AndroidImportance.DEFAULT, sound: "default",
   });
 }
 export async function requestNotificationPermissions(): Promise<boolean> {

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import Constants from "expo-constants";
+import { getApplicationVersion } from "@/utils/appVersion";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -345,8 +345,8 @@ export default function SettingsScreen() {
   async function updateSecurity(updates: Partial<SecuritySettings>) {
     try {
       await finance.setSecuritySettings({ ...security, ...updates });
-    } catch (error) {
-      Alert.alert(t("Could not save security settings"), error instanceof Error ? t(error.message) : t("Retry safely."));
+    } catch {
+      Alert.alert(t("Could not save security settings"), t("Retry safely."));
     }
   }
 
@@ -489,7 +489,7 @@ export default function SettingsScreen() {
           <View style={styles.themeToggle}>
             {([
               ["en", t("English")],
-              ["ar", t("Arabic (Saudi Arabia)")],
+              ["ar", t("Arabic")],
             ] as const).map(([value, label]) => (
               <Pressable
                 key={value}
@@ -497,7 +497,7 @@ export default function SettingsScreen() {
                 accessibilityState={{ selected: preferences.language === value }}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  void preferences.setLanguage(value).catch(error => Alert.alert(t("Language"), error instanceof Error ? error.message : t("Could not change language")));
+                  void preferences.setLanguage(value).catch(() => Alert.alert(t("Language"), t("Could not change language")));
                 }}
                 style={[
                   styles.themeTab,
@@ -526,7 +526,7 @@ export default function SettingsScreen() {
                 accessibilityState={{ selected: preferences.calendar === value }}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  void preferences.setCalendar(value).catch(error => Alert.alert(t("Display calendar"), error instanceof Error ? error.message : t("Could not save preference")));
+                  void preferences.setCalendar(value).catch(() => Alert.alert(t("Display calendar"), t("Could not save preference")));
                 }}
                 style={[
                   styles.themeTab,
@@ -911,7 +911,7 @@ export default function SettingsScreen() {
             </View>
             <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Version")}</Text>
             <View style={{ flex: 1 }} />
-                <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>{Constants.expoConfig?.version ?? t("Expo Go")}</Text>
+            <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>{getApplicationVersion()}</Text>
           </View>
         </View>
 

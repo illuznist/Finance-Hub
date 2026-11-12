@@ -88,6 +88,76 @@ const TERMS_SECTIONS = [
   },
 ];
 
+const ARABIC_PRIVACY_SECTIONS = [
+  {
+    title: "تخزين البيانات",
+    body: "تُخزّن سجلاتك المالية في قاعدة بيانات التطبيق على جهازك ولا تُرفع إلى خادم تابع لـ FinanceApp. لا يشفّر التطبيق قاعدة البيانات أثناء التخزين؛ وتحميها بيئة التطبيق المعزولة في نظام التشغيل على الأجهزة الأصلية، بينما يمكن لملف المتصفح الوصول إلى بيانات تخزين المتصفح. لا تُنشأ النسخ الاحتياطية المشفّرة إلا عند تصديرها.",
+  },
+  {
+    title: "البيانات التي لا نجمعها",
+    body: "لا يوفّر التطبيق خدمة حسابات مستضافة لدى FinanceApp ولا يرسل سجلاتك المالية إلى خادم. يُخزّن اسمك وبريدك الإلكتروني ومُتحقّق بيانات الحساب على هذا الجهاز. تستخدم بيانات تسجيل الدخول في إصدار المتصفح التخزين المحلي ولا تحميها الأجهزة الآمنة في الجهاز.",
+  },
+  {
+    title: "المصادقة",
+    body: "تُخزّن كلمات المرور على هيئة مُتحقّقات PBKDF2-HMAC-SHA256 مع أملاح عشوائية. على الأجهزة الأصلية، تُخزّن مُتحقّقات الحساب وPIN الاختياري باستخدام سلسلة المفاتيح أو مخزن المفاتيح في نظام التشغيل عبر SecureStore؛ ولا تُحفظ داخل المنطقة الآمنة للمعالج. تستخدم إصدارات المتصفح التخزين المحلي. البصمة اختيارية ويتحقق منها نظام التشغيل؛ ولا يتلقى التطبيق عينات البصمة.",
+  },
+  {
+    title: "الإشعارات",
+    body: "عند تفعيل الإشعارات، تُجدول محليًا على جهازك. لا يُرسل محتوى الإشعارات إلى خوادم خارجية. يمكنك إيقاف الإشعارات في أي وقت من الإعدادات.",
+  },
+  {
+    title: "خدمات الجهات الخارجية",
+    body: "لا يتكامل FinanceApp مع خدمات تحليل أو إعلان أو تتبع تابعة لجهات خارجية. ولا يستخدم التطبيق واجهات خارجية تتلقى بياناتك الشخصية أو المالية.",
+  },
+  {
+    title: "حذف البيانات",
+    body: "تُحفظ السجلات المالية محليًا في التطبيق. قد يؤدي حذف بيانات التطبيق أو إلغاء تثبيته إلى حذف تلك السجلات نهائيًا؛ وتبقى ملفات النسخ الاحتياطية المصدّرة في المواقع التي حفظتها فيها. قد تحتفظ بعض أنظمة التشغيل ببيانات اعتماد سلسلة المفاتيح بعد إزالة التطبيق. لا يحتفظ FinanceApp بنسخة على الخادم لحذفها.",
+  },
+  {
+    title: "التواصل",
+    body: "للاستفسارات المتعلقة بالخصوصية، تواصل معنا عبر support@financeapp.com. نرد عادةً خلال يوم إلى يومي عمل.",
+  },
+];
+
+const ARABIC_TERMS_SECTIONS = [
+  {
+    title: "قبول الشروط",
+    body: "باستخدام FinanceApp، فإنك توافق على هذه الشروط والأحكام. إذا لم توافق عليها، يُرجى عدم استخدام التطبيق. قد تُحدّث هذه الشروط دوريًا، ويُعد استمرارك في استخدام التطبيق قبولًا لأي تغييرات.",
+  },
+  {
+    title: "وصف الخدمة",
+    body: "FinanceApp أداة شخصية لتتبع الشؤون المالية تعمل بالكامل على جهازك. وهي مخصصة للاستخدام الشخصي غير التجاري لمساعدتك على إدارة المصروفات والأقساط والدخل والميزانيات.",
+  },
+  {
+    title: "لا تُقدّم نصائح مالية",
+    body: "FinanceApp أداة للتتبع والتنظيم فقط. لا يشكل أي محتوى في التطبيق نصيحة مالية أو استثمارية أو ضريبية أو قانونية. استشر دائمًا مختصًا مؤهلًا قبل اتخاذ قرارات مالية.",
+  },
+  {
+    title: "مسؤولية البيانات",
+    body: "تُخزّن السجلات محليًا على جهازك. تقع على عاتقك مسؤولية إنشاء نسخ احتياطية مشفّرة والاحتفاظ بها في موقع تتحكم به. لا يستطيع التطبيق استعادة كلمة مرور النسخة الاحتياطية. لا نتحمل مسؤولية فقدان البيانات بسبب تعطل الجهاز أو حذف التطبيق أو تحديثات نظام التشغيل أو غير ذلك.",
+  },
+  {
+    title: "دقة المعلومات",
+    body: "أسعار تحويل العملات المعروضة في التطبيق إرشادية فقط وقد لا تعكس أسعار السوق الفعلية. لا تعتمد عليها في معاملات صرف العملات الفعلية.",
+  },
+  {
+    title: "الملكية الفكرية",
+    body: "جميع المحتويات والتصميمات والرموز البرمجية في FinanceApp مملوكة للمطوّر. لا يجوز نسخ أي جزء من التطبيق أو تعديله أو توزيعه أو إجراء هندسة عكسية له دون إذن خطي.",
+  },
+  {
+    title: "حدود المسؤولية",
+    body: "يُقدّم FinanceApp «كما هو» دون أي ضمان. لا نتحمل مسؤولية الأضرار المباشرة أو غير المباشرة أو العرضية أو التبعية الناتجة عن استخدامك للتطبيق أو عدم قدرتك على استخدامه.",
+  },
+  {
+    title: "القانون الحاكم",
+    body: "تخضع هذه الشروط للقوانين المعمول بها. وتُحل أي نزاعات في الاختصاص القضائي الذي يوجد فيه مقر المطوّر.",
+  },
+  {
+    title: "التواصل",
+    body: "للاستفسارات المتعلقة بهذه الشروط، تواصل معنا عبر support@financeapp.com.",
+  },
+];
+
 export default function LegalScreen() {
   const colors = useColors();
   const { t, isRTL, language } = usePreferences();
@@ -97,7 +167,9 @@ export default function LegalScreen() {
 
   const isPrivacy = type === "privacy";
   const title = isPrivacy ? "Privacy Policy" : "Terms & Conditions";
-  const sections = isPrivacy ? PRIVACY_SECTIONS : TERMS_SECTIONS;
+  const sections = language === "ar"
+    ? (isPrivacy ? ARABIC_PRIVACY_SECTIONS : ARABIC_TERMS_SECTIONS)
+    : (isPrivacy ? PRIVACY_SECTIONS : TERMS_SECTIONS);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   return (
@@ -122,14 +194,20 @@ export default function LegalScreen() {
         ]}
       >
         {language === "ar" ? (
-          <Text style={[styles.metaText, { color: colors.warning, marginBottom: 12 }]}>
-            {t("Legal content is shown in English until an Arabic translation is reviewed.")}
+          <Text
+            style={[
+              styles.metaText,
+              { color: colors.warning, marginBottom: 12, textAlign: "right" },
+            ]}
+            accessibilityRole="summary"
+          >
+            {t("Legal Arabic draft — for review only. The English text remains authoritative.")}
           </Text>
         ) : null}
         {/* Meta */}
         <View style={[styles.metaRow, { borderColor: colors.border }]}>
           <Feather name="file-text" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+            <Text style={[styles.metaText, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>
             {t("Last updated")} {t(LAST_UPDATED)}
           </Text>
         </View>
@@ -137,17 +215,17 @@ export default function LegalScreen() {
         {/* Sections */}
         {sections.map((s, i) => (
           <View key={i} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>
               {i + 1}. {t(s.title)}
             </Text>
-            <Text style={[styles.sectionBody, { color: colors.mutedForeground }]}>
+            <Text style={[styles.sectionBody, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>
               {s.body}
             </Text>
           </View>
         ))}
 
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+          <Text style={[styles.footerText, { color: colors.mutedForeground, textAlign: "center" }]}>
             {t("FinanceApp — Built with privacy by design")}
           </Text>
         </View>

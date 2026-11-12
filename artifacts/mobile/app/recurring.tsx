@@ -75,7 +75,7 @@ export default function RecurringScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[ui.bodyStrong, { color: colors.foreground }]} numberOfLines={1}>{r.name}</Text>
           <Text style={[ui.small, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {freqLabel(r, t)} · {r.active ? `${t("Next")} ${shortDate(nextDue(r))}` : t("Paused")} · {acctName(r.accountId)}
+            {freqLabel(r, t)} · {r.active ? t("Next {date}", { date: shortDate(nextDue(r)) }) : t("Paused")} · {acctName(r.accountId)}
           </Text>
         </View>
         <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{money(r.amount, r.currency)}</Text>
@@ -100,10 +100,10 @@ export default function RecurringScreen() {
           </EmptyBlock>
         ) : (
           <>
-            <Text style={[ui.section, { color: colors.foreground }]}>{t("Active")} · {active.length}</Text>
+            <Text style={[ui.section, { color: colors.foreground }]}>{t("Active")} · {formatAppNumber(active.length)}</Text>
             {active.length ? active.map(row) : <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("No active schedules.")}</Text>}
             {paused.length ? <>
-              <Text style={[ui.section, { color: colors.foreground }]}>{t("Paused")} · {paused.length}</Text>
+              <Text style={[ui.section, { color: colors.foreground }]}>{t("Paused")} · {formatAppNumber(paused.length)}</Text>
               {paused.map(row)}
             </> : null}
           </>
@@ -113,7 +113,7 @@ export default function RecurringScreen() {
       {detail ? (
         <FormModal title={detail.name} topInset={topInset} bottomInset={bottomInset} onClose={() => setDetailId(null)} testID="recurring-detail">
           <Text style={[ui.hero, { color: colors.foreground }]}>{money(detail.amount, detail.currency)}</Text>
-          <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 4 }]}>{freqLabel(detail, t)} · {detail.category} · {acctName(detail.accountId)}</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 4 }]}>{freqLabel(detail, t)} · {t(detail.category)} · {acctName(detail.accountId)}</Text>
           <View style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}>
             {([["Status", detail.active ? "Active" : "Paused"], ["Next due", detail.active ? shortDate(nextDue(detail)) : "—"],
               ["Started", shortDate(detail.startDate)], ["Ends", detail.endDate ? shortDate(detail.endDate) : "No end date"],
@@ -168,7 +168,7 @@ function History({ id }: { id: string }) {
               </View>
               <Text style={[ui.body, ui.num, { color: colors.foreground }]}>{money(o.amount, o.currency)}</Text>
               {o.status === "paid" && o.expenseId ? (
-                <Pressable hitSlop={8} accessibilityLabel="Open in Transactions" testID={`occurrence-tx-${o.id}`} onPress={() => router.push("/transactions")}>
+                  <Pressable hitSlop={8} accessibilityLabel={t("Open in Transactions")} testID={`occurrence-tx-${o.id}`} onPress={() => router.push("/transactions")}>
                   <Feather name="external-link" size={15} color={colors.primary} />
                 </Pressable>
               ) : null}
@@ -265,7 +265,7 @@ function RecurringForm({ editing, topInset, bottomInset, onClose }: {
       </Field>
       {editing ? (
         <Field label="Next due date" hint="Calculated, not editable. After saving, the next due date is the first scheduled date after today, based on the start date and frequency. Change the start date to move the schedule.">
-          <Text testID="rec-next" style={[ui.bodyStrong, { color: colors.foreground }]}>Currently {shortDate(editing.nextDueDate)}</Text>
+          <Text testID="rec-next" style={[ui.bodyStrong, { color: colors.foreground }]}>{t("Currently {date}", { date: shortDate(editing.nextDueDate) })}</Text>
         </Field>
       ) : null}
       <Field label="End date (optional)" error={errors.end}>
