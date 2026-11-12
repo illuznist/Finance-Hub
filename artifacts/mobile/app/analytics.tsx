@@ -12,6 +12,8 @@ import { useFinance } from "@/context/FinanceContext";
 import { PERIODS, SPENDING_LABELS, buildAnalyticsReport, reportingRange } from "@/finance/analytics";
 import type { AnalyticsReport, DateRange, NetWorthItem, PeriodPreset } from "@/finance/analyticsTypes";
 import { useColors } from "@/hooks/useColors";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatAppNumber } from "@/i18n/localization";
 import { exportAnalyticsReport } from "@/utils/shareAnalyticsReport";
 
 type DrillType = "income" | "expenses" | "movements";
@@ -21,13 +23,14 @@ function signed(v: number, c: string) { return `${v > 0 ? "+" : v < 0 ? "-" : ""
 
 /** Change vs previous. higherIsBetter=false for spending. Percentage is unavailable when previous is zero. */
 function Delta({ now, before, currency, higherIsBetter, colors }: { now: number; before: number; currency: string; higherIsBetter: boolean; colors: Colors }) {
+  const { t } = usePreferences();
   const d = Math.round((now - before) * 100) / 100;
-  if (d === 0) return <Text style={[ui.small, { color: colors.mutedForeground }]}>No change from previous period</Text>;
+  if (d === 0) return <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("No change from previous period")}</Text>;
   const good = higherIsBetter ? d > 0 : d < 0;
-  const p = before !== 0 ? ` (${Math.abs(d / Math.abs(before) * 100).toFixed(1)}%)` : "";
+  const p = before !== 0 ? ` (${formatAppNumber(Math.abs(d / Math.abs(before) * 100), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)` : "";
   return (
     <Text style={[ui.small, ui.num, { color: good ? colors.success : colors.destructive }]}>
-      {d > 0 ? "Up" : "Down"} {money(Math.abs(d), currency)}{p} {good ? "· favorable" : "· unfavorable"}
+      {t(d > 0 ? "Up" : "Down")} {money(Math.abs(d), currency)}{p} {good ? `· ${t("favorable")}` : `· ${t("unfavorable")}`}
     </Text>
   );
 }

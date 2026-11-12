@@ -15,7 +15,9 @@ import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
-import { lockOnResume, lockWhenBackgrounded } from "@/security/appLockPolicy";
+import { lockOnResume, lockWhenBackgrounded, nextAppLockStatus } from "@/security/appLockPolicy";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatNumber } from "@/i18n/localization";
 
 function PasswordRecovery({
   visible,
@@ -27,6 +29,7 @@ function PasswordRecovery({
   onRecover: (password: string) => Promise<boolean>;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,9 +56,9 @@ function PasswordRecovery({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.modalShade}>
         <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.modalTitle, { color: colors.foreground }]}>Reset app lock</Text>
+          <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("Reset app lock")}</Text>
           <Text style={[styles.modalCopy, { color: colors.mutedForeground }]}>
-            Verify your account password to remove the unavailable PIN. Your finance records will stay unchanged.
+            {t("Verify your account password to remove the unavailable PIN. Your finance records will stay unchanged.")}
           </Text>
           <TextInput
             value={password}
@@ -63,7 +66,7 @@ function PasswordRecovery({
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="Account password"
+            placeholder={t("Account password")}
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="done"
             onSubmitEditing={submit}
@@ -72,7 +75,7 @@ function PasswordRecovery({
           {!!message && <Text style={[styles.error, { color: colors.destructive }]}>{message}</Text>}
           <View style={styles.modalActions}>
             <Pressable onPress={onCancel} style={styles.modalAction}>
-              <Text style={{ color: colors.mutedForeground, fontWeight: "600" }}>Cancel</Text>
+              <Text style={{ color: colors.mutedForeground, fontWeight: "600" }}>{t("Cancel")}</Text>
             </Pressable>
             <Pressable
               onPress={submit}
@@ -80,7 +83,7 @@ function PasswordRecovery({
               style={[styles.modalAction, { backgroundColor: colors.primary, borderRadius: 12 }]}
             >
               <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
-                {busy ? "Checking…" : "Verify"}
+                {t(busy ? "Checking…" : "Verify")}
               </Text>
             </Pressable>
           </View>
@@ -108,6 +111,7 @@ function PinEntry({
   privacyWarning: string | null;
 }) {
   const colors = useColors();
+  const { t, language } = usePreferences();
   const [entered, setEntered] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -140,18 +144,18 @@ function PinEntry({
     try {
       const result = await onVerify(next);
       if (result.ok) {
-        if (result.warning) setNotice(result.warning);
+        if (result.warning) setNotice(t(result.warning));
         onUnlock();
       } else if (result.retryAfterMs) {
         setLockedUntil(Date.now() + result.retryAfterMs);
-        setMessage("Too many attempts. Wait before trying again.");
+        setMessage(t("Too many attempts. Wait before trying again."));
       } else if (result.warning) {
-        setNotice(result.warning);
+        setNotice(t(result.warning));
       } else {
-        setMessage("Incorrect PIN. Try again or use account-password recovery.");
+        setMessage(t("Incorrect PIN. Try again or use account-password recovery."));
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "PIN could not be verified. Use account-password recovery.");
+      setMessage(error instanceof Error ? t(error.message) : t("PIN could not be verified. Use account-password recovery."));
     } finally {
       setEntered("");
       setBusy(false);
@@ -163,8 +167,8 @@ function PinEntry({
       <View style={[styles.lockIcon, { backgroundColor: colors.primary + "18" }]}>
         <Feather name="lock" size={25} color={colors.primary} />
       </View>
-      <Text style={[styles.title, { color: colors.foreground }]}>Unlock FinanceApp</Text>
-      <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Enter your 4-digit app PIN</Text>
+      <Text style={[styles.title, { color: colors.foreground }]}>{t("Unlock FinanceApp")}</Text>
+      <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{t("Enter your 4-digit app PIN")}</Text>
 
       <View style={styles.dotsRow}>
         {[0, 1, 2, 3].map(index => (
@@ -180,9 +184,9 @@ function PinEntry({
 
       {!!message && <Text style={[styles.error, { color: colors.destructive }]}>{message}</Text>}
       {remainingSeconds > 0 && (
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Try again in {remainingSeconds}s</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{t("Try again in")} {formatNumber(remainingSeconds, language)}s</Text>
       )}
-      {!!privacyWarning && <Text style={[styles.privacyWarning, { color: colors.mutedForeground }]}>{privacyWarning}</Text>}
+      {!!privacyWarning && <Text style={[styles.privacyWarning, { color: colors.mutedForeground }]}>{t(privacyWarning)}</Text>}
       {!!notice && <Text style={[styles.privacyWarning, { color: colors.mutedForeground }]}>{notice}</Text>}
 
       <View style={styles.numpad}>
@@ -195,7 +199,7 @@ function PinEntry({
           >
             {key === "delete"
               ? <Feather name="delete" size={21} color={colors.foreground} />
-              : <Text style={[styles.numKeyText, { color: colors.foreground }]}>{key}</Text>}
+              : <Text style={[styles.numKeyText, { color: colors.foreground }]}>{formatNumber(Number(key), language)}</Text>}
           </Pressable>
         ))}
       </View>
@@ -204,11 +208,11 @@ function PinEntry({
       {showBiometric && (
         <Pressable onPress={onBiometricPress} style={styles.secondaryAction}>
           <Feather name="unlock" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontWeight: "600" }}>{biometricLabel}</Text>
+          <Text style={{ color: colors.primary, fontWeight: "600" }}>{t(biometricLabel)}</Text>
         </Pressable>
       )}
       <Pressable onPress={onRecovery} style={styles.recoveryAction}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>Forgot PIN? Use account password</Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>{t("Forgot PIN? Use account password")}</Text>
       </Pressable>
     </View>
   );
@@ -229,19 +233,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (auth.isLoading || !finance.isReady) return;
-    if (!pinEnabled) {
-      initialized.current = true;
-      setStatus("open");
-      return;
-    }
-    setStatus("locked");
-    if (!initialized.current) {
-      initialized.current = true;
-      if (biometricAvailable) {
-        void auth.signInWithBiometric().then(success => {
-          if (success) setStatus("open");
-        });
-      }
+    const nextStatus = nextAppLockStatus(initialized.current, pinEnabled);
+    const firstReadyState = !initialized.current;
+    initialized.current = true;
+    if (nextStatus) setStatus(nextStatus);
+    if (!firstReadyState || !pinEnabled) return;
+    if (biometricAvailable) {
+      void auth.signInWithBiometric().then(success => {
+        if (success) setStatus("open");
+      });
     }
   }, [auth.isLoading, auth.signInWithBiometric, biometricAvailable, finance.isReady, pinEnabled]);
 

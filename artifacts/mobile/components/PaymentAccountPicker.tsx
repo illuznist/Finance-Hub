@@ -2,16 +2,18 @@ import React from "react";
 import { ScrollView, Pressable, Text, View } from "react-native";
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
+import { usePreferences } from "@/context/PreferencesContext";
 
 export function PaymentAccountPicker({ value, onChange, currency }: {
   value?: string; onChange: (id: string | undefined) => void; currency?: string;
 }) {
   const finance = useFinance();
   const colors = useColors();
-  const options = [{ id: undefined, name: "Unassigned" }, ...finance.accounts.filter(a => (a.currency ?? finance.currency) === (currency ?? finance.currency))];
+  const { t } = usePreferences();
+  const options = [{ id: undefined, name: t("Unassigned") }, ...finance.accounts.filter(a => (a.currency ?? finance.currency) === (currency ?? finance.currency))];
   return (
     <View style={{ gap: 8, marginBottom: 16 }}>
-      <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.mutedForeground }}>Account</Text>
+      <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.mutedForeground }}>{t("Account")}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         {options.map(a => (
           <Pressable key={a.id ?? "unassigned"} testID={`payment-account-${a.id ?? "unassigned"}`}
@@ -22,7 +24,7 @@ export function PaymentAccountPicker({ value, onChange, currency }: {
           </Pressable>
         ))}
       </ScrollView>
-      {!value && <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>Recorded without changing an account balance.</Text>}
+      {!value && <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>{t("Recorded without changing an account balance.")}</Text>}
     </View>
   );
 }

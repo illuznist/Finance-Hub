@@ -8,7 +8,7 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test finance/__tests__/*.test.cjs security/__tests__/*.test.cjs server/__tests__/*.test.cjs"
+    "test": "node --test finance/__tests__/*.test.cjs i18n/__tests__/*.test.cjs security/__tests__/*.test.cjs server/__tests__/*.test.cjs"
   },
   "devDependencies": {
     "@babel/core": "^7.29.13",

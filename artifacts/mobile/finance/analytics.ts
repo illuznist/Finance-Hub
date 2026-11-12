@@ -1,6 +1,7 @@
 import type { FinanceState } from "../context/FinanceContext";
 import { addDays, addMonths, monthBounds, parseLocal, shiftMonth } from "./calendar";
 import { localDate, minorUnits, validLocalDate, type Transaction } from "./ledger";
+import { formatAppDate } from "../i18n/localization";
 import { analyticsCurrencies, currentNetWorth } from "./netWorth";
 import type { AnalyticsDrill, AnalyticsQuery, AnalyticsReport, CashFlowPoint, DateRange, FlowTotals, PeriodPreset, ReportRange, SpendingEntry, SpendingKind } from "./analyticsTypes";
 export type * from "./analyticsTypes";
@@ -119,7 +120,7 @@ export function buildAnalyticsReport(state: FinanceState, q: AnalyticsQuery, pre
     while (month <= q.to.slice(0, 7)) {
       const bounds = monthBounds(month), m = monthly.get(month);
       if (month <= today.slice(0, 7) || m) {
-        points.push({ key: month, label: parseLocal(`${month}-01`).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+        points.push({ key: month, label: formatAppDate(parseLocal(`${month}-01`), { month: "short", year: "2-digit" }),
           from: q.from > bounds.from ? q.from : bounds.from, to: q.to < bounds.to ? q.to : bounds.to,
           partial: bounds.from < historyStart || bounds.from < q.from || bounds.to > q.to || bounds.to >= today,
           ...totals(m?.incoming ?? 0, m?.outgoing ?? 0) });

@@ -30,6 +30,7 @@ import { SkeletonExpenseCard } from "@/components/Skeleton";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { formatAppCurrency, parseLocalizedNumberInput } from "@/i18n/localization";
 
 const TAB_BAR_HEIGHT = 90;
 
@@ -50,7 +51,7 @@ const ICON_OPTIONS = [
 ];
 
 function fmt(amount: number, currency: string): string {
-  return `${currency} ${amount.toLocaleString("en-US")}`;
+  return formatAppCurrency(amount, currency, { maximumFractionDigits: 0 });
 }
 
 function CategoryFilter({
@@ -139,8 +140,8 @@ function AddExpenseModal({
     const updates = {
       name: name.trim(),
       category: cat,
-      amount: parseFloat(amount) || 0,
-      dueDate: Math.max(1, Math.min(31, parseInt(dueDate) || 1)),
+      amount: parseLocalizedNumberInput(amount) ?? 0,
+      dueDate: Math.max(1, Math.min(31, Math.floor(parseLocalizedNumberInput(dueDate) ?? 1))),
       iconName: icon,
       color: CATEGORY_COLORS[cat] || editing?.color || "#8B5CF6",
     };
@@ -687,7 +688,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: 80,
     borderRadius: 16,
-    marginLeft: 8,
+    marginStart: 8,
     gap: 4,
   },
   swipeDeleteLabel: {

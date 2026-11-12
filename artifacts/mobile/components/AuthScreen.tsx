@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { usePreferences } from "@/context/PreferencesContext";
 
 const BG_TOP = "#0B1529";
 const BG_BOTTOM = "#070A12";
@@ -52,13 +53,14 @@ function Field({
   autoCapitalize?: "none" | "words";
   autoComplete?: string;
 }) {
+  const { t } = usePreferences();
   return (
     <View style={fieldStyles.wrap}>
       <Feather name={icon as any} size={17} color={MUTED} style={fieldStyles.icon} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={t(placeholder)}
         placeholderTextColor={MUTED}
         secureTextEntry={secure}
         keyboardType={keyboardType ?? "default"}
@@ -85,7 +87,7 @@ const fieldStyles = StyleSheet.create({
     height: 54,
     marginBottom: 12,
   },
-  icon: { marginRight: 10 },
+  icon: { marginEnd: 10 },
   input: {
     flex: 1,
     color: TEXT,
@@ -102,6 +104,7 @@ interface Props {
 export default function AuthScreen({ onComplete }: Props) {
   const insets = useSafeAreaInsets();
   const auth = useAuth();
+  const { t, isRTL } = usePreferences();
 
   const [mode, setMode] = useState<"login" | "signup">(auth.hasAccount ? "login" : "signup");
   const [name, setName] = useState("");
@@ -130,7 +133,7 @@ export default function AuthScreen({ onComplete }: Props) {
   }
 
   function setErr(msg: string) {
-    setError(msg);
+    setError(t(msg));
     shake();
   }
 
@@ -203,12 +206,12 @@ export default function AuthScreen({ onComplete }: Props) {
 
             {/* Headline */}
             <Text style={styles.headline}>
-              {mode === "login" ? "Welcome back" : "Create account"}
+              {t(mode === "login" ? "Welcome back" : "Create account")}
             </Text>
             <Text style={styles.sub}>
               {mode === "login"
-                ? "Sign in to access your financial data"
-                : "Your records stay on this device"}
+                ? t("Sign in to access your financial data")
+                : t("Your records stay on this device")}
             </Text>
 
             {/* Mode toggle */}
@@ -218,7 +221,7 @@ export default function AuthScreen({ onComplete }: Props) {
                 style={[styles.modeTab, mode === "login" && styles.modeTabActive]}
               >
                 <Text style={[styles.modeTabText, mode === "login" && styles.modeTabTextActive]}>
-                  Sign In
+                  {t("Sign In")}
                 </Text>
               </Pressable>
               <Pressable
@@ -226,7 +229,7 @@ export default function AuthScreen({ onComplete }: Props) {
                 style={[styles.modeTab, mode === "signup" && styles.modeTabActive]}
               >
                 <Text style={[styles.modeTabText, mode === "signup" && styles.modeTabTextActive]}>
-                  Create Account
+                  {t("Create Account")}
                 </Text>
               </Pressable>
             </View>
@@ -290,10 +293,10 @@ export default function AuthScreen({ onComplete }: Props) {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <Text style={styles.primaryBtnText}>
-                      {mode === "login" ? "Sign In" : "Create Account"}
+                      <Text style={styles.primaryBtnText}>
+                       {t(mode === "login" ? "Sign In" : "Create Account")}
                     </Text>
-                    <Feather name="arrow-right" size={18} color="#fff" />
+                    <Feather name={isRTL ? "arrow-left" : "arrow-right"} size={18} color="#fff" />
                   </>
                 )}
               </LinearGradient>
@@ -304,7 +307,7 @@ export default function AuthScreen({ onComplete }: Props) {
               <Pressable onPress={handleBiometric} disabled={loading} style={styles.bioBtn}>
                 <View style={styles.bioBtnInner}>
                   <Feather name={biometricIcon as any} size={20} color={SUCCESS} />
-                  <Text style={styles.bioBtnText}>Sign in with {biometricLabel}</Text>
+                  <Text style={styles.bioBtnText}>{t("Sign in with")} {t(biometricLabel)}</Text>
                 </View>
               </Pressable>
             )}
@@ -314,8 +317,8 @@ export default function AuthScreen({ onComplete }: Props) {
               <Feather name="shield" size={13} color={MUTED} />
               <Text style={styles.securityText}>
                 {mode === "signup"
-                  ? "No cloud sync. Backups export only when you choose."
-                  : "Sign in to access the finance records stored on this device."}
+                  ? t("No cloud sync. Backups export only when you choose.")
+                  : t("Sign in to access the finance records stored on this device.")}
               </Text>
             </View>
           </Animated.View>

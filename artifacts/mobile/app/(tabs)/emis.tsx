@@ -28,6 +28,7 @@ import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { newId } from "@/finance/ledger";
 import { financialAlert as Alert } from "@/utils/financialAlert";
+import { formatAppCurrency, formatAppDate, parseLocalizedNumberInput } from "@/i18n/localization";
 
 const TAB_BAR_HEIGHT = 90;
 const DONUT_SIZE = 106;
@@ -43,7 +44,7 @@ const CATEGORIES = [
 ] as const;
 
 function fmt(amount: number, currency: string): string {
-  return `${currency} ${Math.max(0, amount).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  return formatAppCurrency(Math.max(0, amount), currency, { maximumFractionDigits: 2 });
 }
 
 function todayString(): string {
@@ -60,12 +61,7 @@ function isValidDate(value: string): boolean {
 
 function displayDate(value?: string): string {
   if (!value || !isValidDate(value)) return "Not set";
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatAppDate(value, { day: "numeric", month: "short", year: "numeric" });
 }
 
 function emiMonthly(emi: EMI): number {
@@ -379,11 +375,11 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
   const selectableAccounts = finance.accounts.filter((account) => account.type === "bank" || account.type === "cash");
 
   function submit() {
-    const amount = Number(financedAmount);
-    const monthly = Number(monthlyAmount);
-    const months = Number(duration);
-    const day = Number(dueDay);
-    const balloon = hasBalloon ? Number(balloonAmount) : 0;
+    const amount = parseLocalizedNumberInput(financedAmount) ?? NaN;
+    const monthly = parseLocalizedNumberInput(monthlyAmount) ?? NaN;
+    const months = parseLocalizedNumberInput(duration) ?? NaN;
+    const day = parseLocalizedNumberInput(dueDay) ?? NaN;
+    const balloon = hasBalloon ? parseLocalizedNumberInput(balloonAmount) ?? NaN : 0;
     if (!name.trim()) return setError("Enter a name for this plan.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Financed amount must be greater than zero.");
     if (!Number.isFinite(monthly) || monthly <= 0) return setError("Monthly EMI must be greater than zero.");
@@ -551,7 +547,7 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   const [error, setError] = useState("");
 
   function submit() {
-    const parsedAmount = Number(amount);
+    const parsedAmount = parseLocalizedNumberInput(amount) ?? NaN;
     if (submitted.current) return;
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return setError("Enter a payment amount greater than zero.");
     if (!isValidDate(date)) return setError("Enter a valid date in YYYY-MM-DD format.");
@@ -983,7 +979,7 @@ const styles = StyleSheet.create({
   metric: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 46 },
   metricIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   metricLabel: { flex: 1, fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
-  metricValue: { fontSize: TYPOGRAPHY.cardTitle, flexShrink: 1, textAlign: "right", fontFamily: "Inter_600SemiBold", marginTop: 0, fontVariant: ["tabular-nums"] },
+  metricValue: { fontSize: TYPOGRAPHY.cardTitle, flexShrink: 1, textAlign: "auto", fontFamily: "Inter_600SemiBold", marginTop: 0, fontVariant: ["tabular-nums"] },
   listHeading: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold", marginTop: 4 },
   emiCard: { borderRadius: 19, padding: 15, gap: 12 },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
@@ -999,7 +995,7 @@ const styles = StyleSheet.create({
   emiStats: { flex: 1, gap: 7 },
   statRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 6 },
   statLabel: { flex: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
-  statValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right", fontVariant: ["tabular-nums"] },
+  statValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "auto", fontVariant: ["tabular-nums"] },
   divider: { height: 1 },
   progressTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   progressFill: { height: 6, borderRadius: 3 },
@@ -1007,7 +1003,7 @@ const styles = StyleSheet.create({
   badgeWrap: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
   badgeText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
-  nextDate: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", textAlign: "right" },
+  nextDate: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", textAlign: "auto" },
   accountCaption: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: -6 },
   quickPay: { minHeight: 40, borderRadius: 11, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   quickPayText: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_600SemiBold" },
@@ -1057,7 +1053,7 @@ const styles = StyleSheet.create({
   infoCard: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 9 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", gap: 10, paddingVertical: 6 },
   infoLabel: { flex: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
-  infoValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  infoValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "auto" },
   distinctHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
   balloonIcon: { width: 27, height: 27, borderRadius: 9, alignItems: "center", justifyContent: "center", marginTop: 6 },
   detailAction: { flex: 0, marginTop: 6 },

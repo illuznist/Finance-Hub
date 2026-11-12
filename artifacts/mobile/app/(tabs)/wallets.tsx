@@ -32,9 +32,10 @@ import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { localDate, validLocalDate, newId } from "@/finance/ledger";
 import { financialAlert as Alert } from "@/utils/financialAlert";
 import { router } from "expo-router";
+import { formatAppCurrency, parseLocalizedNumberInput } from "@/i18n/localization";
 
 function fmt(amount: number, currency: string): string {
-  return `${currency} ${amount.toLocaleString("en-US")}`;
+  return formatAppCurrency(amount, currency, { maximumFractionDigits: 0 });
 }
 
 const ACCOUNT_TYPES = ["bank", "cash", "savings"] as const;
@@ -168,8 +169,8 @@ function SavingsGoalRow({
 
   function submitAdd() {
     if (contributionSubmitted.current) return;
-    const n = parseFloat(addAmt);
-    if (n > 0 && validLocalDate(date)) {
+    const n = parseLocalizedNumberInput(addAmt);
+    if (n !== null && n > 0 && validLocalDate(date)) {
       contributionSubmitted.current = true;
       if (!onAddFunds(n, accountId, date, contributionId.current)) { contributionSubmitted.current = false; return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -257,9 +258,10 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
   useEffect(() => { if (visible) submitted.current = false; }, [visible]);
 
   function submit() {
-    if (submitted.current || !name.trim() || !Number.isFinite(Number(balance))) return;
+    const parsedBalance = parseLocalizedNumberInput(balance);
+    if (submitted.current || !name.trim() || parsedBalance === null) return;
     submitted.current = true;
-    finance.addAccount({ name: name.trim(), balance: parseFloat(balance) || 0, type, color: PALETTE[colorIdx] });
+    finance.addAccount({ name: name.trim(), balance: parsedBalance, type, color: PALETTE[colorIdx] });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setName(""); setBalance("0"); setType("bank"); setColorIdx(0);
     onClose();
@@ -326,13 +328,14 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
 
   function submit() {
     if (submitted.current) return;
-    if (!name.trim() || !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 ||
+    const parsedAmount = parseLocalizedNumberInput(amount);
+    if (!name.trim() || !amount.trim() || parsedAmount === null || parsedAmount <= 0 ||
       (kind === "received" && !validLocalDate(date)) || (kind === "expected" && !!expectedDate && !validLocalDate(expectedDate))) {
       setError("Enter a name, positive amount and valid date."); return;
     }
     submitted.current = true;
     try {
-      const input = { name: name.trim(), amount: Number(amount), type, kind, category: category.trim() || type, accountId,
+      const input = { name: name.trim(), amount: parsedAmount, type, kind, category: category.trim() || type, accountId,
         date: kind === "received" ? date : expectedDate.trim() || undefined, currency,
         color: type === "salary" ? "#0D9488" : type === "freelance" ? "#10B981" : "#F59E0B" };
       if (editing) finance.updateIncome(editing.id, input);
@@ -409,8 +412,8 @@ function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => v
     if (!name.trim() || !target.trim()) return;
     finance.addSavingsGoal({
       name: name.trim(),
-      targetAmount: parseFloat(target) || 0,
-      savedAmount: parseFloat(saved) || 0,
+      targetAmount: parseLocalizedNumberInput(target) ?? 0,
+      savedAmount: parseLocalizedNumberInput(saved) ?? 0,
       color: PALETTE[colorIdx],
       iconName: GOAL_ICONS[iconIdx],
       deadline: deadline.trim() || undefined,
@@ -538,7 +541,7 @@ export default function WalletsScreen() {
             <Feather name="plus" size={16} color={colors.primaryForeground} />
           </Pressable>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingEnd: 4 }}>
           {finance.accounts.map((acc) => (
             <AccountCard key={acc.id} account={acc} currency={acc.currency ?? finance.currency}
               onDelete={() => {

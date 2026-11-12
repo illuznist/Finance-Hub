@@ -31,6 +31,7 @@ import {
 import { FinanceProvider, useFinance } from "@/context/FinanceContext";
 import { FinanceStorageGate } from "@/components/FinanceStorageGate";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { PreferencesProvider } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
 import { ToastProvider, useToast } from "@/context/ToastContext";
 import {
@@ -204,6 +205,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
+          <PreferencesProvider>
           <AuthProvider>
             <FinanceProvider>
               <GestureHandlerRootView>
@@ -223,6 +225,7 @@ export default function RootLayout() {
               </GestureHandlerRootView>
             </FinanceProvider>
           </AuthProvider>
+          </PreferencesProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </ErrorBoundary>

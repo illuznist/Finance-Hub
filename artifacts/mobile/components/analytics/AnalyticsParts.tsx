@@ -8,23 +8,26 @@ import { money, shortDate, ui, type Colors } from "@/components/PlanningUI";
 import { TYPOGRAPHY } from "@/constants/typography";
 import type { CashFlowPoint, NetWorthItem, NetWorthSnapshot } from "@/finance/analyticsTypes";
 import { useColors } from "@/hooks/useColors";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatAppNumber } from "@/i18n/localization";
 
 export const tap = () => { if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {}); };
 
 export function pct(v: number | null, digits = 1): string {
-  return v === null || !Number.isFinite(v) ? "Unavailable" : `${v.toFixed(digits)}%`;
+  return v === null || !Number.isFinite(v) ? "Unavailable" : `${formatAppNumber(v, { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 }
 
 /** Card with an eyebrow label, title and optional expandable explanation. */
 export function Section({ eyebrow, title, children, note, testID }: { eyebrow: string; title: string; children: React.ReactNode; note?: React.ReactNode; testID?: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const [open, setOpen] = useState(false);
   return (
     <View testID={testID} style={[ui.card, s.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={ui.between}>
         <View style={{ flex: 1 }}>
-          <Text style={[s.eyebrow, { color: colors.primary }]}>{eyebrow}</Text>
-          <Text style={[ui.cardTitle, { color: colors.foreground, marginTop: 2 }]}>{title}</Text>
+          <Text style={[s.eyebrow, { color: colors.primary }]}>{t(eyebrow)}</Text>
+          <Text style={[ui.cardTitle, { color: colors.foreground, marginTop: 2 }]}>{t(title)}</Text>
         </View>
         {note ? (
           <Pressable accessibilityRole="button" accessibilityLabel={open ? "Hide explanation" : "How this is calculated"} hitSlop={8}
@@ -51,6 +54,7 @@ export function DrillRow({ label, sub, value, valueColor, onPress, testID, accen
   label: string; sub?: string; value: string; valueColor?: string; onPress?: () => void; testID?: string; accent?: string; share?: number;
 }) {
   const colors = useColors();
+  const { isRTL } = usePreferences();
   return (
     <Pressable testID={testID} disabled={!onPress} accessibilityRole={onPress ? "button" : "text"}
       accessibilityLabel={`${label}, ${value}${sub ? `, ${sub}` : ""}`}
@@ -63,7 +67,7 @@ export function DrillRow({ label, sub, value, valueColor, onPress, testID, accen
           {sub ? <Text numberOfLines={1} style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>{sub}</Text> : null}
         </View>
         <Text style={[ui.bodyStrong, ui.num, { color: valueColor ?? colors.foreground }]}>{value}</Text>
-        {onPress ? <Feather name="chevron-right" size={16} color={colors.mutedForeground} /> : null}
+        {onPress ? <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} /> : null}
       </View>
       {share !== undefined ? (
         <View style={[ui.track, { backgroundColor: colors.muted, marginTop: 8, height: 4 }]}>

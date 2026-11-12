@@ -28,6 +28,7 @@ import {
 } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
+import { formatAppCurrency, formatAppDate, parseLocalizedNumberInput } from "@/i18n/localization";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { newId } from "@/finance/ledger";
@@ -82,12 +83,11 @@ function validDate(value: string): boolean {
 
 function formatDate(value?: string): string {
   if (!value || !validDate(value)) return "Not set";
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return formatAppDate(value, { day: "numeric", month: "short", year: "numeric" });
 }
 
 function fmt(amount: number, currency: string): string {
-  return `${currency} ${Math.max(0, amount).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  return formatAppCurrency(Math.max(0, amount), currency, { maximumFractionDigits: 2 });
 }
 
 function idForPayment(): string {
@@ -259,11 +259,11 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
 
   function submit() {
     if (formSubmitted.current) return;
-    const parsedPrincipal = Number(principal);
-    const parsedTotal = totalRepayment.trim() ? Number(totalRepayment) : undefined;
-    const parsedRate = interestRate.trim() ? Number(interestRate) : undefined;
-    const parsedPlanned = plannedPayment.trim() ? Number(plannedPayment) : undefined;
-    const initial = initialAmount.trim() ? Number(initialAmount) : 0;
+    const parsedPrincipal = parseLocalizedNumberInput(principal) ?? NaN;
+    const parsedTotal = totalRepayment.trim() ? parseLocalizedNumberInput(totalRepayment) ?? NaN : undefined;
+    const parsedRate = interestRate.trim() ? parseLocalizedNumberInput(interestRate) ?? NaN : undefined;
+    const parsedPlanned = plannedPayment.trim() ? parseLocalizedNumberInput(plannedPayment) ?? NaN : undefined;
+    const initial = initialAmount.trim() ? parseLocalizedNumberInput(initialAmount) ?? NaN : 0;
     if (!name.trim()) return setError("Enter a name for the loan.");
     if (!counterparty.trim()) return setError("Enter the person or institution involved.");
     if (!Number.isFinite(parsedPrincipal) || parsedPrincipal <= 0) return setError("Principal must be greater than zero.");
@@ -409,7 +409,7 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
                   placeholder="0"
                   numeric
                 />
-                {Number(initialAmount) > 0 && (
+                {(parseLocalizedNumberInput(initialAmount) ?? 0) > 0 && (
                   <LoanField label="Initial payment date (YYYY-MM-DD)" value={initialDate} onChangeText={setInitialDate} placeholder={todayString()} />
                 )}
               </>
@@ -448,7 +448,7 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
 
   function submit() {
     if (submitted.current) return;
-    const parsedAmount = Number(amount);
+    const parsedAmount = parseLocalizedNumberInput(amount) ?? NaN;
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return setError("Amount must be greater than zero.");
     if (!validDate(date)) return setError("Enter a valid date in YYYY-MM-DD format.");
     const success = editing
@@ -830,12 +830,12 @@ const styles = StyleSheet.create({
   summaryCard: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 },
   summaryDot: { width: 7, height: 7, borderRadius: 4 },
   summaryLabel: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
-  summaryValue: { fontSize: TYPOGRAPHY.cardTitle, flexShrink: 1, textAlign: "right", fontFamily: "Inter_600SemiBold", marginTop: 0, fontVariant: ["tabular-nums"] },
+  summaryValue: { fontSize: TYPOGRAPHY.cardTitle, flexShrink: 1, textAlign: "auto", fontFamily: "Inter_600SemiBold", marginTop: 0, fontVariant: ["tabular-nums"] },
   listHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
   sectionHeading: { fontSize: TYPOGRAPHY.sectionHeading, fontFamily: "Inter_700Bold" },
   addInline: { flexDirection: "row", alignItems: "center", gap: 4, padding: 5 },
   addInlineText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_600SemiBold" },
-  filterRow: { flexDirection: "row", gap: 7, paddingRight: 10 },
+  filterRow: { flexDirection: "row", gap: 7, paddingEnd: 10 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1 },
   filterText: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold" },
   loanList: { gap: 10 },
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
   infoCard: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", gap: 10, paddingVertical: 6 },
   infoLabel: { flex: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular" },
-  infoValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  infoValue: { flexShrink: 1, fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", textAlign: "auto" },
   noteText: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", paddingBottom: 5 },
   historyHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 2 },
   historyCount: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium" },

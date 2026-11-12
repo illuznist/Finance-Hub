@@ -14,6 +14,8 @@ import { addDays, monthBounds } from "@/finance/calendar";
 import { localDate, newId, validLocalDate } from "@/finance/ledger";
 import type { UpcomingPayment, UpcomingType } from "@/finance/planningTypes";
 import { useColors } from "@/hooks/useColors";
+import { formatAppDate, formatAppNumber } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 type TypeFilter = "all" | UpcomingType;
 type RangeFilter = "7" | "30" | "month" | "custom";
@@ -41,6 +43,7 @@ export default function UpcomingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const finance = usePlanning();
+  const { t } = usePreferences();
   const isWeb = Platform.OS === "web";
   const topInset = isWeb ? 67 : insets.top;
   const bottomInset = isWeb ? 34 : insets.bottom;
@@ -59,7 +62,7 @@ export default function UpcomingScreen() {
     if (!validLocalDate(from) || !validLocalDate(to)) return { error: "Enter dates as YYYY-MM-DD." };
     if (from > to) return { error: "Start date must be on or before end date." };
     return { from, to };
-  }, [range, from, to, today]);
+  }, [range, from, to, today, t]);
 
   const { items, failed } = useMemo(() => {
     if ("error" in bounds) return { items: [] as UpcomingPayment[], failed: false };
@@ -73,7 +76,7 @@ export default function UpcomingScreen() {
     } catch { return { items: [] as UpcomingPayment[], failed: true }; }
   }, [finance, bounds, showOverdue, type]);
 
-  const acctName = (id?: string) => (id ? finance.accounts.find(a => a.id === id)?.name ?? "Removed account" : "No account");
+  const acctName = (id?: string) => (id ? finance.accounts.find(a => a.id === id)?.name ?? t("Removed account") : t("No account"));
   const overdue = items.filter(i => i.status === "overdue");
   const open = items.filter(i => i.status !== "overdue");
 
@@ -85,9 +88,9 @@ export default function UpcomingScreen() {
         <Pressable testID={`upcoming-${i.id}`} accessibilityRole="button" accessibilityLabel={`${i.name}, ${shortDate(i.dueDate)}, ${s.label}, ${money(i.amount, i.currency)}`}
           onPress={() => setSelected(i)} style={({ pressed }) => [ui.row, { opacity: pressed ? 0.7 : 1 }]}>
           <View style={{ width: 44, alignItems: "center" }}>
-            <Text style={[ui.small, { color: colors.mutedForeground }]}>{new Date(Number(i.dueDate.slice(0, 4)), Number(i.dueDate.slice(5, 7)) - 1, 1).toLocaleDateString(undefined, { month: "short" })}</Text>
-            <Text style={[ui.cardTitle, ui.num, { color: colors.foreground }]}>{i.dueDate.slice(8)}</Text>
-            {i.dueDate.slice(0, 4) !== today.slice(0, 4) ? <Text style={[ui.small, { color: colors.mutedForeground }]}>{i.dueDate.slice(0, 4)}</Text> : null}
+            <Text style={[ui.small, { color: colors.mutedForeground }]}>{formatAppDate(`${i.dueDate.slice(0, 7)}-01`, { month: "short" })}</Text>
+            <Text style={[ui.cardTitle, ui.num, { color: colors.foreground }]}>{formatAppNumber(Number(i.dueDate.slice(8)))}</Text>
+            {i.dueDate.slice(0, 4) !== today.slice(0, 4) ? <Text style={[ui.small, { color: colors.mutedForeground }]}>{formatAppNumber(Number(i.dueDate.slice(0, 4)))}</Text> : null}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[ui.bodyStrong, { color: colors.foreground }]} numberOfLines={1}>{i.name}</Text>
@@ -108,15 +111,15 @@ export default function UpcomingScreen() {
         leading={<HeaderAction icon="arrow-left" label="Go back" variant="neutral" testID="back-button" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
         trailing={<HeaderAction icon="repeat" label="Manage recurring expenses" variant="neutral" testID="open-recurring" onPress={() => router.push("/recurring")} />} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} keyboardShouldPersistTaps="handled">
-        <Chips items={TYPES} value={type} onChange={setType} prefix="upcoming-type" />
-        <Chips items={RANGES} value={range} onChange={setRange} prefix="upcoming-range" />
+          <Chips items={TYPES.map(item => ({ ...item, label: t(item.label) }))} value={type} onChange={setType} prefix="upcoming-type" />
+          <Chips items={RANGES.map(item => ({ ...item, label: t(item.label) }))} value={range} onChange={setRange} prefix="upcoming-range" />
         {range === "custom" ? (
           <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1 }}><Field label="From"><Input testID="upcoming-from" value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" maxLength={10} autoCapitalize="none" /></Field></View>
             <View style={{ flex: 1 }}><Field label="To"><Input testID="upcoming-to" value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" maxLength={10} autoCapitalize="none" /></Field></View>
           </View>
         ) : null}
-        {"error" in bounds ? <Text style={[ui.small, { color: colors.destructive, marginTop: 8 }]}>{bounds.error}</Text> : null}
+        {"error" in bounds ? <Text style={[ui.small, { color: colors.destructive, marginTop: 8 }]}>{t(bounds.error)}</Text> : null}
         <ToggleRow label="Include overdue" value={showOverdue} onChange={setShowOverdue} testID="toggle-overdue" />
 
         {failed ? (
@@ -130,11 +133,11 @@ export default function UpcomingScreen() {
         ) : (
           <>
             {overdue.length ? <>
-              <Text style={[ui.section, { color: colors.destructive }]}>Overdue · {money(overdue.reduce((s, i) => s + i.amount, 0), finance.currency)}</Text>
+              <Text style={[ui.section, { color: colors.destructive }]}>{t("Overdue")} · {money(overdue.reduce((s, i) => s + i.amount, 0), finance.currency)}</Text>
               {overdue.map(renderRow)}
             </> : null}
-            <Text style={[ui.section, { color: colors.foreground }]}>Scheduled · {open.length}</Text>
-            {open.length ? open.map(renderRow) : <Text style={[ui.small, { color: colors.mutedForeground }]}>Nothing else in this range.</Text>}
+            <Text style={[ui.section, { color: colors.foreground }]}>{t("Scheduled")} · {formatAppNumber(open.length)}</Text>
+            {open.length ? open.map(renderRow) : <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Nothing else in this range.")}</Text>}
           </>
         )}
       </ScrollView>
@@ -145,6 +148,7 @@ export default function UpcomingScreen() {
 
 function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPayment; topInset: number; bottomInset: number; onClose: () => void }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const router = useRouter();
   const finance = usePlanning();
   const lock = useRef(false);
@@ -180,23 +184,23 @@ function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPaym
       else { lock.current = false; setError("This occurrence could not be skipped."); }
     };
     const msg = pause ? "Skip this occurrence and pause the schedule. No payment is recorded." : "Skip this occurrence and move to the next due date. No payment is recorded.";
-    if (Platform.OS === "web") { if (typeof window !== "undefined" && window.confirm(msg)) run(); }
-    else Alert.alert(pause ? "Skip and pause?" : "Skip this one?", msg, [{ text: "Cancel", style: "cancel" }, { text: pause ? "Skip and pause" : "Skip", onPress: run }]);
+    if (Platform.OS === "web") { if (typeof window !== "undefined" && window.confirm(t(msg))) run(); }
+    else Alert.alert(t(pause ? "Skip and pause?" : "Skip this one?"), t(msg), [{ text: t("Cancel"), style: "cancel" }, { text: t(pause ? "Skip and pause" : "Skip"), onPress: run }]);
   };
 
   return (
-    <FormModal title={closed ? item.name : "Confirm payment"} topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="pay-sheet">
+        <FormModal title={closed ? item.name : "Confirm payment"} translateTitle={!closed} topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="pay-sheet">
       <View style={ui.between}>
         <Text style={[ui.cardTitle, { color: colors.foreground, flex: 1 }]}>{item.name}</Text>
-        <View style={[ui.pill, { backgroundColor: s.bg }]}><Text style={[ui.pillText, { color: s.color }]}>{s.label}</Text></View>
+        <View style={[ui.pill, { backgroundColor: s.bg }]}><Text style={[ui.pillText, { color: s.color }]}>{t(s.label)}</Text></View>
       </View>
       <Text style={[ui.hero, { color: colors.foreground, marginTop: 6 }]}>{money(item.amount, item.currency)}</Text>
-      <Text style={[ui.small, { color: colors.mutedForeground }]}>{TYPE_LABEL[item.type]} · due {shortDate(item.dueDate)}</Text>
+      <Text style={[ui.small, { color: colors.mutedForeground }]}>{t(TYPE_LABEL[item.type])} · {t("due")} {shortDate(item.dueDate)}</Text>
 
       {closed ? (
         <>
           <Text style={[ui.body, { color: colors.mutedForeground, marginTop: 18 }]}>
-            {item.status === "paid" ? "This payment is confirmed and recorded in Transactions." : "This occurrence was skipped. No payment was recorded."}
+            {t(item.status === "paid" ? "This payment is confirmed and recorded in Transactions." : "This occurrence was skipped. No payment was recorded.")}
           </Text>
           {item.status === "paid" ? (
             <Button label="View in Transactions" tone="neutral" style={{ marginTop: 16 }} testID="pay-view-transactions" onPress={() => { onClose(); router.push("/transactions"); }} />
@@ -204,7 +208,7 @@ function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPaym
         </>
       ) : (
         <>
-          <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 14 }]}>Confirming creates one transaction and updates the selected account balance.</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 14 }]}>{t("Confirming creates one transaction and updates the selected account balance.")}</Text>
           <View style={{ marginTop: 16 }}><PaymentAccountPicker value={accountId} onChange={setAccountId} currency={item.currency} /></View>
           <Field label="Payment date"><Input testID="pay-date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" maxLength={10} autoCapitalize="none" /></Field>
           {partial ? (
@@ -212,8 +216,8 @@ function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPaym
               <Input testID="pay-amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
             </Field>
           ) : null}
-          {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 12 }]} testID="pay-error">{error}</Text> : null}
-          <Button label={busy ? "Recording..." : `Confirm ${partial ? "payment" : money(item.amount, item.currency)}`} onPress={pay} disabled={busy} testID="pay-confirm" style={{ marginTop: 20 }} />
+          {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 12 }]} testID="pay-error">{t(error)}</Text> : null}
+          <Button label={busy ? "Recording..." : t("Confirm payment")} onPress={pay} disabled={busy} testID="pay-confirm" style={{ marginTop: 20 }} />
           {item.type === "expense" && item.recurringId ? (
             <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
               <Button label="Skip" tone="neutral" style={{ flex: 1 }} onPress={() => skip(false)} testID="pay-skip" />
@@ -223,7 +227,7 @@ function PaySheet({ item, topInset, bottomInset, onClose }: { item: UpcomingPaym
           {item.recurringId ? (
             <Pressable testID="pay-open-recurring" onPress={() => { onClose(); router.push(`/recurring?id=${item.recurringId}`); }} style={{ flexDirection: "row", gap: 6, alignItems: "center", marginTop: 16, alignSelf: "center" }}>
               <Feather name="repeat" size={14} color={colors.primary} />
-              <Text style={[ui.link, { color: colors.primary }]}>Edit schedule</Text>
+              <Text style={[ui.link, { color: colors.primary }]}>{t("Edit schedule")}</Text>
             </Pressable>
           ) : null}
         </>

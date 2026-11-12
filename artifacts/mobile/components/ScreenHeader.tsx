@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useColors } from "@/hooks/useColors";
+import { usePreferences } from "@/context/PreferencesContext";
 
 type HeaderActionProps = {
   icon?: React.ComponentProps<typeof Feather>["name"];
@@ -21,12 +22,18 @@ export function HeaderAction({
   variant = "primary",
 }: HeaderActionProps) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const primary = variant === "primary";
+  const resolvedIcon = isRTL && icon === "arrow-left"
+    ? "arrow-right"
+    : isRTL && icon === "arrow-right"
+      ? "arrow-left"
+      : icon;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={t(label)}
       testID={testID}
       onPress={onPress}
       hitSlop={4}
@@ -39,7 +46,7 @@ export function HeaderAction({
       ]}
     >
       <Feather
-        name={icon}
+        name={resolvedIcon}
         size={20}
         color={primary ? colors.primaryForeground : colors.primary}
       />
@@ -55,6 +62,7 @@ type ScreenHeaderProps = {
   leading?: ReactNode;
   trailing?: ReactNode;
   centered?: boolean;
+  translateTitle?: boolean;
 };
 
 export function ScreenHeader({
@@ -65,7 +73,9 @@ export function ScreenHeader({
   leading,
   trailing,
   centered = false,
+  translateTitle = true,
 }: ScreenHeaderProps) {
+  const { t } = usePreferences();
   return (
     <View
       style={[
@@ -91,14 +101,14 @@ export function ScreenHeader({
               centered && styles.centeredTitle,
             ]}
           >
-            {title}
+            {translateTitle ? t(title) : title}
           </Text>
           {subtitle ? (
             <Text
               numberOfLines={1}
               style={[styles.subtitle, { color: colors.mutedForeground }]}
             >
-              {subtitle}
+              {t(subtitle)}
             </Text>
           ) : null}
         </View>

@@ -20,6 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SUPPORTED_CURRENCIES, useFinance } from "@/context/FinanceContext";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
 
 export const ONBOARDING_KEY = "@finance_onboarded_v1";
 
@@ -63,6 +65,7 @@ interface Props {
 export default function OnboardingScreen({ onComplete }: Props) {
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const { t, isRTL } = usePreferences();
 
   const scrollRef = useRef<ScrollViewInstance | null>(null);
   const dotAnim = useRef(new Animated.Value(0)).current;
@@ -87,7 +90,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   async function finish() {
     const finalName = name.trim();
-    const parsedBudget = Number(budget);
+    const parsedBudget = parseLocalizedNumberInput(budget) ?? NaN;
     const finalBudget = Number.isFinite(parsedBudget) && parsedBudget >= 0 ? parsedBudget : 0;
 
     finance.setUserName(finalName);
@@ -122,7 +125,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
           </View>
           {page < 2 && (
             <Pressable onPress={skip} style={styles.skipBtn}>
-              <Text style={styles.skipText}>Skip</Text>
+              <Text style={styles.skipText}>{t("Skip")}</Text>
             </Pressable>
           )}
         </View>
@@ -160,9 +163,9 @@ export default function OnboardingScreen({ onComplete }: Props) {
               </View>
             </View>
 
-            <Text style={styles.headline}>Your finances,{"\n"}beautifully organized</Text>
+            <Text style={styles.headline}>{t("Your finances,")}{"\n"}{t("beautifully organized")}</Text>
             <Text style={styles.sub}>
-              A premium personal finance tracker built for clarity and control.
+              {t("A premium personal finance tracker built for clarity and control.")}
             </Text>
 
             <View style={styles.featureList}>
@@ -172,8 +175,8 @@ export default function OnboardingScreen({ onComplete }: Props) {
                     <Feather name={f.icon} size={16} color={f.color} />
                   </View>
                   <View style={styles.featureText}>
-                    <Text style={styles.featureTitle}>{f.title}</Text>
-                    <Text style={styles.featureDesc}>{f.desc}</Text>
+                    <Text style={styles.featureTitle}>{t(f.title)}</Text>
+                    <Text style={styles.featureDesc}>{t(f.desc)}</Text>
                   </View>
                 </View>
               ))}
@@ -185,15 +188,15 @@ export default function OnboardingScreen({ onComplete }: Props) {
             <View style={styles.pageIconWrap}>
               <Feather name="user" size={32} color={ACCENT} />
             </View>
-            <Text style={styles.headline}>Personalize{"\n"}your experience</Text>
-            <Text style={styles.sub}>We'll set up the app to match your preferences.</Text>
+            <Text style={styles.headline}>{t("Personalize")}{"\n"}{t("your experience")}</Text>
+            <Text style={styles.sub}>{t("We'll set up the app to match your preferences.")}</Text>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Your name</Text>
+              <Text style={styles.label}>{t("Your name")}</Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="Enter your name"
+                placeholder={t("Enter your name")}
                 placeholderTextColor={MUTED}
                 style={styles.input}
                 autoCapitalize="words"
@@ -202,7 +205,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Default currency</Text>
+              <Text style={styles.label}>{t("Default currency")}</Text>
               <View style={styles.currencyGrid}>
                 {SUPPORTED_CURRENCIES.map((c) => (
                   <Pressable
@@ -236,20 +239,20 @@ export default function OnboardingScreen({ onComplete }: Props) {
             <View style={styles.pageIconWrap}>
               <Feather name="target" size={32} color={ACCENT2} />
             </View>
-            <Text style={styles.headline}>Set your{"\n"}monthly budget</Text>
+            <Text style={styles.headline}>{t("Set your")}{"\n"}{t("monthly budget")}</Text>
             <Text style={styles.sub}>
-              Define how much you plan to spend each month. You can always adjust this later in Settings.
+              {t("Define how much you plan to spend each month. You can always adjust this later in Settings.")}
             </Text>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Monthly budget ({currency})</Text>
+              <Text style={styles.label}>{t("Monthly budget")} ({currency})</Text>
               <View style={styles.budgetInputRow}>
                 <Text style={styles.budgetCurrencyPrefix}>
                   {SUPPORTED_CURRENCIES.find((c) => c.code === currency)?.symbol ?? currency}
                 </Text>
                 <TextInput
                   value={budget}
-                  onChangeText={(v) => setBudget(v.replace(/[^0-9.]/g, ""))}
+                  onChangeText={(value) => setBudget(value.replace(/[^0-9٠-٩۰-۹.,٬٫]/g, ""))}
                   placeholder="0"
                   placeholderTextColor={MUTED}
                   keyboardType="numeric"
@@ -270,7 +273,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                   ]}
                 >
                   <Text style={[styles.hintText, budget === v && { color: "#0B1529" }]}>
-                    {parseInt(v).toLocaleString()}
+                    {formatAppNumber(parseInt(v))}
                   </Text>
                 </Pressable>
               ))}
@@ -282,8 +285,8 @@ export default function OnboardingScreen({ onComplete }: Props) {
         <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
           {page > 0 && (
             <Pressable onPress={() => goTo(page - 1)} style={styles.backBtn}>
-              <Feather name="arrow-left" size={18} color={MUTED} />
-              <Text style={styles.backText}>Back</Text>
+              <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={18} color={MUTED} />
+              <Text style={styles.backText}>{t("Back")}</Text>
             </Pressable>
           )}
 
@@ -298,7 +301,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
               style={styles.nextBtnInner}
             >
               <Text style={styles.nextText}>
-                {page < TOTAL_PAGES - 1 ? "Continue" : "Get Started"}
+                {t(page < TOTAL_PAGES - 1 ? "Continue" : "Get Started")}
               </Text>
               <Feather
                 name={page < TOTAL_PAGES - 1 ? "arrow-right" : "check"}
@@ -496,7 +499,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 20,
     color: ACCENT,
-    marginRight: 8,
+    marginEnd: 8,
   },
   budgetInput: {
     flex: 1,

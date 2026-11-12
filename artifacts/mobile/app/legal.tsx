@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { usePreferences } from "@/context/PreferencesContext";
 
 const LAST_UPDATED = "November 2026";
 
@@ -89,6 +90,7 @@ const TERMS_SECTIONS = [
 
 export default function LegalScreen() {
   const colors = useColors();
+  const { t, isRTL, language } = usePreferences();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { type } = useLocalSearchParams<{ type: string }>();
@@ -107,7 +109,7 @@ export default function LegalScreen() {
         centered
         leading={
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
+            <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={colors.foreground} />
           </Pressable>
         }
       />
@@ -119,11 +121,16 @@ export default function LegalScreen() {
           { paddingBottom: 60 + insets.bottom },
         ]}
       >
+        {language === "ar" ? (
+          <Text style={[styles.metaText, { color: colors.warning, marginBottom: 12 }]}>
+            {t("Legal content is shown in English until an Arabic translation is reviewed.")}
+          </Text>
+        ) : null}
         {/* Meta */}
         <View style={[styles.metaRow, { borderColor: colors.border }]}>
           <Feather name="file-text" size={14} color={colors.mutedForeground} />
           <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-            Last updated {LAST_UPDATED}
+            {t("Last updated")} {t(LAST_UPDATED)}
           </Text>
         </View>
 
@@ -131,7 +138,7 @@ export default function LegalScreen() {
         {sections.map((s, i) => (
           <View key={i} style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              {i + 1}. {s.title}
+              {i + 1}. {t(s.title)}
             </Text>
             <Text style={[styles.sectionBody, { color: colors.mutedForeground }]}>
               {s.body}
@@ -141,7 +148,7 @@ export default function LegalScreen() {
 
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-            FinanceApp — Built with privacy by design
+            {t("FinanceApp — Built with privacy by design")}
           </Text>
         </View>
       </ScrollView>

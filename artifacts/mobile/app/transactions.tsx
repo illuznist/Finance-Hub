@@ -32,6 +32,7 @@ import {
   type Transaction,
 } from "@/finance/ledger";
 import { useColors } from "@/hooks/useColors";
+import { formatAppCurrency, formatAppDate, normalizeLocalizedNumberInput } from "@/i18n/localization";
 
 type Colors = ReturnType<typeof useColors>;
 type TypeFilter = "all" | "income" | "expenses" | "transfers" | "repayments";
@@ -64,24 +65,23 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function money(value: number, currency: string): string {
-  return `${currency} ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatAppCurrency(value, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDate(value: string): string {
   if (!validLocalDate(value)) return value;
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return formatAppDate(value, { day: "numeric", month: "short", year: "numeric" });
 }
 
 function parseAmount(text: string): number | null {
-  const t = text.trim();
+  const t = normalizeLocalizedNumberInput(text.trim());
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
   const n = Number(t);
   return n > 0 && Number.isFinite(n) ? n : null;
 }
 
 function parseSigned(text: string): number | null {
-  const t = text.trim();
+  const t = normalizeLocalizedNumberInput(text.trim());
   if (!/^-?\d+(\.\d{1,2})?$/.test(t)) return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
@@ -412,7 +412,7 @@ function DetailSheet({ t, accountName, pairAccount, colors, bottomInset, onClose
         {rows.map(([k, v]) => (
           <View key={k} style={[styles.between, { paddingVertical: 6 }]}>
             <Text style={[styles.body, { color: colors.mutedForeground }]}>{k}</Text>
-            <Text style={[styles.body, { color: colors.foreground, flexShrink: 1, textAlign: "right", marginLeft: 12 }]}>{v}</Text>
+            <Text style={[styles.body, { color: colors.foreground, flexShrink: 1, textAlign: "auto", marginStart: 12 }]}>{v}</Text>
           </View>
         ))}
       </View>

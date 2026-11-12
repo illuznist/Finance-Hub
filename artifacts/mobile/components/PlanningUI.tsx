@@ -8,6 +8,8 @@ import { TYPOGRAPHY } from "@/constants/typography";
 import { useFinance } from "@/context/FinanceContext";
 import type { getBudgetView } from "@/finance/budgets";
 import { useColors } from "@/hooks/useColors";
+import { formatAppCurrency, formatAppDate, normalizeLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 export type Colors = ReturnType<typeof useColors>;
 export type BudgetView = ReturnType<typeof getBudgetView>;
@@ -15,22 +17,20 @@ export type BudgetView = ReturnType<typeof getBudgetView>;
 export const usePlanning = useFinance;
 
 export function money(value: number, currency: string): string {
-  return `${currency} ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatAppCurrency(value, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function shortDate(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return formatAppDate(value, { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function monthTitle(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return formatAppDate(`${month}-01`, { month: "long", year: "numeric" });
 }
 
 export function parseMoney(text: string, allowZero = false): number | null {
-  const t = text.trim();
+  const t = normalizeLocalizedNumberInput(text.trim());
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
   const n = Number(t);
   return Number.isFinite(n) && (allowZero ? n >= 0 : n > 0) ? n : null;
@@ -69,12 +69,16 @@ export function Chips<T extends string>({ items, value, onChange, prefix }: {
 
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string | null; children: React.ReactNode }) {
   const colors = useColors();
+  const { t } = usePreferences();
+  const translatedLabel = /\bdate\b/i.test(label)
+    ? `${t(label)} · ${t("Gregorian date")}`
+    : t(label);
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={[ui.label, { color: colors.mutedForeground, marginBottom: 6 }]}>{label}</Text>
+      <Text style={[ui.label, { color: colors.mutedForeground, marginBottom: 6 }]}>{translatedLabel}</Text>
       {children}
-      {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 6 }]}>{error}</Text>
-        : hint ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]}>{hint}</Text> : null}
+      {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 6 }]}>{t(error)}</Text>
+        : hint ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 6 }]}>{t(hint)}</Text> : null}
     </View>
   );
 }
@@ -88,11 +92,12 @@ export function Input(props: React.ComponentProps<typeof TextInput>) {
 
 export function ToggleRow({ label, hint, value, onChange, testID }: { label: string; hint?: string; value: boolean; onChange: (v: boolean) => void; testID: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <View style={[ui.toggleRow, { borderBottomColor: colors.border }]}>
       <View style={{ flex: 1 }}>
-        <Text style={[ui.body, { color: colors.foreground }]}>{label}</Text>
-        {hint ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>{hint}</Text> : null}
+        <Text style={[ui.body, { color: colors.foreground }]}>{t(label)}</Text>
+        {hint ? <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 2 }]}>{t(hint)}</Text> : null}
       </View>
       <Switch testID={testID} accessibilityLabel={label} value={value} onValueChange={onChange}
         trackColor={{ true: colors.primary, false: colors.muted }} thumbColor={colors.card} />
@@ -104,12 +109,13 @@ export function Button({ label, onPress, tone = "primary", testID, disabled, sty
   label: string; onPress: () => void; tone?: "primary" | "neutral" | "danger"; testID?: string; disabled?: boolean; style?: object;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const bg = tone === "primary" ? colors.primary : tone === "danger" ? colors.errorLight : colors.muted;
   const fg = tone === "primary" ? colors.primaryForeground : tone === "danger" ? colors.destructive : colors.foreground;
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
       style={({ pressed }) => [ui.btn, { backgroundColor: bg, opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }, style]}>
-      <Text style={[ui.btnText, { color: fg }]}>{label}</Text>
+      <Text style={[ui.btnText, { color: fg }]}>{t(label)}</Text>
     </Pressable>
   );
 }
@@ -123,14 +129,14 @@ export function Progress({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-export function FormModal({ title, topInset, bottomInset, onClose, testID, children, footer }: {
-  title: string; topInset: number; bottomInset: number; onClose: () => void; testID: string; children: React.ReactNode; footer?: React.ReactNode;
+export function FormModal({ title, topInset, bottomInset, onClose, testID, children, footer, translateTitle = false }: {
+  title: string; topInset: number; bottomInset: number; onClose: () => void; testID: string; children: React.ReactNode; footer?: React.ReactNode; translateTitle?: boolean;
 }) {
   const colors = useColors();
   return (
     <Modal visible animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: colors.background }} testID={testID}>
-        <ScreenHeader title={title} topInset={topInset} colors={colors}
+        <ScreenHeader title={title} translateTitle={translateTitle} topInset={topInset} colors={colors}
           leading={<HeaderAction icon="x" label="Cancel" variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />} />
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
           {children}
@@ -143,11 +149,12 @@ export function FormModal({ title, topInset, bottomInset, onClose, testID, child
 
 export function EmptyBlock({ icon, title, body, children }: { icon: React.ComponentProps<typeof Feather>["name"]; title: string; body: string; children?: React.ReactNode }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <View style={[ui.empty, { borderColor: colors.border }]}>
       <Feather name={icon} size={22} color={colors.mutedForeground} />
-      <Text style={[ui.cardTitle, { color: colors.foreground }]}>{title}</Text>
-      <Text style={[ui.small, { color: colors.mutedForeground, textAlign: "center" }]}>{body}</Text>
+      <Text style={[ui.cardTitle, { color: colors.foreground }]}>{t(title)}</Text>
+      <Text style={[ui.small, { color: colors.mutedForeground, textAlign: "center" }]}>{t(body)}</Text>
       {children}
     </View>
   );

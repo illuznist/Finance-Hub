@@ -15,6 +15,7 @@ import {
   type CashFlowForecast, type ForecastMode, type ForecastPreset, type ForecastScenario,
 } from "@/finance/forecast";
 import { useColors } from "@/hooks/useColors";
+import { parseLocalizedNumberInput } from "@/i18n/localization";
 
 const PRESETS: { key: ForecastPreset; label: string }[] = [
   { key: "7", label: "7 days" }, { key: "30", label: "30 days" },
@@ -227,7 +228,7 @@ export default function ForecastScreen() {
   const addScenario = () => {
     setScenarioError("");
     if (scenarioKind === "delay_expected_income") {
-      const days = Number(delayDays);
+      const days = parseLocalizedNumberInput(delayDays) ?? NaN;
       if (!delayIncomeId || !Number.isInteger(days) || days < 1 || days > 365) {
         setScenarioError("Choose a dated expected income and a delay from 1 to 365 days.");
         return;

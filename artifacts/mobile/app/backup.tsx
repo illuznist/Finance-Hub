@@ -22,7 +22,9 @@ import Constants from "expo-constants";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useFinance } from "@/context/FinanceContext";
 import { useTheme } from "@/context/ThemeContext";
+import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
+import { formatAppDate, formatAppNumber } from "@/i18n/localization";
 import { randomBytes } from "@/security/deviceSecurity";
 import {
   MAX_BACKUP_FILE_BYTES,
@@ -58,6 +60,7 @@ export default function BackupScreen() {
   const router = useRouter();
   const finance = useFinance();
   const theme = useTheme();
+  const { t, isRTL } = usePreferences();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [restorePassword, setRestorePassword] = useState("");
@@ -187,7 +190,7 @@ export default function BackupScreen() {
       if (utf8(serialized).byteLength > MAX_BACKUP_FILE_BYTES) {
         throw new Error("This file is larger than the 64 MB backup limit.");
       }
-      setNotice(`Selected: ${asset.name}`);
+      setNotice(`${t("Selected")}: ${asset.name}`);
       setSelectedBackupName(asset.name);
       setSelectedBackupText(serialized);
     } catch (cause) {
@@ -261,7 +264,7 @@ export default function BackupScreen() {
         centered
         leading={
           <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
+            <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={colors.foreground} />
           </Pressable>
         }
       />
@@ -269,18 +272,18 @@ export default function BackupScreen() {
         <View style={[styles.noticeCard, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "35" }]}>
           <Feather name="shield" size={19} color={colors.primary} />
           <Text style={[styles.noticeText, { color: colors.foreground }]}>
-            Backups are encrypted on this device with AES-256-GCM and exported only to a location you choose. Finance records are not uploaded. Keep a copy outside this app; uninstalling the app or losing the device can otherwise erase local records. The backup password cannot be recovered if lost.
+            {t("Backups are encrypted on this device with AES-256-GCM and exported only to a location you choose. Finance records are not uploaded. Keep a copy outside this app; uninstalling the app or losing the device can otherwise erase local records. The backup password cannot be recovered if lost.")}
           </Text>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Create encrypted backup</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("Create encrypted backup")}</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            Includes your accounts, ledger, income, expenses, EMIs, loans, budgets, recurring items, savings, snapshots, and display preferences. Device PIN and account credentials are excluded.
+            {t("Includes your accounts, ledger, income, expenses, EMIs, loans, budgets, recurring items, savings and snapshots. Theme is included; language and calendar stay on this device. Device PIN and account credentials are excluded.")}
           </Text>
           {Platform.OS === "web" && (
             <Text style={[styles.small, { color: colors.mutedForeground }]}>
-              Browser storage is not hardware-backed. Use a trusted device profile and keep exported backups protected.
+              {t("Browser storage is not hardware-backed. Use a trusted device profile and keep exported backups protected.")}
             </Text>
           )}
           <TextInput
@@ -289,7 +292,7 @@ export default function BackupScreen() {
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder={`Backup password (${MIN_BACKUP_PASSWORD_LENGTH}+ characters)`}
+            placeholder={`${t("Backup password")} (${formatAppNumber(MIN_BACKUP_PASSWORD_LENGTH)}+ ${t("characters")})`}
             placeholderTextColor={colors.mutedForeground}
             style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
           />
@@ -299,27 +302,27 @@ export default function BackupScreen() {
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="Confirm backup password"
+            placeholder={t("Confirm backup password")}
             placeholderTextColor={colors.mutedForeground}
             style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
           />
           <Pressable disabled={working} onPress={exportBackup} style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: working ? 0.6 : 1 }]}>
             {working ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="download" size={17} color={colors.primaryForeground} />}
-            <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Create and export backup</Text>
+            <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{t("Create and export backup")}</Text>
           </Pressable>
           <Text style={[styles.small, { color: colors.mutedForeground }]}>
-            Last backup created: {lastBackup ? new Date(lastBackup).toLocaleString() : "Not yet"}
+            {t("Last backup created")}: {lastBackup ? formatAppDate(new Date(lastBackup), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : t("Not yet")}
           </Text>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Restore from backup</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("Restore from backup")}</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            The file and password are checked and the contents are validated before any saved records change.
+            {t("The file and password are checked and the contents are validated before any saved records change.")}
           </Text>
           <Pressable disabled={working} onPress={chooseBackup} style={[styles.secondaryButton, { borderColor: colors.border }]}>
             <Feather name="folder" size={17} color={colors.primary} />
-            <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>Choose backup file</Text>
+            <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>{t("Choose backup file")}</Text>
           </Pressable>
           {!!selectedBackupText && (
             <>
@@ -330,59 +333,59 @@ export default function BackupScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholder="Backup password"
+                placeholder={t("Backup password")}
                 placeholderTextColor={colors.mutedForeground}
                 style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
               />
               {!hasVerifiedBackup && (
                 <Pressable disabled={working} onPress={openSelectedBackup} style={[styles.secondaryButton, { borderColor: colors.primary + "60" }]}>
                   {working ? <ActivityIndicator color={colors.primary} /> : <Feather name="unlock" size={17} color={colors.primary} />}
-                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Verify backup and preview</Text>
+                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>{t("Verify backup and preview")}</Text>
                 </Pressable>
               )}
             </>
           )}
           {hasVerifiedBackup && backup && (
             <View style={[styles.preview, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Text style={[styles.previewTitle, { color: colors.foreground }]}>Backup preview</Text>
+              <Text style={[styles.previewTitle, { color: colors.foreground }]}>{t("Backup preview")}</Text>
               <Text style={[styles.small, { color: colors.mutedForeground }]}>
-                Created {new Date(backup.metadata.createdAt).toLocaleString()} · app {backup.metadata.appVersion} · format v1
+                {t("Created")} {formatAppDate(new Date(backup.metadata.createdAt), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })} · {t("app")} {backup.metadata.appVersion} · {t("format")} v1
               </Text>
               {previewCounts.map(([label, count]) => (
                 <View key={label} style={styles.countRow}>
-                  <Text style={[styles.body, { color: colors.mutedForeground }]}>{label}</Text>
-                  <Text style={[styles.body, { color: colors.foreground, fontWeight: "600" }]}>{count}</Text>
+                  <Text style={[styles.body, { color: colors.mutedForeground }]}>{t(label)}</Text>
+                  <Text style={[styles.body, { color: colors.foreground, fontWeight: "600" }]}>{formatAppNumber(count)}</Text>
                 </View>
               ))}
               <Pressable onPress={() => setConfirmRestore(true)} style={[styles.dangerButton, { backgroundColor: colors.destructive }]}>
                 <Feather name="refresh-ccw" size={17} color="#fff" />
-                <Text style={styles.primaryButtonText}>Replace local records</Text>
+                <Text style={styles.primaryButtonText}>{t("Replace local records")}</Text>
               </Pressable>
             </View>
           )}
         </View>
 
         <Text style={[styles.small, { color: colors.mutedForeground }]}>
-          Store the exported file somewhere you control and keep its password separately. Uninstalling the app or losing this device does not transfer its local records.
+          {t("Store the exported file somewhere you control and keep its password separately. Uninstalling the app or losing this device does not transfer its local records.")}
         </Text>
 
-        {!!notice && <Text style={[styles.statusText, { color: colors.primary }]}>{notice}</Text>}
-        {!!error && <Text style={[styles.statusText, { color: colors.destructive }]}>{error}</Text>}
+        {!!notice && <Text style={[styles.statusText, { color: colors.primary }]}>{t(notice)}</Text>}
+        {!!error && <Text style={[styles.statusText, { color: colors.destructive }]}>{t(error)}</Text>}
       </ScrollView>
 
       <Modal visible={confirmRestore} transparent animationType="fade" onRequestClose={() => setConfirmRestore(false)}>
         <View style={styles.modalShade}>
           <View style={[styles.confirmCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Replace this device’s records?</Text>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("Replace this device’s records?")}</Text>
             <Text style={[styles.body, { color: colors.mutedForeground }]}>
-              The current finance data and appearance setting will be saved in a protected recovery copy first. Your device PIN and account lock will stay as they are. Do not clear app storage during restore.
+              {t("The current finance data and appearance setting will be saved in a protected recovery copy first. Your device PIN and account lock will stay as they are. Do not clear app storage during restore.")}
             </Text>
             <View style={styles.modalActions}>
               <Pressable onPress={() => setConfirmRestore(false)} style={styles.modalButton}>
-                <Text style={{ color: colors.mutedForeground, fontWeight: "600" }}>Cancel</Text>
+                <Text style={{ color: colors.mutedForeground, fontWeight: "600" }}>{t("Cancel")}</Text>
               </Pressable>
               <Pressable disabled={working} onPress={applyRestore} style={[styles.modalButton, { backgroundColor: colors.destructive, borderRadius: 12 }]}>
-                <Text style={{ color: "#fff", fontWeight: "700" }}>{working ? "Restoring…" : "Replace records"}</Text>
+                <Text style={{ color: "#fff", fontWeight: "700" }}>{t(working ? "Restoring…" : "Replace records")}</Text>
               </Pressable>
             </View>
           </View>

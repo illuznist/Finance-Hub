@@ -14,6 +14,8 @@ import { shiftMonth } from "@/finance/calendar";
 import { localDate, minorUnits, newId } from "@/finance/ledger";
 import type { BudgetCategory, BudgetMode, BudgetPlan } from "@/finance/planningTypes";
 import { useColors } from "@/hooks/useColors";
+import { formatAppNumber, normalizeLocalizedNumberInput, parseLocalizedNumberInput } from "@/i18n/localization";
+import { usePreferences } from "@/context/PreferencesContext";
 
 const ICONS = ["grid", "home", "shopping-cart", "coffee", "truck", "compass", "shopping-bag", "film", "heart", "zap", "repeat", "map", "book", "user", "gift", "smartphone", "tool", "credit-card", "archive"];
 const SWATCHES = ["#2563EB", "#1E3A8A", "#0F766E", "#475569", "#7C3AED", "#B45309", "#BE123C"];
@@ -27,6 +29,7 @@ function safeView(fn: () => BudgetView): BudgetView | null {
 
 export default function BudgetScreen() {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const finance = usePlanning();
@@ -51,7 +54,7 @@ export default function BudgetScreen() {
   const attention = (view?.categories ?? []).filter(c => ["approaching", "near", "exceeded"].includes(c.status));
   const listed = (view?.categories ?? []).filter(c => c.limit !== 0 || c.spent > 0);
   const diff = view && prev ? view.spent - prev.spent : 0;
-  const relation = month < current ? "Past month" : month > current ? "Next month" : "Current month";
+  const relation = t(month < current ? "Past month" : month > current ? "Next month" : "Current month");
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -60,15 +63,15 @@ export default function BudgetScreen() {
         trailing={<HeaderAction icon="edit-2" label={`Edit ${monthTitle(month)} budget`} testID="edit-budget" onPress={() => setEditing(true)} />} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }}>
         <View style={[ui.between, { marginBottom: 16 }]}>
-          <Pressable testID="month-prev" accessibilityLabel="Previous month" hitSlop={8} onPress={() => setMonth(m => shiftMonth(m, -1))} style={[ui.icon, { backgroundColor: colors.muted }]}>
-            <Feather name="chevron-left" size={18} color={colors.foreground} />
+          <Pressable testID="month-prev" accessibilityLabel={t("Previous month")} hitSlop={8} onPress={() => setMonth(m => shiftMonth(m, -1))} style={[ui.icon, { backgroundColor: colors.muted }]}>
+            <Feather name={isRTL ? "chevron-right" : "chevron-left"} size={18} color={colors.foreground} />
           </Pressable>
           <Pressable onPress={() => setMonth(current)} testID="month-current" accessibilityLabel="Go to current month" style={{ alignItems: "center" }}>
             <Text style={[ui.cardTitle, { color: colors.foreground }]}>{monthTitle(month)}</Text>
-            <Text style={[ui.small, { color: month === current ? colors.primary : colors.mutedForeground }]}>{relation}{month !== current ? " · tap for current" : ""}</Text>
+            <Text style={[ui.small, { color: month === current ? colors.primary : colors.mutedForeground }]}>{relation}{month !== current ? ` · ${t("tap for current")}` : ""}</Text>
           </Pressable>
-          <Pressable testID="month-next" accessibilityLabel="Next month" hitSlop={8} onPress={() => setMonth(m => shiftMonth(m, 1))} style={[ui.icon, { backgroundColor: colors.muted }]}>
-            <Feather name="chevron-right" size={18} color={colors.foreground} />
+          <Pressable testID="month-next" accessibilityLabel={t("Next month")} hitSlop={8} onPress={() => setMonth(m => shiftMonth(m, 1))} style={[ui.icon, { backgroundColor: colors.muted }]}>
+            <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={18} color={colors.foreground} />
           </Pressable>
         </View>
 
@@ -80,17 +83,17 @@ export default function BudgetScreen() {
           <>
             <View style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="budget-summary">
               <View style={ui.between}>
-                <Text style={[ui.label, { color: colors.mutedForeground }]}>REMAINING</Text>
-                <View style={[ui.pill, { backgroundColor: tone.bg }]}><Text style={[ui.pillText, { color: tone.color }]}>{tone.label}</Text></View>
+                <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("REMAINING")}</Text>
+                <View style={[ui.pill, { backgroundColor: tone.bg }]}><Text style={[ui.pillText, { color: tone.color }]}>{t(tone.label)}</Text></View>
               </View>
               <Text style={[ui.hero, { color: view.remaining < 0 ? colors.destructive : colors.foreground, marginTop: 6 }]} numberOfLines={1} adjustsFontSizeToFit>
                 {view.remaining < 0 ? "-" : ""}{money(Math.abs(view.remaining), cur)}
               </Text>
               <View style={{ marginTop: 14 }}><Progress pct={view.percentage} color={tone.color} /></View>
               <View style={[ui.between, { marginTop: 12 }]}>
-                <Stat label={`Spent (${cur})`} value={view.spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
-                <Stat label={`Budget (${cur})`} value={view.period.limit !== 0 ? view.period.limit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Not set"} />
-                <Stat label="Used" value={`${view.percentage.toFixed(1)}%`} />
+                <Stat label={`Spent (${cur})`} value={formatAppNumber(view.spent, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />
+                <Stat label={`Budget (${cur})`} value={view.period.limit !== 0 ? formatAppNumber(view.period.limit, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Not set"} />
+                <Stat label="Used" value={`${formatAppNumber(view.percentage, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`} />
               </View>
               <View style={[ui.sep, { backgroundColor: colors.border, marginVertical: 12 }]} />
               <View style={ui.between}>
@@ -115,7 +118,7 @@ export default function BudgetScreen() {
 
             {attention.length > 0 ? (
               <>
-                <Text style={[ui.section, { color: colors.foreground }]}>Needs attention</Text>
+                <Text style={[ui.section, { color: colors.foreground }]}>{t("Needs attention")}</Text>
                 {attention.map(c => {
                   const t = statusTone(c.status, colors);
                   return (
@@ -128,7 +131,7 @@ export default function BudgetScreen() {
               </>
             ) : null}
 
-            <Text style={[ui.section, { color: colors.foreground }]}>Categories</Text>
+            <Text style={[ui.section, { color: colors.foreground }]}>{t("Categories")}</Text>
             {listed.length === 0 ? (
               <EmptyBlock icon="pie-chart" title="No category limits yet" body="Set limits for categories you want to watch. Spending without a limit still counts toward the total.">
                 <Button label="Set category limits" onPress={() => setEditing(true)} testID="empty-edit-budget" />
@@ -175,9 +178,10 @@ export default function BudgetScreen() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <View style={{ flex: 1 }}>
-      <Text style={[ui.small, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[ui.small, { color: colors.mutedForeground }]}>{t(label)}</Text>
       <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground, marginTop: 2 }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </View>
   );
@@ -189,6 +193,7 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
   month: string; view: BudgetView; topInset: number; bottomInset: number; onClose: () => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const finance = usePlanning();
   const p = view.period;
   const current = localDate().slice(0, 7);
@@ -255,7 +260,7 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
   };
 
   return (
-    <FormModal title={`Budget · ${monthTitle(month)}`} topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="budget-form"
+    <FormModal title={`${t("Budget")} · ${monthTitle(month)}`} topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="budget-form"
       footer={<>
         {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 16 }]} testID="budget-form-error">{error}</Text> : null}
         <Button label={`Save ${monthTitle(month)}`} onPress={save} testID="budget-form-save" style={{ marginTop: 20 }} />
@@ -270,7 +275,7 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
         <Chips items={MODES} value={mode} onChange={setMode} prefix="budget-mode" />
       </Field>
       <Field label={`Total monthly limit (${p.currency})`} hint={hasCarry
-          ? `Includes ${money(totalCarry, p.currency)} carried from last month${totalCarry < 0 ? " (a deficit, so the total may be negative)" : ""}. Base limit now ${money((minorUnits(Number(limit) || 0) - minorUnits(totalCarry)) / 100, p.currency)}. Enter the final total; carry is not added again.`
+          ? `Includes ${money(totalCarry, p.currency)} carried from last month${totalCarry < 0 ? " (a deficit, so the total may be negative)" : ""}. Base limit now ${money((minorUnits(parseLocalizedNumberInput(limit) ?? 0) - minorUnits(totalCarry)) / 100, p.currency)}. Enter the final total; carry is not added again.`
           : mode === "rollover" ? "Unused money from categories with rollover on carries into next month." : "This period's total limit."}>
         <Input testID="budget-limit" value={limit} onChangeText={setLimit} keyboardType={totalCarry < 0 ? "numbers-and-punctuation" : "decimal-pad"} placeholder="0.00" />
       </Field>
@@ -311,7 +316,7 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
               <Text style={[ui.body, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{c.name}</Text>
             </View>
             <Input value={c.limitText} onChangeText={v => patch(c.id, { limitText: v })} keyboardType="numbers-and-punctuation" placeholder="No limit"
-              style={{ width: 110, paddingVertical: 8, textAlign: "right" }} testID={`cat-limit-${c.id}`} accessibilityLabel={`${c.name} limit`} />
+              style={{ width: 110, paddingVertical: 8, textAlign: "auto" }} testID={`cat-limit-${c.id}`} accessibilityLabel={`${c.name} limit`} />
             <Pressable hitSlop={8} accessibilityLabel={`Delete ${c.name}`} testID={`cat-delete-${c.id}`}
               onPress={() => setCats(cs => cs.filter(x => x.id !== c.id))}>
               <Feather name="trash-2" size={16} color={colors.mutedForeground} />
@@ -344,9 +349,9 @@ function BudgetEditor({ month, view, topInset, bottomInset, onClose }: {
 }
 
 function parseSigned(text: string): number | null {
-  const t = text.trim();
+  const t = normalizeLocalizedNumberInput(text.trim());
   if (!/^-?\d+(\.\d{1,2})?$/.test(t)) return null;
-  const n = Number(t);
+    const n = parseLocalizedNumberInput(t) ?? NaN;
   return Number.isFinite(n) ? n : null;
 }
 

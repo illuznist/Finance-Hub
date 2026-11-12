@@ -11,30 +11,32 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useTheme } from "@/context/ThemeContext";
+import { usePreferences } from "@/context/PreferencesContext";
 
 function NativeTabLayout() {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <NativeTabs tintColor={colors.primary} backgroundColor={colors.card}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("Home")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="expenses">
         <NativeTabs.Trigger.Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
-        <NativeTabs.Trigger.Label>Expenses</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("Expenses")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="emis">
         <NativeTabs.Trigger.Icon sf={{ default: "calendar.badge.clock", selected: "calendar.badge.clock" }} />
-        <NativeTabs.Trigger.Label>EMIs</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("EMIs")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="loans">
         <NativeTabs.Trigger.Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
-        <NativeTabs.Trigger.Label>Loans</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("Loans")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="wallets">
         <NativeTabs.Trigger.Icon sf={{ default: "wallet.pass", selected: "wallet.pass.fill" }} />
-        <NativeTabs.Trigger.Label>Wallets</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("Wallets")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -42,6 +44,7 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const colors = useColors();
+  const { t } = usePreferences();
   const { resolvedScheme } = useTheme();
   const safeAreaInsets = useSafeAreaInsets();
   const isDark = resolvedScheme === "dark";
@@ -85,7 +88,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("Home"),
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (
@@ -99,7 +102,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="expenses"
         options={{
-          title: "Expenses",
+          title: t("Expenses"),
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (
@@ -113,7 +116,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="emis"
         options={{
-          title: "EMIs",
+          title: t("EMIs"),
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (
@@ -127,7 +130,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="loans"
         options={{
-          title: "Loans",
+          title: t("Loans"),
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (
@@ -141,7 +144,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="wallets"
         options={{
-          title: "Wallets",
+          title: t("Wallets"),
           tabBarIcon: ({ focused }) => {
             const color = focused ? colors.primary : colors.mutedForeground;
             return isIOS ? (

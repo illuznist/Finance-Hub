@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -25,15 +26,18 @@ import {
 } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, type ThemeMode } from "@/context/ThemeContext";
+import { usePreferences } from "@/context/PreferencesContext";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { formatNumber, parseLocalizedNumberInput } from "@/i18n/localization";
 
 function SectionHeader({ title }: { title: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>
-      {title}
+      {t(title)}
     </Text>
   );
 }
@@ -54,6 +58,7 @@ function SettingRow({
   destructive?: boolean;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   return (
     <Pressable
       onPress={onPress}
@@ -66,7 +71,7 @@ function SettingRow({
         <Feather name={icon as any} size={17} color={iconColor ?? colors.primary} />
       </View>
       <Text style={[styles.settingLabel, { color: destructive ? colors.destructive : colors.foreground }]}>
-        {label}
+        {t(label)}
       </Text>
       <View style={{ flex: 1 }} />
       {right}
@@ -81,22 +86,25 @@ function PinSetupModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSave: (pin: string) => void;
+  onSave: (pin: string) => Promise<void>;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const [step, setStep] = useState<"enter" | "confirm">("enter");
   const [first, setFirst] = useState("");
   const [second, setSecond] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   function reset() {
     setStep("enter");
     setFirst("");
     setSecond("");
-    setError(false);
+    setError("");
   }
 
-  function handlePress(digit: string) {
+  async function handlePress(digit: string) {
+    if (busy) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step === "enter") {
       const next = first + digit;
@@ -106,19 +114,30 @@ function PinSetupModal({
       const next = second + digit;
       setSecond(next);
       if (next.length === 4) {
-        if (next === first) {
-          onSave(next);
-          reset();
-        } else {
-          setError(true);
+        if (next !== first) {
+          setError("PINs don't match — try again");
           setSecond("");
-          setTimeout(() => setError(false), 800);
+          return;
+        }
+        setBusy(true);
+        setError("");
+        try {
+          await onSave(next);
+          reset();
+        } catch (saveError) {
+          setStep("enter");
+          setFirst("");
+          setSecond("");
+          setError(t(saveError instanceof Error ? saveError.message : "PIN could not be saved. Try again."));
+        } finally {
+          setBusy(false);
         }
       }
     }
   }
 
   function handleBack() {
+    if (busy) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step === "enter") setFirst(first.slice(0, -1));
     else setSecond(second.slice(0, -1));
@@ -127,15 +146,15 @@ function PinSetupModal({
   const current = step === "enter" ? first : second;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={() => { reset(); onClose(); }}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={() => { if (!busy) { reset(); onClose(); } }}>
       <View style={styles.pinModalOverlay}>
         <View style={[styles.pinModalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.pinTitle, { color: colors.foreground }]}>
-            {step === "enter" ? "Set your PIN" : "Confirm your PIN"}
+            {t(step === "enter" ? "Set your PIN" : "Confirm your PIN")}
           </Text>
           <Text style={[styles.pinSubtitle, { color: colors.mutedForeground }]}>
-            {step === "enter" ? "Enter a 4-digit PIN" : "Enter the PIN again to confirm"}
+            {t(step === "enter" ? "Enter a 4-digit PIN" : "Enter the PIN again to confirm")}
           </Text>
 
           <View style={styles.dotsRow}>
@@ -159,14 +178,12 @@ function PinSetupModal({
             ))}
           </View>
 
-          {error && (
-            <Text style={[styles.pinError, { color: colors.destructive }]}>PINs don't match — try again</Text>
-          )}
+          {!!error && <Text style={[styles.pinError, { color: colors.destructive }]}>{error}</Text>}
 
-          <NumPad onPress={handlePress} onBackspace={handleBack} colors={colors} />
+          <NumPad onPress={handlePress} onBackspace={handleBack} colors={colors} disabled={busy} />
 
-          <Pressable onPress={() => { reset(); onClose(); }} style={styles.cancelLink}>
-            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+          <Pressable disabled={busy} onPress={() => { reset(); onClose(); }} style={styles.cancelLink}>
+            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>{t(busy ? "Saving…" : "Cancel")}</Text>
           </Pressable>
         </View>
       </View>
@@ -186,6 +203,7 @@ function PasswordConfirmationModal({
   onConfirm: (password: string) => Promise<boolean>;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -199,10 +217,10 @@ function PasswordConfirmationModal({
         setError("");
         onCancel();
       } else {
-        setError("That password was not correct.");
+        setError(t("That password was not correct."));
       }
     } catch {
-      setError("Password verification could not complete. Try again.");
+      setError(t("Password verification could not complete. Try again."));
     } finally {
       setBusy(false);
     }
@@ -212,9 +230,9 @@ function PasswordConfirmationModal({
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
       <View style={[styles.pinModalOverlay, { justifyContent: "center" }]}>
         <View style={[styles.pinModalSheet, { backgroundColor: colors.card }]}>
-          <Text style={[styles.pinTitle, { color: colors.foreground }]}>{title}</Text>
+          <Text style={[styles.pinTitle, { color: colors.foreground }]}>{t(title)}</Text>
           <Text style={[styles.pinSubtitle, { color: colors.mutedForeground }]}>
-            Verify your account password before changing app lock settings.
+            {t("Verify your account password before changing app lock settings.")}
           </Text>
           <TextInput
             value={password}
@@ -222,7 +240,7 @@ function PasswordConfirmationModal({
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="Account password"
+            placeholder={t("Account password")}
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="done"
             onSubmitEditing={submit}
@@ -241,7 +259,7 @@ function PasswordConfirmationModal({
           {!!error && <Text style={[styles.pinError, { color: colors.destructive }]}>{error}</Text>}
           <View style={{ flexDirection: "row", gap: 12, marginTop: 20 }}>
             <Pressable onPress={onCancel} style={{ flex: 1, paddingVertical: 13, alignItems: "center" }}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 15 }}>Cancel</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 15 }}>{t("Cancel")}</Text>
             </Pressable>
             <Pressable
               onPress={submit}
@@ -249,7 +267,7 @@ function PasswordConfirmationModal({
               style={{ flex: 1, paddingVertical: 13, alignItems: "center", borderRadius: 12, backgroundColor: colors.primary }}
             >
               <Text style={{ color: colors.primaryForeground, fontSize: 15, fontWeight: "600" }}>
-                {busy ? "Checking…" : "Continue"}
+                {t(busy ? "Checking…" : "Continue")}
               </Text>
             </Pressable>
           </View>
@@ -263,10 +281,12 @@ function NumPad({
   onPress,
   onBackspace,
   colors,
+  disabled,
 }: {
   onPress: (d: string) => void;
   onBackspace: () => void;
   colors: ReturnType<typeof useColors>;
+  disabled: boolean;
 }) {
   const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
   return (
@@ -274,6 +294,7 @@ function NumPad({
       {keys.map((k, i) => (
         <Pressable
           key={i}
+          disabled={disabled || !k}
           onPress={() => k === "⌫" ? onBackspace() : k ? onPress(k) : undefined}
           style={({ pressed }) => [
             styles.numKey,
@@ -299,6 +320,8 @@ export default function SettingsScreen() {
   const finance = useFinance();
   const auth = useAuth();
   const theme = useTheme();
+  const preferences = usePreferences();
+  const t = preferences.t;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const [editingName, setEditingName] = useState(false);
@@ -323,7 +346,7 @@ export default function SettingsScreen() {
     try {
       await finance.setSecuritySettings({ ...security, ...updates });
     } catch (error) {
-      Alert.alert("Could not save security settings", error instanceof Error ? error.message : "Retry safely.");
+      Alert.alert(t("Could not save security settings"), error instanceof Error ? t(error.message) : t("Retry safely."));
     }
   }
 
@@ -331,10 +354,10 @@ export default function SettingsScreen() {
     if (value) {
       setShowPinSetup(true);
     } else {
-      Alert.alert("Disable PIN", "Are you sure you want to disable PIN lock?", [
-        { text: "Cancel", style: "cancel" },
+      Alert.alert(t("Disable PIN"), t("Are you sure you want to disable PIN lock?"), [
+        { text: t("Cancel"), style: "cancel" },
         {
-          text: "Disable",
+          text: t("Disable"),
           style: "destructive",
           onPress: () => setPasswordAction("disable-pin"),
         },
@@ -349,7 +372,7 @@ export default function SettingsScreen() {
       setShowPinSetup(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      Alert.alert("PIN could not be saved", error instanceof Error ? error.message : "Try again. Your current app lock was not changed.");
+      throw new Error(error instanceof Error ? error.message : "PIN could not be saved. Your current app lock was not changed.");
     }
   }
 
@@ -370,12 +393,12 @@ export default function SettingsScreen() {
 
   async function handleSignOut() {
     Alert.alert(
-      "Sign Out",
-      "You will need to sign in again to access your data.",
+      t("Sign Out"),
+      t("You will need to sign in again to access your data."),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         {
-          text: "Sign Out",
+          text: t("Sign Out"),
           style: "destructive",
           onPress: () => auth.signOut(),
         },
@@ -384,10 +407,10 @@ export default function SettingsScreen() {
   }
 
   const timingLabels: Record<string, string> = {
-    same: "Same day",
-    "1day": "1 day before",
-    "3days": "3 days before",
-    "7days": "7 days before",
+    same: t("Same day"),
+    "1day": t("1 day before"),
+    "3days": t("3 days before"),
+    "7days": t("7 days before"),
   };
 
   function cycleTimimg() {
@@ -406,13 +429,13 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
-        title="Settings"
+        title={t("Settings")}
         topInset={topPad}
         colors={colors}
         centered
         leading={
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
+            <Feather name={preferences.isRTL ? "arrow-right" : "arrow-left"} size={22} color={colors.foreground} />
           </Pressable>
         }
       />
@@ -430,13 +453,13 @@ export default function SettingsScreen() {
         <SectionHeader title="APPEARANCE" />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
           <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginBottom: 12 }]}>
-            Theme
+            {t("Theme")}
           </Text>
           <View style={styles.themeToggle}>
             {(["system", "light", "dark"] as ThemeMode[]).map((m) => {
               const active = theme.mode === m;
               const icon = m === "system" ? "monitor" : m === "light" ? "sun" : "moon";
-              const label = m === "system" ? "System" : m === "light" ? "Light" : "Dark";
+              const label = t(m === "system" ? "System" : m === "light" ? "Light" : "Dark");
               return (
                 <Pressable
                   key={m}
@@ -461,6 +484,64 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+          <View style={[styles.rowDivider, { backgroundColor: colors.border, marginStart: 0, marginTop: 14, marginBottom: 12 }]} />
+          <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("Language")}</Text>
+          <View style={styles.themeToggle}>
+            {([
+              ["en", t("English")],
+              ["ar", t("Arabic (Saudi Arabia)")],
+            ] as const).map(([value, label]) => (
+              <Pressable
+                key={value}
+                accessibilityRole="button"
+                accessibilityState={{ selected: preferences.language === value }}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  void preferences.setLanguage(value).catch(error => Alert.alert(t("Language"), error instanceof Error ? error.message : t("Could not change language")));
+                }}
+                style={[
+                  styles.themeTab,
+                  preferences.language === value
+                    ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                    : { backgroundColor: colors.muted, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.themeTabText, { color: preferences.language === value ? colors.primaryForeground : colors.mutedForeground }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[styles.currencyNote, { color: colors.mutedForeground, marginTop: 8 }]}>{t("Changing language reloads the app to apply right-to-left layout.")}</Text>
+          <View style={[styles.rowDivider, { backgroundColor: colors.border, marginStart: 0, marginTop: 14, marginBottom: 12 }]} />
+          <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("Display calendar")}</Text>
+          <View style={styles.themeToggle}>
+            {([
+              ["gregorian", t("Gregorian")],
+              ["hijri", t("Hijri")],
+            ] as const).map(([value, label]) => (
+              <Pressable
+                key={value}
+                accessibilityRole="button"
+                accessibilityState={{ selected: preferences.calendar === value }}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  void preferences.setCalendar(value).catch(error => Alert.alert(t("Display calendar"), error instanceof Error ? error.message : t("Could not save preference")));
+                }}
+                style={[
+                  styles.themeTab,
+                  preferences.calendar === value
+                    ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                    : { backgroundColor: colors.muted, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.themeTabText, { color: preferences.calendar === value ? colors.primaryForeground : colors.mutedForeground }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[styles.currencyNote, { color: colors.mutedForeground, marginTop: 8 }]}>{t("Date entry always uses the Gregorian calendar.")}</Text>
         </View>
 
         {/* Profile */}
@@ -490,7 +571,7 @@ export default function SettingsScreen() {
             ) : (
               <View style={{ flex: 1 }}>
                 <Text style={[styles.profileName, { color: colors.foreground }]}>{finance.userName}</Text>
-                <Text style={[styles.profileSub, { color: colors.mutedForeground }]}>Tap to edit name</Text>
+                <Text style={[styles.profileSub, { color: colors.mutedForeground }]}>{t("Tap to edit name")}</Text>
               </View>
             )}
             <Pressable onPress={() => { setEditingName(true); setNameValue(finance.userName); }} hitSlop={8}>
@@ -504,7 +585,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>
           {/* Currency picker */}
           <View style={styles.currencySection}>
-            <Text style={[styles.currencyLabel, { color: colors.mutedForeground }]}>Display Currency</Text>
+            <Text style={[styles.currencyLabel, { color: colors.mutedForeground }]}>{t("Display Currency")}</Text>
             <View style={styles.currencyChips}>
               {SUPPORTED_CURRENCIES.map((c) => {
                 const active = finance.currency === c.code;
@@ -527,7 +608,7 @@ export default function SettingsScreen() {
                       {c.code}
                     </Text>
                     <Text style={[styles.currencyChipRate, { color: active ? colors.primaryForeground + "AA" : colors.mutedForeground }]}>
-                      {c.name}
+                      {t(c.name)}
                     </Text>
                   </Pressable>
                 );
@@ -535,7 +616,7 @@ export default function SettingsScreen() {
             </View>
             {finance.currency !== "SAR" && (
               <Text style={[styles.currencyNote, { color: colors.mutedForeground }]}>
-                Totals include only records in {finance.currency}. Different currencies are never combined without conversion.
+                {t("Totals include only records in this currency. Different currencies are never combined without conversion.").replace("this currency", finance.currency)}
               </Text>
             )}
           </View>
@@ -545,7 +626,7 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
               <Feather name="target" size={17} color={colors.primary} />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Monthly Budget</Text>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Monthly Budget")}</Text>
             <View style={{ flex: 1 }} />
             {editingBudget ? (
               <TextInput
@@ -555,20 +636,20 @@ export default function SettingsScreen() {
                 value={budgetValue}
                 onChangeText={setBudgetValue}
                 onBlur={() => {
-                  const n = parseFloat(budgetValue);
-                  if (!isNaN(n) && n > 0) finance.setMonthlyBudget(n);
+                  const n = parseLocalizedNumberInput(budgetValue);
+                  if (n !== null && n > 0) finance.setMonthlyBudget(n);
                   setEditingBudget(false);
                 }}
                 onSubmitEditing={() => {
-                  const n = parseFloat(budgetValue);
-                  if (!isNaN(n) && n > 0) finance.setMonthlyBudget(n);
+                  const n = parseLocalizedNumberInput(budgetValue);
+                  if (n !== null && n > 0) finance.setMonthlyBudget(n);
                   setEditingBudget(false);
                 }}
               />
             ) : (
               <Pressable onPress={() => { setEditingBudget(true); setBudgetValue(finance.monthlyBudget.toString()); }}>
                 <Text style={[styles.budgetValue, { color: colors.primary }]}>
-                  {finance.currency} {finance.monthlyBudget.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                  {finance.currency} {formatNumber(finance.monthlyBudget, preferences.language, { maximumFractionDigits: 2 })}
                 </Text>
               </Pressable>
             )}
@@ -582,7 +663,7 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: "#F59E0B20" }]}>
               <Feather name="bell" size={17} color="#F59E0B" />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Enable Reminders</Text>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Enable Reminders")}</Text>
             <View style={{ flex: 1 }} />
             <Switch
               value={notif.enabled}
@@ -598,17 +679,17 @@ export default function SettingsScreen() {
                 <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
                   <Feather name="clock" size={17} color={colors.primary} />
                 </View>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Remind me</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Remind me")}</Text>
                 <View style={{ flex: 1 }} />
                 <Text style={[styles.settingValue, { color: colors.primary }]}>{timingLabels[notif.timing]}</Text>
-                <Feather name="chevron-right" size={14} color={colors.mutedForeground} style={{ marginLeft: 4 }} />
+                <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={14} color={colors.mutedForeground} style={{ marginStart: 4 }} />
               </Pressable>
               <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
               <View style={styles.settingRow}>
                 <View style={[styles.settingIconWrap, { backgroundColor: "#10B98120" }]}>
                   <Feather name="refresh-cw" size={17} color="#10B981" />
                 </View>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>EMI reminders</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("EMI reminders")}</Text>
                 <View style={{ flex: 1 }} />
                 <Switch
                   value={notif.emiEnabled}
@@ -622,7 +703,7 @@ export default function SettingsScreen() {
                 <View style={[styles.settingIconWrap, { backgroundColor: "#EF444420" }]}>
                   <Feather name="list" size={17} color="#EF4444" />
                 </View>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Expense reminders</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Expense reminders")}</Text>
                 <View style={{ flex: 1 }} />
                 <Switch
                   value={notif.expenseEnabled}
@@ -636,7 +717,7 @@ export default function SettingsScreen() {
                 <View style={[styles.settingIconWrap, { backgroundColor: "#F59E0B20" }]}>
                   <Feather name="alert-triangle" size={17} color="#F59E0B" />
                 </View>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Budget alerts</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Budget alerts")}</Text>
                 <View style={{ flex: 1 }} />
                 <Switch
                   value={notif.budgetEnabled}
@@ -653,14 +734,14 @@ export default function SettingsScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {(["balloonEnabled", "loanEnabled"] as const).map(key => (
               <View key={key} style={styles.settingRow}>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{key === "balloonEnabled" ? "Balloon reminders" : "Loan reminders"}</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t(key === "balloonEnabled" ? "Balloon reminders" : "Loan reminders")}</Text>
                 <View style={{ flex: 1 }} />
                 <Switch testID={`notification-${key}`} value={notif[key] ?? true}
                   onValueChange={value => updateNotif({ [key]: value })}
                   trackColor={{ true: colors.primary, false: colors.muted }} />
               </View>
             ))}
-            <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting }}>Local reminders require device permission. Web previews do not send notifications. Category thresholds are configured in Budget.</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting }}>{t("Local reminders require device permission. Web previews do not send notifications. Category thresholds are configured in Budget.")}</Text>
           </View>
         )}
         {/* Security */}
@@ -675,10 +756,10 @@ export default function SettingsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.settingLabel, { color: colors.foreground }]}>
-                    {auth.biometricType === "face" ? "Face ID" : "Fingerprint"}
+                    {t(auth.biometricType === "face" ? "Face ID" : "Fingerprint")}
                   </Text>
                   <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>
-                    {auth.biometricEnabled ? "Biometric unlock is on" : "Use biometrics to unlock app"}
+                    {t(auth.biometricEnabled ? "Biometric unlock is on" : "Use biometrics to unlock app")}
                   </Text>
                 </View>
                 <Switch
@@ -696,9 +777,9 @@ export default function SettingsScreen() {
               <Feather name="lock" size={17} color="#8B5CF6" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.settingLabel, { color: colors.foreground }]}>PIN Lock</Text>
+              <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("PIN Lock")}</Text>
               <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>
-                {security.pinEnabled ? "PIN set — locks on restart and after inactivity" : "Protect your data with a PIN"}
+                {t(security.pinEnabled ? "PIN set — locks on restart and after inactivity" : "Protect your data with a PIN")}
               </Text>
             </View>
             <Switch
@@ -715,21 +796,21 @@ export default function SettingsScreen() {
                 <View style={[styles.settingIconWrap, { backgroundColor: "#8B5CF620" }]}>
                   <Feather name="clock" size={17} color="#8B5CF6" />
                 </View>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Auto-lock</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Auto-lock")}</Text>
                 <View style={{ flex: 1 }} />
                 <Text style={[styles.settingValue, { color: colors.primary }]}>
-                  {autoLockLabels[security.autoLockMinutes]}
+                  {t(autoLockLabels[security.autoLockMinutes])}
                 </Text>
-                <Feather name="chevron-right" size={14} color={colors.mutedForeground} style={{ marginLeft: 4 }} />
+                <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={14} color={colors.mutedForeground} style={{ marginStart: 4 }} />
               </Pressable>
               <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
                <Pressable style={styles.settingRow} onPress={() => setPasswordAction("change-pin")}>
                 <View style={[styles.settingIconWrap, { backgroundColor: "#8B5CF620" }]}>
                   <Feather name="edit-3" size={17} color="#8B5CF6" />
                 </View>
-                <Text style={[styles.settingLabel, { color: colors.foreground }]}>Change PIN</Text>
+                <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Change PIN")}</Text>
                 <View style={{ flex: 1 }} />
-                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
               </Pressable>
             </>
           )}
@@ -745,10 +826,10 @@ export default function SettingsScreen() {
               <Feather name="archive" size={17} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.settingLabel, { color: colors.foreground }]}>Backup & Restore</Text>
-              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>Encrypted local file, no cloud upload</Text>
+              <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Backup & Restore")}</Text>
+              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>{t("Encrypted local file, no cloud upload")}</Text>
             </View>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
           </Pressable>
         </View>
 
@@ -762,7 +843,7 @@ export default function SettingsScreen() {
                   <Feather name="user" size={17} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Signed in as</Text>
+                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Signed in as")}</Text>
                   <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
                     {auth.userEmail}
                   </Text>
@@ -775,9 +856,9 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: "#EF444420" }]}>
               <Feather name="log-out" size={17} color="#EF4444" />
             </View>
-            <Text style={[styles.settingLabel, { color: "#EF4444" }]}>Sign Out</Text>
+            <Text style={[styles.settingLabel, { color: "#EF4444" }]}>{t("Sign Out")}</Text>
             <View style={{ flex: 1 }} />
-            <Feather name="chevron-right" size={16} color="#EF444480" />
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color="#EF444480" />
           </Pressable>
         </View>
 
@@ -791,9 +872,9 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
               <Feather name="life-buoy" size={17} color={colors.primary} />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Help & Support</Text>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Help & Support")}</Text>
             <View style={{ flex: 1 }} />
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
           </Pressable>
           <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
           <Pressable
@@ -803,9 +884,9 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: "#10B98120" }]}>
               <Feather name="shield" size={17} color="#10B981" />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Privacy Policy</Text>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Privacy Policy")}</Text>
             <View style={{ flex: 1 }} />
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
           </Pressable>
           <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
           <Pressable
@@ -815,9 +896,9 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: "#F59E0B20" }]}>
               <Feather name="file-text" size={17} color="#F59E0B" />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Terms & Conditions</Text>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Terms & Conditions")}</Text>
             <View style={{ flex: 1 }} />
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
           </Pressable>
         </View>
 
@@ -828,9 +909,9 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
               <Feather name="info" size={17} color={colors.primary} />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>Version</Text>
+            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Version")}</Text>
             <View style={{ flex: 1 }} />
-            <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>1.0.0</Text>
+                <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>{Constants.expoConfig?.version ?? t("Expo Go")}</Text>
           </View>
         </View>
 
@@ -865,7 +946,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginTop: 16,
     marginBottom: 6,
-    marginLeft: 4,
+    marginStart: 4,
   },
   card: {
     borderRadius: 18,
@@ -914,7 +995,7 @@ const styles = StyleSheet.create({
   settingLabel: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_500Medium" },
   settingSubLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", marginTop: 2 },
   settingValue: { fontSize: TYPOGRAPHY.body, fontFamily: "Inter_500Medium" },
-  rowDivider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
+  rowDivider: { height: StyleSheet.hairlineWidth, marginStart: 60 },
   currencySection: { padding: 14 },
   currencyLabel: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_500Medium", marginBottom: 10, letterSpacing: 0.4 },
   currencyChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -945,7 +1026,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     minWidth: 96,
-    textAlign: "right",
+    textAlign: "auto",
   },
   pinModalOverlay: {
     flex: 1,

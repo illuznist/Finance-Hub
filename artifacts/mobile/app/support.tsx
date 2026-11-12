@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { usePreferences } from "@/context/PreferencesContext";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -59,6 +60,7 @@ const FAQ: { q: string; a: string }[] = [
 
 function FaqItem({ item }: { item: { q: string; a: string } }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const [open, setOpen] = useState(false);
   const rotAnim = useRef(new Animated.Value(0)).current;
 
@@ -73,19 +75,19 @@ function FaqItem({ item }: { item: { q: string; a: string } }) {
     setOpen((v) => !v);
   }
 
-  const rotate = rotAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] });
+  const rotate = rotAnim.interpolate({ inputRange: [0, 1], outputRange: [isRTL ? "180deg" : "0deg", "90deg"] });
 
   return (
     <View>
       <Pressable onPress={toggle} style={styles.faqRow}>
-        <Text style={[styles.faqQ, { color: colors.foreground, flex: 1 }]}>{item.q}</Text>
+        <Text style={[styles.faqQ, { color: colors.foreground, flex: 1 }]}>{t(item.q)}</Text>
         <Animated.View style={{ transform: [{ rotate }] }}>
-          <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
         </Animated.View>
       </Pressable>
       {open && (
         <Text style={[styles.faqA, { color: colors.mutedForeground, borderTopColor: colors.border }]}>
-          {item.a}
+          {t(item.a)}
         </Text>
       )}
     </View>
@@ -106,6 +108,7 @@ function ActionRow({
   onPress: () => void;
 }) {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   return (
     <Pressable
       onPress={onPress}
@@ -115,18 +118,19 @@ function ActionRow({
         <Feather name={icon as any} size={18} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.actionLabel, { color: colors.foreground }]}>{label}</Text>
+        <Text style={[styles.actionLabel, { color: colors.foreground }]}>{t(label)}</Text>
         {sublabel && (
-          <Text style={[styles.actionSub, { color: colors.mutedForeground }]}>{sublabel}</Text>
+          <Text style={[styles.actionSub, { color: colors.mutedForeground }]}>{t(sublabel)}</Text>
         )}
       </View>
-      <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }
 
 export default function SupportScreen() {
   const colors = useColors();
+  const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -146,7 +150,7 @@ export default function SupportScreen() {
         centered
         leading={
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
+            <Feather name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={colors.foreground} />
           </Pressable>
         }
       />
@@ -164,15 +168,15 @@ export default function SupportScreen() {
             <Feather name="life-buoy" size={28} color={colors.primary} />
           </View>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>
-            We are here to help
+            {t("We are here to help")}
           </Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
-            Browse the FAQ below or reach out and we will get back to you as soon as possible.
+            {t("Browse the FAQ below or reach out and we will get back to you as soon as possible.")}
           </Text>
         </View>
 
         {/* Contact options */}
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CONTACT</Text>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>{t("CONTACT")}</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ActionRow
             icon="mail"
@@ -199,8 +203,8 @@ export default function SupportScreen() {
         </View>
 
         {/* FAQ */}
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-          FREQUENTLY ASKED
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+          {t("FREQUENTLY ASKED")}
         </Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {FAQ.map((item, i) => (
@@ -213,7 +217,7 @@ export default function SupportScreen() {
 
         {/* Footer note */}
         <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>
-          Average response time: 1–2 business days
+          {t("Average response time: 1–2 business days")}
         </Text>
       </ScrollView>
     </View>
@@ -265,7 +269,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginTop: 12,
     marginBottom: 6,
-    marginLeft: 4,
+    marginStart: 4,
   },
   card: {
     borderRadius: 18,
@@ -293,7 +297,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.supporting,
     marginTop: 2,
   },
-  divider: { height: StyleSheet.hairlineWidth, marginLeft: 68 },
+  divider: { height: StyleSheet.hairlineWidth, marginStart: 68 },
   faqRow: {
     flexDirection: "row",
     alignItems: "center",

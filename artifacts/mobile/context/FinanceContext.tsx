@@ -731,6 +731,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const setSecuritySettings = useCallback(
     async (securitySettings: SecuritySettings) => {
       if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before changing security settings.");
+      const previousSecuritySettings = stateRef.current.securitySettings;
       const next = { ...stateRef.current, securitySettings };
       stateRef.current = next;
       setState(next);
@@ -739,6 +740,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         readyRef.current = true;
         setStorageError(null);
       } catch {
+        const recovered = {
+          ...stateRef.current,
+          securitySettings: previousSecuritySettings,
+        };
+        stateRef.current = recovered;
+        setState(recovered);
         readyRef.current = false;
         setStorageError("Security settings could not be saved. Keep the app open and retry safely.");
         throw new Error("Security settings could not be saved. Retry safely before leaving this screen.");

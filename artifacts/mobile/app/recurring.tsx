@@ -14,6 +14,8 @@ import { defaultCategories } from "@/finance/budgets";
 import { localDate, newId, validLocalDate } from "@/finance/ledger";
 import type { RecurringExpense, RecurringFrequency } from "@/finance/planningTypes";
 import { useColors } from "@/hooks/useColors";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
 
 const FREQS: { key: RecurringFrequency; label: string }[] = [
   { key: "daily", label: "Daily" }, { key: "weekly", label: "Weekly" }, { key: "monthly", label: "Monthly" },
@@ -22,18 +24,24 @@ const FREQS: { key: RecurringFrequency; label: string }[] = [
 ];
 const UNITS: { key: "day" | "week" | "month"; label: string }[] = [{ key: "day", label: "Days" }, { key: "week", label: "Weeks" }, { key: "month", label: "Months" }];
 
-function freqLabel(r: RecurringExpense): string {
-  if (r.frequency === "custom") return `Every ${r.interval ?? 1} ${r.intervalUnit ?? "month"}${(r.interval ?? 1) === 1 ? "" : "s"}`;
-  return FREQS.find(f => f.key === r.frequency)?.label ?? r.frequency;
+function freqLabel(r: RecurringExpense, t: (key: string) => string): string {
+  if (r.frequency === "custom") {
+    const count = r.interval ?? 1;
+    const unit = r.intervalUnit ?? "month";
+    const key = `${unit}${count === 1 ? "" : "s"}`;
+    return `${t("Every")} ${formatAppNumber(count)} ${t(key)}`;
+  }
+  return t(FREQS.find(f => f.key === r.frequency)?.label ?? r.frequency);
 }
 
-function confirm(title: string, msg: string, action: string, run: () => void, destructive = false) {
-  if (Platform.OS === "web") { if (typeof window !== "undefined" && window.confirm(`${title}\n${msg}`)) run(); return; }
-  Alert.alert(title, msg, [{ text: "Cancel", style: "cancel" }, { text: action, style: destructive ? "destructive" : "default", onPress: run }]);
+function confirm(t: (key: string) => string, title: string, msg: string, action: string, run: () => void, destructive = false) {
+  if (Platform.OS === "web") { if (typeof window !== "undefined" && window.confirm(`${t(title)}\n${t(msg)}`)) run(); return; }
+  Alert.alert(t(title), t(msg), [{ text: t("Cancel"), style: "cancel" }, { text: t(action), style: destructive ? "destructive" : "default", onPress: run }]);
 }
 
 export default function RecurringScreen() {
   const colors = useColors();
+  const { t } = usePreferences();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const finance = usePlanning();
@@ -57,7 +65,7 @@ export default function RecurringScreen() {
   const active = all.filter(r => r.active).sort((a, b) => nextDue(a).localeCompare(nextDue(b)));
   const paused = all.filter(r => !r.active);
   const detail = detailId ? all.find(r => r.id === detailId) ?? null : null;
-  const acctName = (id?: string) => (id ? finance.accounts.find(a => a.id === id)?.name ?? "Removed account" : "Unassigned");
+  const acctName = (id?: string) => (id ? finance.accounts.find(a => a.id === id)?.name ?? t("Removed account") : t("Unassigned"));
 
   const row = (r: RecurringExpense, i: number) => (
     <View key={r.id}>
@@ -67,7 +75,7 @@ export default function RecurringScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[ui.bodyStrong, { color: colors.foreground }]} numberOfLines={1}>{r.name}</Text>
           <Text style={[ui.small, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {freqLabel(r)} · {r.active ? `Next ${shortDate(nextDue(r))}` : "Paused"} · {acctName(r.accountId)}
+            {freqLabel(r, t)} · {r.active ? `${t("Next")} ${shortDate(nextDue(r))}` : t("Paused")} · {acctName(r.accountId)}
           </Text>
         </View>
         <Text style={[ui.bodyStrong, ui.num, { color: colors.foreground }]}>{money(r.amount, r.currency)}</Text>
@@ -82,20 +90,20 @@ export default function RecurringScreen() {
         trailing={<HeaderAction icon="plus" label="Add recurring expense" testID="add-recurring" onPress={() => setForm({})} />} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }}>
         <Pressable testID="open-upcoming" onPress={() => router.push("/upcoming")} style={[ui.between, { paddingVertical: 4 }]}>
-          <Text style={[ui.small, { color: colors.mutedForeground }]}>Pay or skip due items from Upcoming.</Text>
-          <Text style={[ui.link, { color: colors.primary }]}>Upcoming</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("Pay or skip due items from Upcoming.")}</Text>
+          <Text style={[ui.link, { color: colors.primary }]}>{t("Upcoming")}</Text>
         </Pressable>
-        {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 8 }]}>{error}</Text> : null}
+        {error ? <Text style={[ui.small, { color: colors.destructive, marginTop: 8 }]}>{t(error)}</Text> : null}
         {all.length === 0 ? (
           <EmptyBlock icon="repeat" title="No recurring expenses" body="Add rent, bills and subscriptions once. They appear in Upcoming when due and only affect balances when you confirm payment.">
             <Button label="Add recurring expense" onPress={() => setForm({})} testID="empty-add-recurring" />
           </EmptyBlock>
         ) : (
           <>
-            <Text style={[ui.section, { color: colors.foreground }]}>Active · {active.length}</Text>
-            {active.length ? active.map(row) : <Text style={[ui.small, { color: colors.mutedForeground }]}>No active schedules.</Text>}
+            <Text style={[ui.section, { color: colors.foreground }]}>{t("Active")} · {active.length}</Text>
+            {active.length ? active.map(row) : <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("No active schedules.")}</Text>}
             {paused.length ? <>
-              <Text style={[ui.section, { color: colors.foreground }]}>Paused · {paused.length}</Text>
+              <Text style={[ui.section, { color: colors.foreground }]}>{t("Paused")} · {paused.length}</Text>
               {paused.map(row)}
             </> : null}
           </>
@@ -105,15 +113,15 @@ export default function RecurringScreen() {
       {detail ? (
         <FormModal title={detail.name} topInset={topInset} bottomInset={bottomInset} onClose={() => setDetailId(null)} testID="recurring-detail">
           <Text style={[ui.hero, { color: colors.foreground }]}>{money(detail.amount, detail.currency)}</Text>
-          <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 4 }]}>{freqLabel(detail)} · {detail.category} · {acctName(detail.accountId)}</Text>
+          <Text style={[ui.small, { color: colors.mutedForeground, marginTop: 4 }]}>{freqLabel(detail, t)} · {detail.category} · {acctName(detail.accountId)}</Text>
           <View style={[ui.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}>
             {([["Status", detail.active ? "Active" : "Paused"], ["Next due", detail.active ? shortDate(nextDue(detail)) : "—"],
               ["Started", shortDate(detail.startDate)], ["Ends", detail.endDate ? shortDate(detail.endDate) : "No end date"],
               ["Reminder", detail.reminder ? "On" : "Off"], ["Auto-create pending", detail.autoGenerate ? "On" : "Off"],
               ...(detail.notes ? [["Notes", detail.notes]] : [])] as [string, string][]).map(([k, v]) => (
               <View key={k} style={[ui.between, { paddingVertical: 5 }]}>
-                <Text style={[ui.body, { color: colors.mutedForeground }]}>{k}</Text>
-                <Text style={[ui.body, { color: colors.foreground, flexShrink: 1, textAlign: "right" }]}>{v}</Text>
+                <Text style={[ui.body, { color: colors.mutedForeground }]}>{t(k)}</Text>
+                <Text style={[ui.body, { color: colors.foreground, flexShrink: 1, textAlign: "auto" }]}>{k === "Notes" ? v : t(v)}</Text>
               </View>
             ))}
           </View>
@@ -123,10 +131,10 @@ export default function RecurringScreen() {
               onPress={() => { if (!finance.setRecurringActive(detail.id, !detail.active)) setError("Status could not be changed."); }} />
           </View>
           <Button label="Archive" tone="danger" style={{ marginTop: 10 }} testID="recurring-archive"
-            onPress={() => confirm("Archive schedule?", "No new occurrences will be created. Paid history and transactions are kept.", "Archive", () => {
+            onPress={() => confirm(t, "Archive schedule?", "No new occurrences will be created. Paid history and transactions are kept.", "Archive", () => {
               if (finance.deleteRecurring(detail.id)) setDetailId(null); else setError("This schedule could not be archived.");
             }, true)} />
-          <Text style={[ui.section, { color: colors.foreground }]}>History</Text>
+          <Text style={[ui.section, { color: colors.foreground }]}>{t("History")}</Text>
           <History id={detail.id} />
         </FormModal>
       ) : null}
@@ -141,10 +149,11 @@ export default function RecurringScreen() {
 
 function History({ id }: { id: string }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const router = useRouter();
   const finance = usePlanning();
   const items = (finance.planning?.occurrences ?? []).filter(o => o.recurringId === id).sort((a, b) => b.dueDate.localeCompare(a.dueDate));
-  if (!items.length) return <Text style={[ui.small, { color: colors.mutedForeground }]}>No occurrences yet.</Text>;
+  if (!items.length) return <Text style={[ui.small, { color: colors.mutedForeground }]}>{t("No occurrences yet.")}</Text>;
   return (
     <View>
       {items.map((o, i) => {
@@ -155,7 +164,7 @@ function History({ id }: { id: string }) {
             <View style={[ui.between, { paddingVertical: 10 }]} testID={`occurrence-${o.id}`}>
               <View style={{ flex: 1 }}>
                 <Text style={[ui.body, { color: colors.foreground }]}>{shortDate(o.dueDate)}</Text>
-                <Text style={[ui.small, { color: tone }]}>{o.status === "paid" ? "Paid" : o.status === "skipped" ? `Skipped${o.skipReason ? ` · ${o.skipReason}` : ""}` : "Pending"}</Text>
+                <Text style={[ui.small, { color: tone }]}>{t(o.status === "paid" ? "Paid" : o.status === "skipped" ? "Skipped" : "Pending")}{o.status === "skipped" && o.skipReason ? ` · ${o.skipReason}` : ""}</Text>
               </View>
               <Text style={[ui.body, ui.num, { color: colors.foreground }]}>{money(o.amount, o.currency)}</Text>
               {o.status === "paid" && o.expenseId ? (
@@ -175,6 +184,7 @@ function RecurringForm({ editing, topInset, bottomInset, onClose }: {
   editing: RecurringExpense | null; topInset: number; bottomInset: number; onClose: () => void;
 }) {
   const colors = useColors();
+  const { t } = usePreferences();
   const finance = usePlanning();
   const formId = useRef(editing?.id ?? newId()).current;
   const saving = useRef(false);
@@ -212,7 +222,7 @@ function RecurringForm({ editing, topInset, bottomInset, onClose }: {
     if (value === null) e.amount = "Enter a positive amount with up to two decimals.";
     if (!validLocalDate(startDate)) e.start = "Use YYYY-MM-DD.";
     if (endDate && (!validLocalDate(endDate) || endDate < startDate)) e.end = "End date must be a valid date on or after the start.";
-    const n = Number(interval);
+    const n = parseLocalizedNumberInput(interval) ?? NaN;
     if (frequency === "custom" && (!Number.isInteger(n) || n < 1 || n > 365)) e.interval = "Use a whole number from 1 to 365.";
     setErrors(e);
     if (Object.keys(e).length) return;
@@ -230,9 +240,9 @@ function RecurringForm({ editing, topInset, bottomInset, onClose }: {
   };
 
   return (
-    <FormModal title={editing ? "Edit recurring" : "New recurring expense"} topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="recurring-form"
+    <FormModal title={editing ? "Edit recurring" : "New recurring expense"} translateTitle topInset={topInset} bottomInset={bottomInset} onClose={onClose} testID="recurring-form"
       footer={<>
-        {formError ? <Text style={[ui.small, { color: colors.destructive, marginTop: 16 }]}>{formError}</Text> : null}
+        {formError ? <Text style={[ui.small, { color: colors.destructive, marginTop: 16 }]}>{t(formError)}</Text> : null}
         <Button label={editing ? "Save changes" : "Add schedule"} onPress={save} testID="recurring-form-save" style={{ marginTop: 20 }} />
       </>}>
       <Field label="Name" error={errors.name}><Input testID="rec-name" value={name} onChangeText={setName} placeholder="Rent, internet, gym" /></Field>

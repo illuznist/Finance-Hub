@@ -7,7 +7,11 @@ const {
   verifyCredentialVerifier,
 } = require("../credentials.ts");
 const { pinDelayMs } = require("../pinPolicy.ts");
-const { lockOnResume, lockWhenBackgrounded } = require("../appLockPolicy.ts");
+const {
+  lockOnResume,
+  lockWhenBackgrounded,
+  nextAppLockStatus,
+} = require("../appLockPolicy.ts");
 const {
   PIN_ATTEMPTS_KEY,
   PIN_VERIFIER_KEY,
@@ -92,4 +96,11 @@ test("app lock policy covers immediate, delayed, long, and never-lock settings",
   assert.equal(lockOnResume(30, 30 * 60_000), true);
   assert.equal(lockWhenBackgrounded(0), false);
   assert.equal(lockOnResume(0, 86_400_000), false);
+});
+
+test("enabling a PIN during the current session does not interrupt setup", () => {
+  assert.equal(nextAppLockStatus(false, false), "open");
+  assert.equal(nextAppLockStatus(false, true), "locked");
+  assert.equal(nextAppLockStatus(true, true), null);
+  assert.equal(nextAppLockStatus(true, false), "open");
 });

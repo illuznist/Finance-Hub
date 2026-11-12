@@ -25,19 +25,28 @@ import { HeaderAction } from "@/components/ScreenHeader";
 import { addDays } from "@/finance/calendar";
 import { localDate } from "@/finance/ledger";
 import type { UpcomingPayment } from "@/finance/planningTypes";
+import { usePreferences } from "@/context/PreferencesContext";
+import { formatCurrency, formatDisplayDate, formatNumber, type AppLanguage } from "@/i18n/localization";
+import { useStackedSavingsHeader } from "@/finance/presentationLayout";
 
 const TAB_BAR_HEIGHT = 90;
 
-function greeting(name: string): string {
+function greeting(name: string, language: AppLanguage): string {
   const hour = new Date().getHours();
   const suffix = name.trim() ? `, ${name}` : "";
-  if (hour < 12) return `Good Morning${suffix}`;
-  if (hour < 17) return `Good Afternoon${suffix}`;
-  return `Good Evening${suffix}`;
+  if (hour < 12) return `${translate("Good Morning", language)}${suffix}`;
+  if (hour < 17) return `${translate("Good Afternoon", language)}${suffix}`;
+  return `${translate("Good Evening", language)}${suffix}`;
 }
 
-function fmt(amount: number, currency: string): string {
-  return `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
+function translate(key: string, language: AppLanguage): string {
+  return language === "ar"
+    ? ({
+      "Good Morning": "صباح الخير",
+      "Good Afternoon": "مساء الخير",
+      "Good Evening": "مساء الخير",
+    }[key] ?? key)
+    : key;
 }
 
 
@@ -53,11 +62,15 @@ function BudgetAlertBanner({
   remaining,
   overspend,
   currency,
+  language,
+  t,
 }: {
   spentPerc: number;
   remaining: number;
   overspend: number;
   currency: string;
+  language: AppLanguage;
+  t: (key: string) => string;
 }) {
   const colors = useColors();
   const [dismissedDay, setDismissedDay] = useState<string | null>(null);
@@ -91,24 +104,24 @@ function BudgetAlertBanner({
       border: colors.warning,
       icon: "alert-triangle" as const,
       color: colors.warning,
-      title: "Heads up",
-      body: `You've used ${Math.round(spentPerc * 100)}% of your monthly budget`,
+      title: t("Heads up"),
+      body: `${t("You've used")} ${formatNumber(Math.round(spentPerc * 100), language)}% ${t("of your monthly budget")}`,
     },
     danger: {
       bg: colors.warningLight,
       border: colors.warning,
       icon: "alert-circle" as const,
       color: colors.warning,
-      title: "Low budget",
-      body: `Only ${currency} ${remaining.toLocaleString()} left this month`,
+      title: t("Low budget"),
+      body: `${t("Only")} ${formatCurrency(remaining, currency, language)} ${t("left this month")}`,
     },
     exceeded: {
       bg: colors.errorLight,
       border: colors.destructive,
       icon: "x-circle" as const,
       color: colors.destructive,
-      title: "Budget exceeded",
-      body: `Over by ${currency} ${overspend.toLocaleString()} — review your spending`,
+      title: t("Budget exceeded"),
+      body: `${t("Over by")} ${formatCurrency(overspend, currency, language)} — ${t("review your spending")}`,
     },
   }[level];
 
@@ -136,7 +149,7 @@ function BudgetAlertBanner({
         <Text style={[styles.alertTitle, { color: config.color }]}>{config.title}</Text>
         <Text style={[styles.alertBody, { color: colors.mutedForeground }]}>{config.body}</Text>
       </View>
-      <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10} accessibilityLabel="Dismiss budget alert">
+      <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10} accessibilityLabel={t("Dismiss budget alert")}>
         <Feather name="x" size={16} color={colors.mutedForeground} />
       </Pressable>
     </Animated.View>
@@ -146,6 +159,7 @@ function BudgetAlertBanner({
 function ResetBanner() {
   const finance = useFinance();
   const colors = useColors();
+  const { t, language } = usePreferences();
   const info = finance.monthResetInfo;
   const slideAnim = useRef(new Animated.Value(-60)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -186,10 +200,10 @@ function ResetBanner() {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.alertTitle, { color: colors.primary }]}>
-          {info.month} is here
+          {info.month} {t("is here")}
         </Text>
         <Text style={[styles.alertBody, { color: colors.mutedForeground }]}>
-          {info.count} recurring {info.count === 1 ? "expense" : "expenses"} reset and ready to track
+          {formatNumber(info.count, language)} {t(info.count === 1 ? "expense reset and ready to track" : "expenses reset and ready to track")}
         </Text>
       </View>
       <Pressable onPress={dismiss} style={styles.alertDismiss} hitSlop={10}>
@@ -203,10 +217,12 @@ function ResetBanner() {
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
   const toast = useToast();
+  const preferences = usePreferences();
+  const { t, language, calendar } = preferences;
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -235,6 +251,7 @@ export default function DashboardScreen() {
   // Savings goal: e.g. 3x monthly income as target
   const savingsGoal = finance.totalMonthlyIncome * 3;
   const savingsPerc = savingsGoal > 0 ? Math.min(1, totalSavings / savingsGoal) : 0;
+  const stackedSavingsHeader = useStackedSavingsHeader(screenWidth, fontScale);
   // Monthly savings contribution
   const monthlySavings = Math.max(
     0,
@@ -289,11 +306,11 @@ export default function DashboardScreen() {
             </Text>
           </View>
           <View style={styles.brandActions}>
-            <HeaderAction icon="list" label="Open transactions" variant="neutral" testID="home-transactions-button"
+            <HeaderAction icon="list" label={t("Open transactions")} variant="neutral" testID="home-transactions-button"
               onPress={() => router.push("/transactions")} />
             <HeaderAction
               icon="bar-chart-2"
-              label="Open analytics"
+              label={t("Open analytics")}
               variant="neutral"
               testID="home-analytics-button"
               onPress={() => {
@@ -303,7 +320,7 @@ export default function DashboardScreen() {
             />
             <HeaderAction
               icon="settings"
-              label="Open settings"
+              label={t("Open settings")}
               variant="neutral"
               testID="home-settings-button"
               onPress={() => {
@@ -319,7 +336,7 @@ export default function DashboardScreen() {
             <View style={styles.dateRow}>
               <Feather name="calendar" size={13} color={colors.mutedForeground} />
               <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
-                {new Date().toLocaleDateString(undefined, {
+                {formatDisplayDate(new Date(), language, calendar, {
                   weekday: "long",
                   day: "numeric",
                   month: "long",
@@ -328,7 +345,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
             <Text style={[styles.greetingText, { color: colors.foreground }]}>
-              {greeting(finance.userName)}
+              {greeting(finance.userName, language)}
             </Text>
           </View>
         </View>
@@ -345,29 +362,29 @@ export default function DashboardScreen() {
             <View style={[styles.balanceRing, styles.balanceRingMiddle]} />
             <View style={[styles.balanceRing, styles.balanceRingInner]} />
           </View>
-          <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
+          <Text style={styles.balanceLabel}>{t("TOTAL BALANCE")}</Text>
           <Text style={styles.balanceAmount}>
-            {fmt(finance.totalBalance, finance.currency)}
+            {formatCurrency(finance.totalBalance, finance.currency, language)}
           </Text>
           <View style={styles.balanceDivider} />
           <View style={styles.balanceRow}>
             <View style={styles.balanceItem}>
               <View style={styles.balanceItemLabelRow}>
                 <Feather name="arrow-down-left" size={13} color="rgba(255,255,255,0.72)" />
-                <Text style={styles.balanceItemLabel}>Received this month</Text>
+                <Text style={styles.balanceItemLabel}>{t("Received this month")}</Text>
               </View>
               <Text style={styles.balanceItemValue}>
-                {fmt(finance.actualMonthlyIncome, finance.currency)}
+                {formatCurrency(finance.actualMonthlyIncome, finance.currency, language)}
               </Text>
             </View>
             <View style={styles.balanceSep} />
             <View style={styles.balanceItem}>
               <View style={styles.balanceItemLabelRow}>
                 <Feather name="arrow-up-right" size={13} color="rgba(255,255,255,0.72)" />
-                <Text style={styles.balanceItemLabel}>Paid this month</Text>
+                <Text style={styles.balanceItemLabel}>{t("Paid this month")}</Text>
               </View>
               <Text style={styles.balanceItemValue}>
-                {fmt(finance.actualMonthlyOutflow, finance.currency)}
+                {formatCurrency(finance.actualMonthlyOutflow, finance.currency, language)}
               </Text>
             </View>
           </View>
@@ -390,12 +407,12 @@ export default function DashboardScreen() {
               <Text
                 style={[styles.remainingLabel, { color: colors.mutedForeground }]}
               >
-                {budgetLimit === 0 ? "Set a monthly budget" : remaining < 0 ? "Over budget this month" : "Remaining this month"}
+                {t(budgetLimit === 0 ? "Set a monthly budget" : remaining < 0 ? "Over budget this month" : "Remaining this month")}
               </Text>
               <Text
                 style={[styles.remainingAmount, { color: remainingColor }]}
               >
-                {fmt(budgetLimit === 0 ? 0 : Math.abs(remaining), budgetCurrency)}
+                {formatCurrency(budgetLimit === 0 ? 0 : Math.abs(remaining), budgetCurrency, language)}
               </Text>
               <Text
                 style={[
@@ -403,7 +420,7 @@ export default function DashboardScreen() {
                   { color: colors.mutedForeground },
                 ]}
               >
-                of {fmt(budgetLimit, budgetCurrency)} budget
+                {t("of")} {formatCurrency(budgetLimit, budgetCurrency, language)} {t("budget")}
               </Text>
             </View>
             <View
@@ -426,7 +443,7 @@ export default function DashboardScreen() {
               <Text
                 style={[styles.remainingBadgeText, { color: remainingColor }]}
               >
-                {Math.round(remainingPerc * 100)}%
+                {formatNumber(Math.round(remainingPerc * 100), language)}%
               </Text>
             </View>
           </View>
@@ -450,11 +467,11 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.remainingCapRow}>
             <Text style={[styles.remainingCap, { color: colors.mutedForeground }]}>
-              Spent {fmt(totalSpent, budgetCurrency)}
+              {t("Spent")} {formatCurrency(totalSpent, budgetCurrency, language)}
             </Text>
             <Pressable onPress={() => router.push("/budget")} testID="home-open-budget" accessibilityRole="link" hitSlop={8}>
               <Text style={[styles.remainingCap, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
-                Budget details
+                {t("Budget details")}
               </Text>
             </Pressable>
           </View>
@@ -467,16 +484,18 @@ export default function DashboardScreen() {
           remaining={remaining}
           overspend={Math.max(0, totalSpent - budgetLimit)}
           currency={budgetCurrency}
+          language={language}
+          t={t}
         />
 
         {/* ── Upcoming payments ── */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Coming up
+            {t("Coming up")}
           </Text>
           <Pressable onPress={() => router.push("/upcoming")} testID="home-view-upcoming" accessibilityRole="link" hitSlop={8}>
             <Text style={[styles.sectionCount, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
-              View all
+              {t("View all")}
             </Text>
           </Pressable>
         </View>
@@ -489,7 +508,7 @@ export default function DashboardScreen() {
           {nextUp.length === 0 ? (
             <View style={[styles.expenseRow, { borderBottomColor: colors.border }]}>
               <Text style={[styles.expenseDue, { color: colors.mutedForeground, flex: 1 }]}>
-                No upcoming commitments. Recurring expenses, EMIs and loan schedules appear here.
+                {t("No upcoming commitments. Recurring expenses, EMIs and loan schedules appear here.")}
               </Text>
             </View>
           ) : nextUp.map((item, index) => (
@@ -515,12 +534,12 @@ export default function DashboardScreen() {
                   {item.name}
                 </Text>
                 <Text style={[styles.expenseDue, { color: item.status === "overdue" ? colors.destructive : colors.mutedForeground }]}>
-                  {item.status === "overdue" ? "Overdue · " : item.status === "due_today" ? "Due today · " : ""}
-                  {new Date(Number(item.dueDate.slice(0, 4)), Number(item.dueDate.slice(5, 7)) - 1, Number(item.dueDate.slice(8))).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                  {item.status === "overdue" ? `${t("Overdue")} · ` : item.status === "due_today" ? `${t("Due today")} · ` : ""}
+                  {formatDisplayDate(item.dueDate, language, calendar, { day: "numeric", month: "short" })}
                 </Text>
               </View>
               <Text style={[styles.expenseAmount, { color: colors.foreground }]}>
-                {fmt(item.amount, item.currency)}
+                {formatCurrency(item.amount, item.currency, language)}
               </Text>
             </Pressable>
           ))}
@@ -536,7 +555,7 @@ export default function DashboardScreen() {
           <View
             style={[
               styles.savingsHeader,
-              screenWidth <= 360 && styles.savingsHeaderCompact,
+              stackedSavingsHeader && styles.savingsHeaderCompact,
             ]}
           >
             <View style={styles.savingsHeaderLeft}>
@@ -552,7 +571,7 @@ export default function DashboardScreen() {
                 <Text
                   style={[styles.savingsTitle, { color: colors.foreground }]}
                 >
-                  Savings
+                  {t("Savings")}
                 </Text>
                 <Text
                   style={[
@@ -560,14 +579,14 @@ export default function DashboardScreen() {
                     { color: colors.mutedForeground },
                   ]}
                 >
-                  {monthlySavingsRate}% rate this month
+                  {formatNumber(monthlySavingsRate, language)}% {t("rate this month")}
                 </Text>
               </View>
             </View>
             <Text
-              style={[styles.savingsTotal, { color: colors.success }]}
+              style={[styles.savingsTotal, stackedSavingsHeader && styles.savingsTotalCompact, { color: colors.success }]}
             >
-              {fmt(totalSavings, finance.currency)}
+              {formatCurrency(totalSavings, finance.currency, language)}
             </Text>
           </View>
 
@@ -576,12 +595,12 @@ export default function DashboardScreen() {
             <Text
               style={[styles.savingsGoalLabel, { color: colors.mutedForeground }]}
             >
-              Goal progress
+              {t("Goal progress")}
             </Text>
             <Text
               style={[styles.savingsGoalPct, { color: colors.foreground }]}
             >
-              {Math.round(savingsPerc * 100)}% of {fmt(savingsGoal, finance.currency)}
+              {formatNumber(Math.round(savingsPerc * 100), language)}% {t("of")} {formatCurrency(savingsGoal, finance.currency, language)}
             </Text>
           </View>
           <View
@@ -616,7 +635,7 @@ export default function DashboardScreen() {
                   { color: colors.mutedForeground },
                 ]}
               >
-                Saved this month
+                {t("Saved this month")}
               </Text>
               <Text
                 style={[
@@ -624,7 +643,7 @@ export default function DashboardScreen() {
                   { color: colors.success },
                 ]}
               >
-                +{fmt(monthlySavings, finance.currency)}
+                +{formatCurrency(monthlySavings, finance.currency, language)}
               </Text>
             </View>
             <View
@@ -640,7 +659,7 @@ export default function DashboardScreen() {
                   { color: colors.mutedForeground },
                 ]}
               >
-                In savings accounts
+                {t("In savings accounts")}
               </Text>
               <Text
                 style={[
@@ -648,7 +667,7 @@ export default function DashboardScreen() {
                   { color: colors.foreground },
                 ]}
               >
-                {fmt(totalSavings, finance.currency)}
+                {formatCurrency(totalSavings, finance.currency, language)}
               </Text>
             </View>
           </View>
@@ -661,7 +680,7 @@ export default function DashboardScreen() {
             { color: colors.foreground, marginBottom: 12, marginTop: 4 },
           ]}
         >
-          Active EMIs
+          {t("Active EMIs")}
         </Text>
         <View style={{ gap: 8 }}>
           {finance.emis
@@ -709,7 +728,7 @@ export default function DashboardScreen() {
                           { color: colors.foreground },
                         ]}
                       >
-                        {fmt(emi.monthlyAmount, finance.currency)}/mo
+                        {formatCurrency(emi.monthlyAmount, finance.currency, language)}/mo
                       </Text>
                     </View>
                     <View
@@ -972,6 +991,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
     gap: 12,
+    width: "100%",
   },
   savingsHeader: {
     flexDirection: "row",
@@ -988,6 +1008,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+    minWidth: 0,
   },
   savingsCopy: { flex: 1, minWidth: 0 },
   savingsIcon: {
@@ -1009,13 +1031,18 @@ const styles = StyleSheet.create({
   savingsTotal: {
     fontSize: 20,
     fontFamily: "Inter_600SemiBold",
-    flexShrink: 0,
+    flexShrink: 1,
+    maxWidth: "58%",
+    textAlign: "auto",
     fontVariant: ["tabular-nums"],
   },
+  savingsTotalCompact: { maxWidth: "100%", width: "100%" },
   savingsGoalRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 4,
   },
   savingsGoalLabel: {
     fontSize: TYPOGRAPHY.supporting,
@@ -1024,6 +1051,8 @@ const styles = StyleSheet.create({
   savingsGoalPct: {
     fontSize: TYPOGRAPHY.supporting,
     fontFamily: "Inter_600SemiBold",
+    flexShrink: 1,
+    textAlign: "auto",
   },
   savingsTrack: {
     height: 12,
@@ -1041,7 +1070,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 12,
   },
-  savingsBreakdownItem: { flex: 1, gap: 2 },
+  savingsBreakdownItem: { flex: 1, minWidth: 0, gap: 2 },
   savingsBreakdownDivider: { width: 1, height: 32 },
   savingsBreakdownLabel: {
     fontSize: TYPOGRAPHY.supporting,
@@ -1049,7 +1078,9 @@ const styles = StyleSheet.create({
   },
   savingsBreakdownValue: {
     fontSize: 14,
-    fontFamily: "Inter_600SemiBold", fontVariant: ["tabular-nums"]
+    fontFamily: "Inter_600SemiBold",
+    fontVariant: ["tabular-nums"],
+    flexShrink: 1,
   },
 
   // Shared

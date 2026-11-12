@@ -70,7 +70,7 @@ test("backup encrypt/decrypt round trip preserves records and excludes device se
   const expectedFinanceState = structuredClone(state);
   delete expectedFinanceState.securitySettings;
   assert.deepEqual(opened.payload.financeState, expectedFinanceState);
-  assert.equal(opened.payload.userPreferences.themeMode, "dark");
+  assert.deepEqual(opened.payload.userPreferences, { themeMode: "dark" });
   assert.equal(opened.metadata.recordCounts.transactions, 1);
   assert.equal(opened.metadata.recordCounts.emiPayments, 1);
   assert.equal(opened.metadata.recordCounts.loanPayments, 1);
