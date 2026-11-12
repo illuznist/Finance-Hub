@@ -170,6 +170,7 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="forecast" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="transactions" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="budget" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="recurring" options={{ headerShown: false, presentation: "card" }} />

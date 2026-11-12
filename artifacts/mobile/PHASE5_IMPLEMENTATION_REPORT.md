@@ -12,6 +12,8 @@ records were used for this work.
 
 - Added a read-only cash-flow forecast screen at `/forecast`, reachable through
   **Plan ahead** on Analytics.
+- Hid the default Expo Router header on Forecast so the screen uses only its
+  own safe-area-aware header.
 - Added 7-, 30-, 60-, 90-day, and custom forecast windows, Conservative and
   Expected income modes, a projected-balance chart, account shortfall warnings,
   and a dated commitment timeline.
@@ -57,6 +59,7 @@ records were used for this work.
 ## Screens and files
 
 - `app/forecast.tsx` — forecast screen and navigation.
+- `app/_layout.tsx` — hides the duplicate native stack header for Forecast.
 - `components/forecast/ForecastChart.tsx` — projected and scenario chart.
 - `app/analytics.tsx` — Analytics entry point.
 - `app/recurring.tsx`, `app/(tabs)/emis.tsx`, `app/(tabs)/loans.tsx`, and
@@ -106,7 +109,7 @@ commitments produce the SAR 50 Conservative shortfall.
 
 ## Known limitations and outstanding risks
 
-- **NOT TESTED:** Stock Expo Go 58 on a physical phone or simulator. Successful
+- **NOT TESTED:** Stock Expo Go 58 on the user's iPhone 17 Pro Max. Successful
   JavaScript exports do not establish Expo Go behavior or native compilation.
 - **BLOCKED:** Expo reports 20 recommended SDK 58 package patch updates. They
   were not applied because of the package-age safeguard.
