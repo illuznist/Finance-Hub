@@ -25,7 +25,7 @@ import {
   migrateLegacyPinBeforeFinanceLoad,
   recoverProtectedRestoreJournal,
 } from "@/security/deviceSecurity";
-import { RestoreRecoveryError } from "@/security/restoreJournal";
+import { isRestoreRecoveryError } from "@/security/restoreJournal";
 import { captureNetWorthSnapshots } from "@/finance/netWorth";
 import type { NetWorthSnapshot } from "@/finance/analyticsTypes";
 import { buildAnalyticsReport } from "@/finance/analytics";
@@ -499,7 +499,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setState(loaded);
     } catch (error) {
       readyRef.current = false;
-      if (error instanceof RestoreRecoveryError) {
+      if (isRestoreRecoveryError(error)) {
         setStorageError(error.message);
         setStorageErrorStage(error.stage);
         setStorageErrorCode(error.code);
@@ -507,6 +507,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       } else {
         setStorageError("Saved data could not be loaded. No records have been reset.");
         setStorageErrorStage(stage);
+        setStorageErrorCode("FINANCE_LOAD_FAILED");
+        setStorageErrorNextAction("Keep app storage intact. Retry once; if it persists, share the diagnostic code.");
       }
     } finally {
       loadingRef.current = false;
@@ -559,7 +561,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setStorageErrorNextAction(null);
     } catch (error) {
       readyRef.current = false;
-      if (error instanceof RestoreRecoveryError) {
+      if (isRestoreRecoveryError(error)) {
         setStorageError(error.message);
         setStorageErrorStage(error.stage);
         setStorageErrorCode(error.code);
@@ -567,6 +569,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       } else {
         setStorageError("Saved data could not be retried safely.");
         setStorageErrorStage(stage);
+        setStorageErrorCode("FINANCE_RETRY_FAILED");
+        setStorageErrorNextAction("Keep app storage intact. Retry once; if it persists, share the diagnostic code.");
       }
     } finally {
       retryingRef.current = false;
@@ -866,7 +870,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           setStorageErrorNextAction(null);
         } catch (recoveryError) {
           readyRef.current = false;
-          if (recoveryError instanceof RestoreRecoveryError) {
+          if (isRestoreRecoveryError(recoveryError)) {
             setStorageError(recoveryError.message);
             setStorageErrorStage(recoveryError.stage);
             setStorageErrorCode(recoveryError.code);
@@ -879,8 +883,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       } else {
         readyRef.current = false;
         setStorageError("Restore could not start safely. Your current records are unchanged; tap Retry safely before continuing.");
-        setStorageErrorCode(null);
-        setStorageErrorNextAction(null);
+        setStorageErrorStage("Preparing backup restore");
+        setStorageErrorCode("FINANCE_RESTORE_FAILED");
+        setStorageErrorNextAction("Keep app storage intact. Retry once; if it persists, share the diagnostic code.");
       }
       throw new Error(error instanceof Error ? error.message : "Restore did not finish; previous records were retained.");
     }

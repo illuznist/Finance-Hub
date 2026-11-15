@@ -44,6 +44,7 @@ interface RestoreJournal {
 }
 
 export type RestoreRecoveryDiagnosticCode =
+  | "RESTORE_RECOVERY_FAILED"
   | "RESTORE_JOURNAL_READ_FAILED"
   | "RESTORE_JOURNAL_PARSE_FAILED"
   | "RESTORE_JOURNAL_WRITE_FAILED"
@@ -76,6 +77,15 @@ export class RestoreRecoveryError extends Error {
     this.nextAction = "Keep app storage intact. Retry once; if it persists, share the diagnostic code.";
     this.cause = cause;
   }
+}
+
+export function isRestoreRecoveryError(error: unknown): error is RestoreRecoveryError {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as Partial<RestoreRecoveryError> & { name?: string };
+  return candidate.name === "RestoreRecoveryError"
+    && typeof candidate.code === "string"
+    && typeof candidate.stage === "string"
+    && typeof candidate.message === "string";
 }
 
 export type RestoreRecoveryWarning = (

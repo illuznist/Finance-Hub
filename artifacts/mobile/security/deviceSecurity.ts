@@ -27,6 +27,8 @@ import {
 import { pinDelayMs } from "./pinPolicy.ts";
 import { sanitizeLegacyFinanceSnapshot } from "./sanitizeFinanceSnapshot.ts";
 import {
+  RestoreRecoveryError,
+  isRestoreRecoveryError,
   RESTORE_FINANCE_DOCUMENT_KEY,
   RESTORE_THEME_PREFERENCE_KEY,
   type JournalStorage,
@@ -259,26 +261,33 @@ export async function createProtectedRestoreJournal(
 export async function recoverProtectedRestoreJournal(
   storage: JournalStorage,
 ): Promise<"none" | "rolled-back" | "committed"> {
-  const { recoverInterruptedRestore } = await import("./restoreJournal.ts");
   const logDiagnostic = (
     code: RestoreRecoveryDiagnosticCode,
     stage: string,
     error: unknown,
   ) => logRestoreDiagnostic(code, stage, error);
   try {
+    const { recoverInterruptedRestore } = await import("./restoreJournal.ts");
     return await recoverInterruptedRestore(storage, {
       get: readSecret,
       set: writeSecret,
       remove: deleteSecret,
     }, logDiagnostic);
   } catch (error) {
-    const diagnostic = error as { code?: RestoreRecoveryDiagnosticCode; stage?: string; cause?: unknown };
+    const diagnostic = isRestoreRecoveryError(error)
+      ? error
+      : new RestoreRecoveryError(
+        "RESTORE_RECOVERY_FAILED",
+        "Checking interrupted restore",
+        "The restore check could not finish. Saved records have not been reset.",
+        error,
+      );
     logRestoreDiagnostic(
-      diagnostic.code ?? "RESTORE_JOURNAL_READ_FAILED",
-      diagnostic.stage ?? "Checking interrupted restore",
+      diagnostic.code,
+      diagnostic.stage,
       diagnostic.cause ?? error,
     );
-    throw error;
+    throw diagnostic;
   }
 }
 
