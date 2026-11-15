@@ -700,7 +700,7 @@ export default function LoansScreen() {
 
   function openCreateLoan() {
     if (!canCreateResource(finance, "loan", entitlements.isPro).allowed) {
-      router.push("/pro?limit=loan");
+      router.push("/limit?resource=loan");
       return;
     }
     openForm();
@@ -815,7 +815,7 @@ export default function LoansScreen() {
           key={editingLoan?.id ?? "new-loan"}
           visible
           editing={editingLoan}
-          onLimitReached={() => { setFormOpen(false); router.push("/pro?limit=loan"); }}
+          onLimitReached={() => { setFormOpen(false); router.push("/limit?resource=loan"); }}
           onClose={() => {
             setFormOpen(false);
             setEditingLoan(undefined);

@@ -838,7 +838,7 @@ export default function EMIsScreen() {
 
   function openCreateEMI() {
     if (!canCreateResource(finance, "emi", entitlements.isPro).allowed) {
-      router.push("/pro?limit=emi");
+      router.push("/limit?resource=emi");
       return;
     }
     openEdit();
@@ -970,7 +970,7 @@ export default function EMIsScreen() {
           key={editing?.id ?? "new"}
           visible={formOpen}
           editing={editing}
-          onLimitReached={() => { setFormOpen(false); router.push("/pro?limit=emi"); }}
+          onLimitReached={() => { setFormOpen(false); router.push("/limit?resource=emi"); }}
           onClose={() => {
             setFormOpen(false);
             setEditing(undefined);

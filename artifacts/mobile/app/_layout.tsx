@@ -194,6 +194,7 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="forecast" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="pro" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="limit" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="about" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="transactions" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="budget" options={{ headerShown: false, presentation: "card" }} />

@@ -541,7 +541,7 @@ export default function WalletsScreen() {
 
   function openAddAccount() {
     if (!canCreateResource(finance, "account", entitlements.isPro).allowed) {
-      router.push("/pro?limit=account");
+      router.push("/limit?resource=account");
       return;
     }
     setShowAddAccount(true);
@@ -550,7 +550,7 @@ export default function WalletsScreen() {
   function confirmAccountArchiveChange(account: Account) {
     if (account.archivedAt) {
       if (!canCreateResource(finance, "account", entitlements.isPro).allowed) {
-        router.push("/pro?limit=account");
+        router.push("/limit?resource=account");
         return;
       }
       Alert.alert(
@@ -560,7 +560,7 @@ export default function WalletsScreen() {
           { text: t("Cancel"), style: "cancel" },
           { text: t("Reactivate account"), onPress: () => {
             if (finance.reactivateAccount(account.id)) toast.show(t("Account reactivated."));
-            else router.push("/pro?limit=account");
+            else router.push("/limit?resource=account");
           } },
         ],
       );
@@ -772,7 +772,7 @@ export default function WalletsScreen() {
       <AddAccountModal
         visible={showAddAccount}
         onClose={() => setShowAddAccount(false)}
-        onLimitReached={() => { setShowAddAccount(false); router.push("/pro?limit=account"); }}
+        onLimitReached={() => { setShowAddAccount(false); router.push("/limit?resource=account"); }}
       />
       <AddIncomeModal visible={showAddIncome} onClose={() => setShowAddIncome(false)} editing={editingIncome} />
       <AddGoalModal visible={showAddGoal} onClose={() => setShowAddGoal(false)} />
