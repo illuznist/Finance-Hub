@@ -275,6 +275,7 @@ export default function DashboardScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
+      contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{
         paddingBottom: TAB_BAR_HEIGHT + (Platform.OS === "web" ? 34 : 0),
       }}
@@ -287,7 +288,7 @@ export default function DashboardScreen() {
       <View
         style={[
           styles.heroGradient,
-          { paddingTop: topPad + 8, backgroundColor: colors.background },
+          { paddingTop: topPad, backgroundColor: colors.background },
         ]}
       >
         <View style={styles.brandRow}>

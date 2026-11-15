@@ -561,9 +561,13 @@ export default function SettingsScreen() {
           testID="settings-plan"
           accessibilityRole="button"
           onPress={() => router.push("/pro")}
-          style={({ pressed }) => [styles.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}
+          style={({ pressed }) => [
+            styles.card,
+            styles.planCard,
+            { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.78 : 1 },
+          ]}
         >
-          <View style={styles.settingRow}>
+          <View style={[styles.planCardHeader, { flexDirection: preferences.isRTL ? "row-reverse" : "row" }]}>
             <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
               <Feather name="star" size={17} color={colors.primary} />
             </View>
@@ -573,17 +577,26 @@ export default function SettingsScreen() {
                 {entitlements.isPro ? t("Pro") : t("Free plan")}
               </Text>
             </View>
-            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
+            <Feather
+              name={preferences.isRTL ? "chevron-left" : "chevron-right"}
+              size={16}
+              color={colors.mutedForeground}
+            />
           </View>
-          <View style={[styles.rowDivider, { backgroundColor: colors.border, marginStart: 0 }]} />
+          <View
+            style={[
+              styles.rowDivider,
+              { backgroundColor: colors.border, marginStart: 0, marginTop: 12, marginBottom: 8 },
+            ]}
+          />
           {([
             ["Active wallets", "account"],
             ["Active loans", "loan"],
             ["Active EMI agreements", "emi"],
           ] as const).map(([label, key]) => (
             <View key={key} style={[styles.planUsageRow, { flexDirection: preferences.isRTL ? "row-reverse" : "row" }]}>
-              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>{t(label)}</Text>
-              <Text style={[styles.settingValue, { color: colors.foreground }]}>
+              <Text style={[styles.planUsageLabel, { color: colors.mutedForeground }]}>{t(label)}</Text>
+              <Text style={[styles.planUsageValue, { color: colors.foreground }]}>
                 {entitlements.isPro
                   ? t("{count} active", { count: formatAppNumber(planUsage[key]) })
                   : t("{used} of {limit}", {
@@ -1011,8 +1024,19 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 18,
-        overflow: "hidden",
+    overflow: "hidden",
     marginBottom: 2,
+  },
+  planCard: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
+    overflow: "visible",
+  },
+  planCardHeader: {
+    minHeight: 44,
+    alignItems: "center",
+    gap: 12,
   },
   profileRow: {
     flexDirection: "row",
@@ -1154,14 +1178,27 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   planUsageRow: {
-    minHeight: 36,
+    minHeight: 40,
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
+  planUsageLabel: {
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
+    fontSize: TYPOGRAPHY.supporting,
+    fontFamily: "Inter_400Regular",
+  },
+  planUsageValue: {
+    flexShrink: 1,
+    fontSize: TYPOGRAPHY.body,
+    fontFamily: "Inter_500Medium",
+  },
   planLink: {
     fontSize: TYPOGRAPHY.bodySmall,
+    lineHeight: 20,
     fontFamily: "Inter_600SemiBold",
-    marginTop: 8,
+    marginTop: 10,
   },
 });
