@@ -1,11 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { reloadAppAsync } from "expo";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { I18nManager, Platform } from "react-native";
 
 import {
   type AppLanguage,
   type DisplayCalendar,
+  type DisplayPreferences,
   type TranslationValues,
   isRightToLeftLanguage,
   parseDisplayPreferences,
@@ -13,6 +13,7 @@ import {
   serializeDisplayPreferences,
   translate,
 } from "@/i18n/localization";
+import { applyDirectionPreference, getNativeDirectionStatus } from "@/i18n/rtlDirection";
 
 const PREFERENCES_KEY = "finance_display_preferences_v1";
 
@@ -22,11 +23,32 @@ function applyWebDirection(language: AppLanguage) {
   document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
 }
 
+function prepareNativeDirection(language: AppLanguage): boolean {
+  const platform = Platform.OS === "web" ? "web" : "native";
+  try {
+    applyDirectionPreference(
+      language,
+      platform,
+      I18nManager.isRTL,
+      targetIsRTL => {
+        I18nManager.allowRTL(targetIsRTL);
+        I18nManager.forceRTL(targetIsRTL);
+      },
+    );
+    if (platform === "web") return false;
+    return getNativeDirectionStatus(language, "native", I18nManager.isRTL).restartRequired;
+  } catch {
+    // Keep the selected language and let Settings explain the manual restart.
+    return true;
+  }
+}
+
 interface PreferencesContextValue {
   language: AppLanguage;
   calendar: DisplayCalendar;
   isReady: boolean;
   isRTL: boolean;
+  rtlRestartRequired: boolean;
   setLanguage: (language: AppLanguage) => Promise<void>;
   setCalendar: (calendar: DisplayCalendar) => Promise<void>;
   t: (key: string, values?: TranslationValues) => string;
@@ -38,29 +60,31 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [language, setLanguageState] = useState<AppLanguage>("en");
   const [calendar, setCalendarState] = useState<DisplayCalendar>("gregorian");
   const [isReady, setIsReady] = useState(false);
+  const [rtlRestartRequired, setRtlRestartRequired] = useState(false);
+  const preferencesRef = useRef<DisplayPreferences>({ language: "en", calendar: "gregorian" });
+  const updateQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let active = true;
     void AsyncStorage.getItem(PREFERENCES_KEY).then(async raw => {
-      let savedLanguage: AppLanguage = "en";
-      let savedCalendar: DisplayCalendar = "gregorian";
-      ({ language: savedLanguage, calendar: savedCalendar } = parseDisplayPreferences(raw));
+      const savedPreferences = parseDisplayPreferences(raw);
       if (!active) return;
-      setActiveDisplayPreferences({ language: savedLanguage, calendar: savedCalendar });
-      setLanguageState(savedLanguage);
-      setCalendarState(savedCalendar);
-      applyWebDirection(savedLanguage);
+      preferencesRef.current = savedPreferences;
+      setActiveDisplayPreferences(savedPreferences);
+      setLanguageState(savedPreferences.language);
+      setCalendarState(savedPreferences.calendar);
+      applyWebDirection(savedPreferences.language);
+      setRtlRestartRequired(prepareNativeDirection(savedPreferences.language));
       setIsReady(true);
-
-      if (Platform.OS !== "web" && I18nManager.isRTL !== isRightToLeftLanguage(savedLanguage)) {
-        I18nManager.allowRTL(isRightToLeftLanguage(savedLanguage));
-        I18nManager.forceRTL(isRightToLeftLanguage(savedLanguage));
-        await reloadAppAsync();
-      }
     }).catch(() => {
       if (active) {
-        setActiveDisplayPreferences({ language: "en", calendar: "gregorian" });
+        const defaults: DisplayPreferences = { language: "en", calendar: "gregorian" };
+        preferencesRef.current = defaults;
+        setActiveDisplayPreferences(defaults);
+        setLanguageState(defaults.language);
+        setCalendarState(defaults.calendar);
         applyWebDirection("en");
+        setRtlRestartRequired(prepareNativeDirection("en"));
         setIsReady(true);
       }
     });
@@ -71,36 +95,45 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     await AsyncStorage.setItem(PREFERENCES_KEY, serializeDisplayPreferences(next));
   }, []);
 
-  const setLanguage = useCallback(async (nextLanguage: AppLanguage) => {
-    if (nextLanguage === language) return;
-    await persist({ language: nextLanguage, calendar });
-    setLanguageState(nextLanguage);
-    setActiveDisplayPreferences({ language: nextLanguage, calendar });
-    if (Platform.OS === "web") {
-      applyWebDirection(nextLanguage);
-      return;
-    }
-    I18nManager.allowRTL(nextLanguage === "ar");
-    I18nManager.forceRTL(nextLanguage === "ar");
-    await reloadAppAsync();
-  }, [calendar, language, persist]);
+  const queuePreferenceUpdate = useCallback((update: Partial<DisplayPreferences>) => {
+    const operation = updateQueueRef.current.catch(() => {}).then(async () => {
+      const current = preferencesRef.current;
+      const next = { ...current, ...update };
+      if (next.language === current.language && next.calendar === current.calendar) return;
+      await persist(next);
+      preferencesRef.current = next;
+      setActiveDisplayPreferences(next);
+      setLanguageState(next.language);
+      setCalendarState(next.calendar);
+      applyWebDirection(next.language);
+      if (update.language !== undefined) {
+        setRtlRestartRequired(prepareNativeDirection(next.language));
+      }
+    });
+    updateQueueRef.current = operation;
+    return operation;
+  }, [persist]);
 
-  const setCalendar = useCallback(async (nextCalendar: DisplayCalendar) => {
-    if (nextCalendar === calendar) return;
-    await persist({ language, calendar: nextCalendar });
-    setCalendarState(nextCalendar);
-    setActiveDisplayPreferences({ language, calendar: nextCalendar });
-  }, [calendar, language, persist]);
+  const setLanguage = useCallback(
+    (nextLanguage: AppLanguage) => queuePreferenceUpdate({ language: nextLanguage }),
+    [queuePreferenceUpdate],
+  );
+
+  const setCalendar = useCallback(
+    (nextCalendar: DisplayCalendar) => queuePreferenceUpdate({ calendar: nextCalendar }),
+    [queuePreferenceUpdate],
+  );
 
   const value = useMemo<PreferencesContextValue>(() => ({
     language,
     calendar,
     isReady,
     isRTL: isRightToLeftLanguage(language),
+    rtlRestartRequired,
     setLanguage,
     setCalendar,
     t: (key, values) => translate(key, language, values),
-  }), [calendar, isReady, language, setCalendar, setLanguage]);
+  }), [calendar, isReady, language, rtlRestartRequired, setCalendar, setLanguage]);
 
   if (!isReady) return null;
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

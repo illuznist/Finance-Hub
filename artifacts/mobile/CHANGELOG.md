@@ -1,5 +1,12 @@
 # FinanceApp changelog
 
+## 1.1.2
+
+- Fixed Arabic language switching so Expo Go no longer enters an automatic RTL reload loop.
+- Saved language changes immediately; native layout-direction changes now show a clear close-and-reopen notice when needed.
+- Serialized rapid language and calendar preference updates to prevent stale writes.
+- Aligned Expo SDK 58 packages to the installed SDK's supported patch versions.
+
 ## 1.1.1
 
 - Fixed the PIN setup flow and retained safe password recovery without changing existing finance records.

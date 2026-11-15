@@ -512,7 +512,14 @@ export default function SettingsScreen() {
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.currencyNote, { color: colors.mutedForeground, marginTop: 8 }]}>{t("Changing language reloads the app to apply right-to-left layout.")}</Text>
+          <Text
+            accessibilityRole={preferences.rtlRestartRequired ? "alert" : undefined}
+            style={[styles.currencyNote, { color: preferences.rtlRestartRequired ? colors.warning : colors.mutedForeground, marginTop: 8 }]}
+          >
+            {preferences.rtlRestartRequired
+              ? t("Language saved. Close and reopen FinanceApp to apply the full layout direction.")
+              : t("Language and calendar preferences are saved on this device.")}
+          </Text>
           <View style={[styles.rowDivider, { backgroundColor: colors.border, marginStart: 0, marginTop: 14, marginBottom: 12 }]} />
           <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("Display calendar")}</Text>
           <View style={styles.themeToggle}>

@@ -47,3 +47,11 @@
 - `CHANGELOG.md` now has a v1.1.1 entry for the PIN fix, responsive Savings card, Gregorian/Hijri preferences, English/Arabic localization, RTL, Arabic-Indic numbers, and UI/performance refinements.
 - The application was not published and no GitHub release was created.
 - See `V1_1_1_LOCALIZATION_ACCEPTANCE_REPORT.md` for the complete localization audit and this milestone’s verification results.
+
+## v1.1.2 version-management update
+
+- Authoritative Expo app version is now **1.1.2** in `app.json`.
+- Settings/About and encrypted backup metadata continue to use the shared dynamic version helper.
+- The private workspace package remains `0.0.0`; native build-number and version-code configuration remains unchanged.
+- `CHANGELOG.md` includes the Arabic RTL restart-loop fix and the aligned SDK 58 patch set.
+- See `V1_1_2_ARABIC_RTL_CRASH_FIX_REPORT.md` for the root-cause analysis, restart fallback, regression tests, and native-device verification status.

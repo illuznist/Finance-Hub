@@ -109,6 +109,8 @@ const ARABIC_TRANSLATIONS: Record<string, string> = {
   "Hijri": "هجري",
   "Date entry always uses the Gregorian calendar.": "إدخال التواريخ يستخدم التقويم الميلادي دائمًا.",
   "Changing language reloads the app to apply right-to-left layout.": "سيُعاد تحميل التطبيق لتطبيق اتجاه الكتابة من اليمين إلى اليسار.",
+  "Language saved. Close and reopen FinanceApp to apply the full layout direction.": "تم حفظ اللغة. أغلق FinanceApp وأعد فتحه لتطبيق اتجاه التخطيط بالكامل.",
+  "Language and calendar preferences are saved on this device.": "يتم حفظ تفضيلات اللغة والتقويم على هذا الجهاز.",
   "Gregorian date": "التاريخ ميلادي",
   "Home": "الرئيسية",
   "Wallets": "المحافظ",

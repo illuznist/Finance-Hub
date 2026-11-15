@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   formatCurrency,
   formatAppDate,
@@ -15,6 +17,7 @@ const {
   translate,
   translatePlural,
 } = require("../localization.ts");
+const { applyDirectionPreference, getNativeDirectionStatus } = require("../rtlDirection.ts");
 
 const resetForms = {
   en: {
@@ -43,6 +46,52 @@ test("display preferences default safely and persist only presentation choices",
   });
   assert.deepEqual(parseDisplayPreferences("{broken"), { language: "en", calendar: "gregorian" });
   assert.equal(serializeDisplayPreferences({ language: "ar", calendar: "hijri" }), '{"language":"ar","calendar":"hijri"}');
+});
+
+test("native RTL changes report a restart without scheduling repeated reloads", () => {
+  assert.deepEqual(getNativeDirectionStatus("en", "native", false), {
+    targetIsRTL: false,
+    restartRequired: false,
+  });
+  const arabicPending = getNativeDirectionStatus("ar", "native", false);
+  assert.deepEqual(arabicPending, { targetIsRTL: true, restartRequired: true });
+  assert.deepEqual(getNativeDirectionStatus("ar", "native", false), arabicPending);
+  assert.deepEqual(getNativeDirectionStatus("ar", "native", true), {
+    targetIsRTL: true,
+    restartRequired: false,
+  });
+  assert.deepEqual(getNativeDirectionStatus("en", "native", true), {
+    targetIsRTL: false,
+    restartRequired: true,
+  });
+  assert.deepEqual(getNativeDirectionStatus("ar", "web", false), {
+    targetIsRTL: true,
+    restartRequired: false,
+  });
+
+  const provider = fs.readFileSync(
+    path.join(__dirname, "../../context/PreferencesContext.tsx"),
+    "utf8",
+  );
+  assert.doesNotMatch(provider, /reloadAppAsync/);
+});
+
+test("rapid language toggles always replace the pending native direction", () => {
+  const requestedDirections = [];
+  const arabic = applyDirectionPreference("ar", "native", false, target => requestedDirections.push(target));
+  const english = applyDirectionPreference("en", "native", false, target => requestedDirections.push(target));
+  assert.deepEqual(requestedDirections, [true, false]);
+  assert.equal(arabic.restartRequired, true);
+  assert.equal(english.restartRequired, false);
+});
+
+test("repeated language changes preserve the independent calendar preference", () => {
+  let stored = serializeDisplayPreferences({ language: "en", calendar: "hijri" });
+  for (const language of ["ar", "en", "ar", "en"]) {
+    const current = parseDisplayPreferences(stored);
+    stored = serializeDisplayPreferences({ ...current, language });
+  }
+  assert.deepEqual(parseDisplayPreferences(stored), { language: "en", calendar: "hijri" });
 });
 
 test("Arabic display uses Saudi Arabic text, Arabic-Indic digits, and RTL direction", () => {
