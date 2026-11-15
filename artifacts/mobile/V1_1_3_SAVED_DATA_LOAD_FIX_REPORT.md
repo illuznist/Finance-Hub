@@ -23,11 +23,12 @@ The migration already repaired accounts whose `openingBalance` field was absent,
 
 | Check | Result |
 | --- | --- |
-| Full mobile test suite | **Pending final run** |
-| TypeScript | **Pending final run** |
-| Localization and release metadata | **Pending final run** |
-| Expo SDK package check / Expo Doctor | **Previously passed for the same SDK 58 package set** |
-| Web, iOS, and Android JavaScript exports | **Pending final run** |
+| Full mobile test suite | **Passed: 217 tests** |
+| TypeScript | **Passed** |
+| Localization and release metadata | **Passed: 100% UI-source coverage; app version resolves to 1.1.3** |
+| Expo SDK package check / Expo Doctor | **Passed: packages up to date; 20/20 checks** |
+| Web, iOS, and Android JavaScript exports | **Passed** |
+| `git diff --check` | **Passed** |
 | Physical iPhone data recovery | **Pending user verification; device storage is not accessible from this workspace** |
 
 After updating the Expo Go project from the current QR code, tap **Retry safely** once. Do not uninstall FinanceApp or clear app storage. If the protected-data message remains, share a screenshot of the full screen and whether the message changes after that single retry; keep the phone's app data intact.
