@@ -27,6 +27,10 @@ import {
 import { pinDelayMs } from "./pinPolicy.ts";
 import { sanitizeLegacyFinanceSnapshot } from "./sanitizeFinanceSnapshot.ts";
 import {
+  clearRestoreJournal,
+  commitRestoreJournal,
+  createRestoreJournal,
+  recoverInterruptedRestore,
   RestoreRecoveryError,
   isRestoreRecoveryError,
   RESTORE_FINANCE_DOCUMENT_KEY,
@@ -247,7 +251,6 @@ export async function createProtectedRestoreJournal(
   currentFinanceJson: string | null,
   currentThemePreference: string | null,
 ): Promise<void> {
-  const { createRestoreJournal } = await import("./restoreJournal.ts");
   await createRestoreJournal(storage, {
     get: readSecret,
     set: writeSecret,
@@ -267,7 +270,6 @@ export async function recoverProtectedRestoreJournal(
     error: unknown,
   ) => logRestoreDiagnostic(code, stage, error);
   try {
-    const { recoverInterruptedRestore } = await import("./restoreJournal.ts");
     return await recoverInterruptedRestore(storage, {
       get: readSecret,
       set: writeSecret,
@@ -307,21 +309,26 @@ function logRestoreDiagnostic(
       .replace(/\b[A-Za-z0-9+/]{48,}={0,2}\b/g, "[redacted]")
       .slice(0, 240);
   }
+  const stackLocation = exception?.stack
+    ?.split("\n")
+    .slice(1, 5)
+    .map(line => line.trim())
+    .join(" | ")
+    .slice(0, 500) ?? "unavailable";
   console.warn("[Finance Hub restore recovery]", {
     code,
     stage,
     exceptionName: exception?.name ?? typeof error,
     exceptionMessage: message,
+    exceptionStackLocation: stackLocation,
   });
 }
 
 export async function commitProtectedRestoreJournal(storage: JournalStorage): Promise<void> {
-  const { commitRestoreJournal } = await import("./restoreJournal.ts");
   await commitRestoreJournal(storage);
 }
 
 export async function clearProtectedRestoreJournal(storage: JournalStorage): Promise<void> {
-  const { clearRestoreJournal } = await import("./restoreJournal.ts");
   await clearRestoreJournal(storage, {
     get: readSecret,
     set: writeSecret,
