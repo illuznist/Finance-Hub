@@ -41,7 +41,7 @@ Tests cover: no journal; orphaned keys; SecureStore read and delete failures; pr
 
 ## Verification
 
-- Mobile test suite: **228 passed**
+- Mobile test suite: **229 passed**
 - TypeScript: **passed**
 - Localization audit: **passed**, 100% direct English/Arabic source-key coverage
 - Expo SDK package check: **passed**, dependencies up to date
