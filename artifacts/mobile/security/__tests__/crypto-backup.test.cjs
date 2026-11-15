@@ -5,6 +5,7 @@ const B = require("../backup.ts");
 const J = require("../restoreJournal.ts");
 const ts = require("typescript");
 const fs = require("node:fs");
+const path = require("node:path");
 require.extensions[".ts"] = (module, filename) => {
   module._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -23,6 +24,12 @@ test("PBKDF2-HMAC-SHA256 matches the RFC 6070 SHA-256 vector", async () => {
     C.hex(await C.deriveKey("password", C.utf8("salt"), 1)),
     "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b",
   );
+});
+
+test("device security statically loads restore helpers before startup recovery", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../deviceSecurity.ts"), "utf8");
+  assert.match(source, /import\s*{[\s\S]*?recoverInterruptedRestore[\s\S]*?}\s*from\s*["']\.\/restoreJournal\.ts["']/);
+  assert.doesNotMatch(source, /import\s*\(\s*["']\.\/restoreJournal\.ts["']\s*\)/);
 });
 
 test("base64 encoding round trips empty, padded, and binary values", () => {
