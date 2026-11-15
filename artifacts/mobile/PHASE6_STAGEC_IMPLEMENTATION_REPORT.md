@@ -7,7 +7,8 @@
 - The device-local account, PIN, and biometric authentication remain separate from Supabase Auth.
 - Online sign-in/out changes only the online Supabase session. It does not sign in/out of the local app, change the local finance profile, or move finance records.
 - Finance records, backups, ledger calculations, and local entitlements remain device-local.
-- No Supabase project was created or connected. No credentials were requested or set.
+- The owner created a new Supabase project in the Ctrl Studios organization. It is not connected to Replit; no credentials were read, requested, or set by this work.
+- The retired Tokyo project's exposed credentials were not used.
 - No official Ctrl Studios email is embedded or assumed.
 - No Super Admin has been assigned. The bootstrap procedure has not been run.
 - RevenueCat purchases and the Admin Portal remain reserved for Stages D and E.
@@ -19,7 +20,8 @@
 - Native sessions use Expo SecureStore with bounded, atomic chunks; web preview sessions are tab-scoped.
 - Email verification and password recovery use an Expo Router callback route.
 - Settings separates the optional online account from the existing local app account and shows verified identity and server-reported online access.
-- Express validates bearer tokens with Supabase Auth, reads roles server-side, requires a verified email and `aal2` MFA for administrator routes, and records admin access checks.
+- Express verifies user JWTs through Supabase Auth independently of the API key, reads roles server-side, requires a verified email and `aal2` MFA for administrator routes, and records admin access checks.
+- Mobile configuration accepts only `sb_publishable_...` keys. The API server accepts only `sb_secret_...` keys; the secret key remains server-only and maps to the RLS-bypassing `service_role`.
 - The server exposes account access, administrator access-check, and recent audit-read routes. It does not expose public role promotion or finance data.
 - Versioned SQL prepares default `USER` role assignment, role constraints, promotional grants, RevenueCat identity-link placeholders, administrative audit logs, webhook event deduplication metadata, and RLS policies. No finance-record tables are created.
 - Super Admin bootstrap is an explicit, idempotent server-side command that verifies the requested Supabase account and an enrolled MFA factor. Role assignment and its audit entry are transactional. The command requires a user ID and explicit approval flag; it has not been run.
@@ -36,11 +38,12 @@ If the account endpoint is unavailable, the app reports online entitlement statu
 The following local checks passed:
 
 - Mobile regression suite: 240 tests passed, including financial-ledger, migration/recovery, localization, entitlement, and secure-session-storage coverage.
-- API authorization and migration-safety suite: 15 tests passed.
+- API authorization, JWT-verification, modern-key-format, migration-safety, and bootstrap suite: 18 tests passed.
 - Mobile and API TypeScript checks passed.
 - API production bundle built successfully.
-- Expo dependency alignment check passed.
+- Expo dependency alignment check passed; no dependency changes were made.
 - Expo Doctor passed all 20 checks.
+- iOS and Android JavaScript exports completed with the updated key configuration.
 - Frozen pnpm installation and `git diff --check` passed.
 - The running API health route returned 200; account and admin routes returned generic 401 responses without a session.
 - The browser preview loaded the existing local-account gate. The protected Settings/account UI was not visually checked because the preview is not signed in.
@@ -51,13 +54,13 @@ Stage C must not be marked complete until a project is configured, the migration
 
 ## Supabase setup required before live verification
 
-1. Create a Supabase project owned by Ctrl Studios and choose a region appropriate for the product's users and obligations.
-2. Enable email/password Auth and email confirmation. Configure an approved sender after the official Ctrl Studios email is ready.
-3. Configure the `mobile://auth/callback` redirect for installed app builds and the exact Expo Go callback URL used during testing.
-4. Enable TOTP MFA; enroll and verify the owner account before any administrative access.
-5. Apply `supabase/migrations/20261115000000_optional_accounts_security.sql` in the project's SQL Editor after reviewing the SQL. Do not expose the service-role key to the mobile app.
-6. Add the mobile public URL/key, server URL/service-role key, approved CORS origins, API origin, and redirect URL through Replit environment/secrets tools. Never paste values into chat or commit them.
-7. Register a test user and run the account, RLS-isolation, MFA, admin-denial, and recovery-flow checks described in the delivery notes.
-8. Only after a verified owner account and separate approval, run the one-time Super Admin bootstrap command with that user's UUID. No email address is compiled into the app or script.
+1. Use only the new Ctrl Studios Supabase project and its newly issued keys; do not use the retired Tokyo project's exposed credentials.
+2. Add `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the mobile environment. The key must start with `sb_publishable_`.
+3. Add `SUPABASE_URL` and `SUPABASE_SECRET_KEY` as API Server-only Replit Secrets. The key must start with `sb_secret_`; it bypasses RLS and must never enter Expo public variables or browser code.
+4. Keep the `mobile://auth/callback` redirect for installed builds and allow the exact Expo Go callback URL for the current dev session.
+5. Configure email confirmation and the approved sender address in Supabase Auth after the official Ctrl Studios email is ready. Enable TOTP MFA and verify the owner's factor before any administrative access.
+6. Review the SQL migration and request separate approval before applying it. Do not apply it as part of key configuration.
+7. After project variables are configured, register a test user and run the account, RLS-isolation, MFA, admin-denial, and recovery-flow checks described in the delivery notes.
+8. Super Admin bootstrap remains a separate, explicitly approved action requiring verified email and MFA. No email address is compiled into the app or script.
 
-No production credentials, paid services, project creation, migrations, or account bootstrap have been performed.
+No production credentials have been read or connected, no migration has been applied, and no account bootstrap has been performed.

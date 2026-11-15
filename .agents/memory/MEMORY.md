@@ -3,3 +3,4 @@
 - [Legacy finance history](legacy-finance-history.md) — old wallet balances were independent of payments; never infer historical account movements from schedules or paid counts.
 - [Budget rollover stability](budget-rollover-decisions.md) — future carry previews are provisional; freeze at period start so historical corrections cannot silently change later limits.
 - [Expo toolchain stability](toolchain-stability.md) — avoid one-off Python scripts; runtime auto-provisioning can leave Metro stale and interrupt financial form checks.
+- [Supabase project boundary](supabase-project-boundary.md) — use only the new Ctrl Studios Supabase project; the retired Tokyo project's exposed credentials are off-limits.

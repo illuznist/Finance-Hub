@@ -1,13 +1,13 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { AccountRole } from "../lib/authorization";
 import { isAdminAuthorized } from "../lib/authorization";
-import { getSupabaseServiceClient } from "../lib/supabase";
+import { getSupabaseAdminClient } from "../lib/supabase";
 import { logger } from "../lib/logger";
 
 type RoleReader = (userId: string) => Promise<AccountRole[] | null>;
 
 async function readRoles(userId: string): Promise<AccountRole[] | null> {
-  const client = getSupabaseServiceClient();
+  const client = getSupabaseAdminClient();
   if (!client) return null;
   const { data, error } = await client
     .from("user_roles")
@@ -27,7 +27,7 @@ export async function writeAdminAudit(
   outcome: "allowed" | "denied" | "succeeded" | "failed",
   requestId?: string,
 ): Promise<boolean> {
-  const client = getSupabaseServiceClient();
+  const client = getSupabaseAdminClient();
   if (!client) return false;
   const { error } = await client.from("admin_audit_logs").insert({
     actor_user_id: actorUserId,

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   decodeVerifiedAal,
   extractBearerToken,
+  isCompactJwt,
   isAdminAuthorized,
   resolveProAccess,
 } from "./authorization";
@@ -15,9 +16,17 @@ function jwt(payload: Record<string, unknown>): string {
 
 test("Bearer token extraction accepts only a single bearer token", () => {
   assert.equal(extractBearerToken("Bearer abc.def-123"), "abc.def-123");
+  assert.equal(extractBearerToken("Bearer abc_def.ghi_jkl.sig_123"), "abc_def.ghi_jkl.sig_123");
   assert.equal(extractBearerToken("Basic abc"), null);
   assert.equal(extractBearerToken("Bearer abc extra"), null);
   assert.equal(extractBearerToken(undefined), null);
+});
+
+test("only compact JWTs are candidates for online identity verification", () => {
+  assert.equal(isCompactJwt("header_payload.signature_part.signature_value"), true);
+  assert.equal(isCompactJwt("sb_publishable_not-a-user-token"), false);
+  assert.equal(isCompactJwt("sb_secret_not-a-user-token"), false);
+  assert.equal(isCompactJwt("a.b"), false);
 });
 
 test("MFA claim is used only when it matches the verified identity", () => {

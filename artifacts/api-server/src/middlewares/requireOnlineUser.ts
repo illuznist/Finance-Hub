@@ -1,8 +1,13 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { extractBearerToken, decodeVerifiedAal, type AuthorizationIdentity } from "../lib/authorization";
-import { getSupabaseServiceClient } from "../lib/supabase";
+import {
+  decodeVerifiedAal,
+  extractBearerToken,
+  isCompactJwt,
+  type AuthorizationIdentity,
+} from "../lib/authorization";
+import { getSupabaseAdminClient } from "../lib/supabase";
 
 declare global {
   namespace Express {
@@ -19,28 +24,37 @@ export type TokenVerification =
 
 export type TokenVerifier = (token: string) => Promise<TokenVerification>;
 
-export async function verifySupabaseAccessToken(token: string): Promise<TokenVerification> {
-  const client = getSupabaseServiceClient();
-  if (!client) return { status: "unavailable" };
+export function createSupabaseTokenVerifier(
+  getClient: () => Pick<SupabaseClient, "auth"> | null,
+): TokenVerifier {
+  return async (token) => {
+    // A publishable API key identifies the app, not the user. Only compact user
+    // JWTs proceed to Supabase Auth for remote verification.
+    if (!isCompactJwt(token)) return { status: "invalid" };
+    const client = getClient();
+    if (!client) return { status: "unavailable" };
 
-  try {
-    const { data, error } = await client.auth.getUser(token);
-    const user: User | null = data.user;
-    if (error || !user) return { status: "invalid" };
-    const aal = decodeVerifiedAal(token, user.id);
-    return {
-      status: "valid",
-      identity: {
-        userId: user.id,
-        email: user.email,
-        emailVerified: Boolean(user.email_confirmed_at),
-        aal,
-      },
-    };
-  } catch {
-    return { status: "unavailable" };
-  }
+    try {
+      const { data, error } = await client.auth.getUser(token);
+      const user: User | null = data.user;
+      if (error || !user) return { status: "invalid" };
+      const aal = decodeVerifiedAal(token, user.id);
+      return {
+        status: "valid",
+        identity: {
+          userId: user.id,
+          email: user.email,
+          emailVerified: Boolean(user.email_confirmed_at),
+          aal,
+        },
+      };
+    } catch {
+      return { status: "unavailable" };
+    }
+  };
 }
+
+export const verifySupabaseAccessToken = createSupabaseTokenVerifier(getSupabaseAdminClient);
 
 export function createRequireOnlineUser(verifyToken: TokenVerifier): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction) => {

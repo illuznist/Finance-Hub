@@ -121,8 +121,8 @@ These are planning figures, not a purchase or deployment authorization. Recheck 
 
 Provision only after approval, using provider dashboards and Replit Secrets:
 
-- **Mobile public configuration:** Supabase project URL/public anon key and platform-specific RevenueCat public SDK key. Public keys still require RLS and server-side authorization.
-- **Server-only secrets:** Supabase service-role key and/or database credential; RevenueCat secret API key and webhook authorization value; any App Store Connect private key material. Never bundle these in the app or commit them.
+- **Mobile public configuration:** Supabase project URL and `sb_publishable_...` publishable key, plus platform-specific RevenueCat public SDK key. Publishable keys identify the app, not the user, and still require RLS and server-side authorization.
+- **Server-only secrets:** Supabase `sb_secret_...` key, database credential if used, RevenueCat secret API key and webhook authorization value, and any App Store Connect private key material. The Supabase secret key bypasses RLS; never bundle it in the app, expose it to browser code, or commit it.
 - **Apple testing:** App Store Connect product configuration and sandbox tester. Live product availability and production purchases remain disabled until explicitly approved.
 - **Admin identity:** an owner-controlled Supabase account with MFA. The personal email/identity is supplied privately during the authorized bootstrap step, not stored in source code.
 

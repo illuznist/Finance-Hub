@@ -7,12 +7,20 @@ import { Platform } from "react-native";
 import { createSecureSessionStorage } from "@/lib/secureSessionStorage";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+const hasSupabaseUrl = Boolean(supabaseUrl);
+const hasSupabasePublishableKey = Boolean(supabasePublishableKey);
+const publishableKeyPrefix = "sb_publishable_";
+const hasValidSupabasePublishableKey =
+  supabasePublishableKey.startsWith(publishableKeyPrefix) &&
+  supabasePublishableKey.length > publishableKeyPrefix.length;
 
-export const onlineAccountConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const onlineAccountConfigured = Boolean(supabaseUrl && hasValidSupabasePublishableKey);
 export const onlineAccountConfigurationError =
-  Boolean(supabaseUrl) !== Boolean(supabaseAnonKey)
-    ? "Both Supabase URL and public key are required."
+  hasSupabaseUrl !== hasSupabasePublishableKey
+    ? "Both Supabase URL and publishable key are required."
+    : hasSupabasePublishableKey && !hasValidSupabasePublishableKey
+      ? "A Supabase publishable key using the sb_publishable_ format is required."
     : null;
 
 const secureStorage = createSecureSessionStorage(SecureStore);
@@ -32,7 +40,7 @@ const storage = Platform.OS === "web" ? browserSessionStorage : secureStorage;
 
 export const supabaseClient =
   onlineAccountConfigured
-    ? createClient(supabaseUrl, supabaseAnonKey, {
+    ? createClient(supabaseUrl, supabasePublishableKey, {
         auth: {
           autoRefreshToken: true,
           detectSessionInUrl: false,

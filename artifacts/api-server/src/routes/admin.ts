@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 
-import { getSupabaseServiceClient } from "../lib/supabase";
+import { getSupabaseAdminClient } from "../lib/supabase";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { requireOnlineUser } from "../middlewares/requireOnlineUser";
 
@@ -12,7 +12,7 @@ router.get("/access-check", requireOnlineUser, requireAdmin, (_req, res) => {
 
 router.get("/audit", requireOnlineUser, requireAdmin, async (_req, res) => {
   try {
-    const client = getSupabaseServiceClient();
+    const client = getSupabaseAdminClient();
     if (!client) {
       res.status(503).json({ error: "Authorization service is unavailable." });
       return;

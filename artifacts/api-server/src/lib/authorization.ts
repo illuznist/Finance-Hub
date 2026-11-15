@@ -14,10 +14,14 @@ export function extractBearerToken(header: string | undefined): string | null {
   return match?.[1] ?? null;
 }
 
+export function isCompactJwt(token: string): boolean {
+  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token);
+}
+
 export function decodeVerifiedAal(token: string, verifiedUserId: string): string | null {
   try {
+    if (!isCompactJwt(token)) return null;
     const parts = token.split(".");
-    if (parts.length !== 3) return null;
     const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as {
       sub?: unknown;
       aal?: unknown;

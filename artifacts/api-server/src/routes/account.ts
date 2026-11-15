@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 
 import { resolveProAccess, type AccountRole } from "../lib/authorization";
-import { getSupabaseServiceClient } from "../lib/supabase";
+import { getSupabaseAdminClient } from "../lib/supabase";
 import { requireOnlineUser } from "../middlewares/requireOnlineUser";
 
 const router: IRouter = Router();
@@ -9,7 +9,7 @@ const router: IRouter = Router();
 router.get("/access", requireOnlineUser, async (req, res) => {
   try {
     const identity = req.onlineIdentity;
-    const client = getSupabaseServiceClient();
+    const client = getSupabaseAdminClient();
     if (!identity || !client) {
       res.status(503).json({ error: "Online account service is unavailable." });
       return;

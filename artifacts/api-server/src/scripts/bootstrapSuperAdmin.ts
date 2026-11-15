@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { getSupabaseServiceClient } from "../lib/supabase";
+import { getSupabaseAdminClient } from "../lib/supabase";
 import { logger } from "../lib/logger";
 
 export async function bootstrapSuperAdmin(
@@ -36,11 +36,11 @@ export async function bootstrapSuperAdmin(
 }
 
 async function main() {
-  const client = getSupabaseServiceClient();
+  const client = getSupabaseAdminClient();
   const userId = process.env.BOOTSTRAP_SUPER_ADMIN_USER_ID?.trim();
   const explicitlyApproved = process.env.BOOTSTRAP_SUPER_ADMIN_APPROVED === "YES";
   if (!client || !userId) {
-    throw new Error("Supabase server secrets and an approved user ID must be configured first.");
+    throw new Error("Supabase server secret and an approved user ID must be configured first.");
   }
   const result = await bootstrapSuperAdmin(client, userId, explicitlyApproved);
   console.info(result === "created" ? "Super Admin bootstrap completed." : "Super Admin is already configured.");

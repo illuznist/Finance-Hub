@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { Request, Response } from "express";
 
-import { createRequireOnlineUser } from "./requireOnlineUser";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createRequireOnlineUser, createSupabaseTokenVerifier } from "./requireOnlineUser";
 
 function mockResponse() {
   const response: { statusCode: number; body?: unknown } = { statusCode: 200 };
@@ -59,4 +60,39 @@ test("only verified Supabase identities are attached to API requests", async () 
   await middleware(request, result.api, (() => { nextCalled = true; }) as never);
   assert.equal(nextCalled, true);
   assert.equal(request.onlineIdentity?.userId, "user-1");
+});
+
+test("server verifies the user's JWT with Supabase Auth, never the publishable key", async () => {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const token = `${encode({ alg: "HS256" })}.${encode({ sub: "user-1", aal: "aal2" })}.signed_signature`;
+  let suppliedToken: string | null = null;
+  let lookups = 0;
+  const verifier = createSupabaseTokenVerifier(() => ({
+    auth: {
+      getUser: async (receivedToken: string) => {
+        lookups++;
+        suppliedToken = receivedToken;
+        return {
+          data: { user: { id: "user-1", email: "user@example.invalid", email_confirmed_at: "verified" } },
+          error: null,
+        };
+      },
+    },
+  } as unknown as Pick<SupabaseClient, "auth">));
+
+  const verified = await verifier(token);
+  assert.deepEqual(verified, {
+    status: "valid",
+    identity: {
+      userId: "user-1",
+      email: "user@example.invalid",
+      emailVerified: true,
+      aal: "aal2",
+    },
+  });
+  assert.equal(suppliedToken, token);
+
+  const publishableKey = await verifier("sb_publishable_not-a-user-token");
+  assert.deepEqual(publishableKey, { status: "invalid" });
+  assert.equal(lookups, 1);
 });
