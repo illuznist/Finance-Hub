@@ -14,3 +14,38 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Get verified account and online Pro access
+ */
+export const GetAccountAccessResponse = zod.object({
+  accountId: zod.string().uuid(),
+  emailVerified: zod.boolean(),
+  roles: zod.array(zod.enum(["USER", "ADMIN", "SUPER_ADMIN"])),
+  isPro: zod.boolean(),
+  proSource: zod.enum(["free", "promotional", "super_admin"]),
+  paidPurchasesAvailable: zod.literal(false),
+});
+
+/**
+ * @summary Verify server-authorized administrator access
+ */
+export const CheckAdminAccessResponse = zod.object({
+  status: zod.enum(["authorized"]),
+});
+
+/**
+ * @summary Read recent administrative audit events
+ */
+export const GetAdminAuditResponse = zod.object({
+  entries: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      actor_user_id: zod.string().uuid().nullish(),
+      action: zod.string(),
+      target_user_id: zod.string().uuid().nullish(),
+      outcome: zod.enum(["allowed", "denied", "succeeded", "failed"]),
+      occurred_at: zod.coerce.date(),
+    }),
+  ),
+});

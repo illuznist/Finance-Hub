@@ -7,6 +7,7 @@ import {
 } from "@expo-google-fonts/inter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -28,6 +29,7 @@ import {
   AuthProvider,
   useAuth,
 } from "@/context/AuthContext";
+import { OnlineAccountProvider } from "@/context/OnlineAccountContext";
 import { FinanceProvider, useFinance } from "@/context/FinanceContext";
 import { EntitlementProvider } from "@/context/EntitlementContext";
 import { FinanceStorageGate } from "@/components/FinanceStorageGate";
@@ -40,8 +42,11 @@ import {
   setupNotificationHandler,
 } from "@/utils/notifications";
 import { formatAppNumber, translateAppPlural, translateAppText, type LocalizedPluralForms } from "@/i18n/localization";
+import { getOnlineAccessToken } from "@/lib/supabase";
 
 SplashScreen.preventAutoHideAsync();
+setBaseUrl(process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : null);
+setAuthTokenGetter(getOnlineAccessToken);
 
 const queryClient = new QueryClient();
 const RESET_NOTIFICATION_FORMS: LocalizedPluralForms = {
@@ -201,6 +206,7 @@ function RootLayoutNav() {
         <Stack.Screen name="recurring" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="upcoming" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="settings" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="auth/callback" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="backup" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="legal" options={{ headerShown: false, presentation: "card" }} />
@@ -231,6 +237,7 @@ export default function RootLayout() {
           <ThemeProvider>
           <PreferencesProvider>
           <AuthProvider>
+          <OnlineAccountProvider>
           <EntitlementProvider>
             <FinanceProvider>
               <GestureHandlerRootView>
@@ -250,6 +257,7 @@ export default function RootLayout() {
               </GestureHandlerRootView>
             </FinanceProvider>
           </EntitlementProvider>
+          </OnlineAccountProvider>
           </AuthProvider>
           </PreferencesProvider>
           </ThemeProvider>

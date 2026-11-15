@@ -13,7 +13,15 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  AccountAccess,
+  AdminAccess,
+  AdminAuditResponse,
+  ForbiddenResponse,
+  HealthStatus,
+  ServiceUnavailableResponse,
+  UnauthorizedResponse,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -92,6 +100,245 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get verified account and online Pro access
+ */
+export const getGetAccountAccessUrl = () => {
+  return `/api/account/access`;
+};
+
+export const getAccountAccess = async (
+  options?: RequestInit,
+): Promise<AccountAccess> => {
+  return customFetch<AccountAccess>(getGetAccountAccessUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAccountAccessQueryKey = () => {
+  return [`/api/account/access`] as const;
+};
+
+export const getGetAccountAccessQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountAccess>>,
+  TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountAccess>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAccountAccessQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountAccess>>
+  > = ({ signal }) => getAccountAccess({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountAccess>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountAccessQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountAccess>>
+>;
+export type GetAccountAccessQueryError = ErrorType<
+  UnauthorizedResponse | ServiceUnavailableResponse
+>;
+
+/**
+ * @summary Get verified account and online Pro access
+ */
+
+export function useGetAccountAccess<
+  TData = Awaited<ReturnType<typeof getAccountAccess>>,
+  TError = ErrorType<UnauthorizedResponse | ServiceUnavailableResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountAccess>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountAccessQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Verify server-authorized administrator access
+ */
+export const getCheckAdminAccessUrl = () => {
+  return `/api/admin/access-check`;
+};
+
+export const checkAdminAccess = async (
+  options?: RequestInit,
+): Promise<AdminAccess> => {
+  return customFetch<AdminAccess>(getCheckAdminAccessUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getCheckAdminAccessQueryKey = () => {
+  return [`/api/admin/access-check`] as const;
+};
+
+export const getCheckAdminAccessQueryOptions = <
+  TData = Awaited<ReturnType<typeof checkAdminAccess>>,
+  TError = ErrorType<
+    UnauthorizedResponse | ForbiddenResponse | ServiceUnavailableResponse
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof checkAdminAccess>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getCheckAdminAccessQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof checkAdminAccess>>
+  > = ({ signal }) => checkAdminAccess({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof checkAdminAccess>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type CheckAdminAccessQueryResult = NonNullable<
+  Awaited<ReturnType<typeof checkAdminAccess>>
+>;
+export type CheckAdminAccessQueryError = ErrorType<
+  UnauthorizedResponse | ForbiddenResponse | ServiceUnavailableResponse
+>;
+
+/**
+ * @summary Verify server-authorized administrator access
+ */
+
+export function useCheckAdminAccess<
+  TData = Awaited<ReturnType<typeof checkAdminAccess>>,
+  TError = ErrorType<
+    UnauthorizedResponse | ForbiddenResponse | ServiceUnavailableResponse
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof checkAdminAccess>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getCheckAdminAccessQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Read recent administrative audit events
+ */
+export const getGetAdminAuditUrl = () => {
+  return `/api/admin/audit`;
+};
+
+export const getAdminAudit = async (
+  options?: RequestInit,
+): Promise<AdminAuditResponse> => {
+  return customFetch<AdminAuditResponse>(getGetAdminAuditUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminAuditQueryKey = () => {
+  return [`/api/admin/audit`] as const;
+};
+
+export const getGetAdminAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminAudit>>,
+  TError = ErrorType<
+    UnauthorizedResponse | ForbiddenResponse | ServiceUnavailableResponse
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAudit>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminAuditQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAudit>>> = ({
+    signal,
+  }) => getAdminAudit({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAudit>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminAudit>>
+>;
+export type GetAdminAuditQueryError = ErrorType<
+  UnauthorizedResponse | ForbiddenResponse | ServiceUnavailableResponse
+>;
+
+/**
+ * @summary Read recent administrative audit events
+ */
+
+export function useGetAdminAudit<
+  TData = Awaited<ReturnType<typeof getAdminAudit>>,
+  TError = ErrorType<
+    UnauthorizedResponse | ForbiddenResponse | ServiceUnavailableResponse
+  >,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAudit>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminAuditQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

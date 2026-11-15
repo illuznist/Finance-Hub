@@ -8,3 +8,83 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface ApiError {
+  error: string;
+}
+
+export type AccountAccessRolesItem =
+  (typeof AccountAccessRolesItem)[keyof typeof AccountAccessRolesItem];
+
+export const AccountAccessRolesItem = {
+  USER: "USER",
+  ADMIN: "ADMIN",
+  SUPER_ADMIN: "SUPER_ADMIN",
+} as const;
+
+export type AccountAccessProSource =
+  (typeof AccountAccessProSource)[keyof typeof AccountAccessProSource];
+
+export const AccountAccessProSource = {
+  free: "free",
+  promotional: "promotional",
+  super_admin: "super_admin",
+} as const;
+
+export interface AccountAccess {
+  accountId: string;
+  emailVerified: boolean;
+  roles: AccountAccessRolesItem[];
+  isPro: boolean;
+  proSource: AccountAccessProSource;
+  paidPurchasesAvailable: boolean;
+}
+
+export type AdminAccessStatus =
+  (typeof AdminAccessStatus)[keyof typeof AdminAccessStatus];
+
+export const AdminAccessStatus = {
+  authorized: "authorized",
+} as const;
+
+export interface AdminAccess {
+  status: AdminAccessStatus;
+}
+
+export type AdminAuditEntryOutcome =
+  (typeof AdminAuditEntryOutcome)[keyof typeof AdminAuditEntryOutcome];
+
+export const AdminAuditEntryOutcome = {
+  allowed: "allowed",
+  denied: "denied",
+  succeeded: "succeeded",
+  failed: "failed",
+} as const;
+
+export interface AdminAuditEntry {
+  id: string;
+  actor_user_id?: string | null;
+  action: string;
+  target_user_id?: string | null;
+  outcome: AdminAuditEntryOutcome;
+  occurred_at: string;
+}
+
+export interface AdminAuditResponse {
+  entries: AdminAuditEntry[];
+}
+
+/**
+ * A valid online account session is required
+ */
+export type UnauthorizedResponse = ApiError;
+
+/**
+ * The online account does not have the required role and MFA
+ */
+export type ForbiddenResponse = ApiError;
+
+/**
+ * Supabase account infrastructure is not configured or unavailable
+ */
+export type ServiceUnavailableResponse = ApiError;

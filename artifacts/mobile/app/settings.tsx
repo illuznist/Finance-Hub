@@ -8,7 +8,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -19,6 +18,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { BrandAttribution } from "@/components/BrandAttribution";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { OnlineAccountSettings } from "@/components/OnlineAccountSettings";
 import {
   type NotificationSettings,
   type SecuritySettings,
@@ -445,14 +446,16 @@ export default function SettingsScreen() {
         }
       />
 
-      <ScrollView
+      <KeyboardAwareScrollViewCompat
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingBottom: 60 + insets.bottom,
           paddingTop: 16,
           gap: 4,
         }}
+        bottomOffset={24}
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="interactive"
       >
         {/* Appearance */}
         <SectionHeader title="APPEARANCE" />
@@ -898,8 +901,11 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* Account */}
-        <SectionHeader title="ACCOUNT" />
+        <SectionHeader title="ONLINE ACCOUNT" />
+        <OnlineAccountSettings />
+
+        {/* Device-local account remains separate from optional online identity. */}
+        <SectionHeader title="LOCAL APP ACCOUNT" />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 0 }]}>
           {auth.userEmail && (
             <>
@@ -908,7 +914,7 @@ export default function SettingsScreen() {
                   <Feather name="user" size={17} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Signed in as")}</Text>
+                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Local app sign-in")}</Text>
                   <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
                     {auth.userEmail}
                   </Text>
@@ -921,7 +927,7 @@ export default function SettingsScreen() {
             <View style={[styles.settingIconWrap, { backgroundColor: "#EF444420" }]}>
               <Feather name="log-out" size={17} color="#EF4444" />
             </View>
-            <Text style={[styles.settingLabel, { color: "#EF4444" }]}>{t("Sign Out")}</Text>
+            <Text style={[styles.settingLabel, { color: "#EF4444" }]}>{t("Sign out of local app")}</Text>
             <View style={{ flex: 1 }} />
             <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color="#EF444480" />
           </Pressable>
@@ -989,7 +995,7 @@ export default function SettingsScreen() {
         </Pressable>
         <BrandAttribution />
 
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
 
       <PinSetupModal
         visible={showPinSetup}

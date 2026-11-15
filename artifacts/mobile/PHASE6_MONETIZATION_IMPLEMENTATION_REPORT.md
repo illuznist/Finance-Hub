@@ -1,6 +1,6 @@
 # Finance Hub Phase 6 — Stage A Architecture and Stage B Implementation
 
-**Status:** Stage A approved; Stage B implemented and verified. Stages C–F have not started.
+**Status:** Stage A approved; Stage B implemented and user-verified on iPhone; Stage C is in progress. Stages D–F have not started.
 **Prepared:** 2026-11-15
 **Protected baseline:** `finance-hub-v1.1.3-verified` at `980ba97d03f0041d05901e15878cb9bc0be5d35c`
 **Development branch:** `phase6/monetization`
@@ -160,7 +160,7 @@ Continue on `phase6/monetization` and preserve the verified v1.1.3 `main` baseli
 
 The development purchase adapter is in-memory, visibly test-only, and incapable of granting Pro in production. No app or finance data is uploaded for entitlements. The iOS purchase control remains unavailable until Apple purchase infrastructure is configured and separately approved.
 
-Do **not** start Stage C or later, connect or create paid external services, create production credentials, bootstrap the owner/admin account, deploy the admin portal, publish the app, or enable live purchases without separate approval.
+Stage C was separately approved on 2026-11-15. Proceed only with safe code and migration preparation until a Supabase project and configuration are explicitly approved. Do not bootstrap an owner/admin account before explicit approval. Stage D/E, paid external services, Admin Portal deployment, app publishing, and live purchases remain outside the current authorization.
 
 ## 11. Stage B implementation and verification
 

@@ -44,12 +44,12 @@ Premium UX polish: committed separately on this branch after the policy implemen
 - Expo preview workflow restarted and served without Metro/module-resolution errors after the restart.
 - `git diff --check`: passed.
 
-## Visual and device-test limitations
+## Visual and device-test results
 
-The browser preview was opened at `/analytics`, but the preview browser is unauthenticated and showed the Create Account screen behind the app's authentication gate. Therefore the signed-in premium preview, limit page, Arabic layout, and dark/light variants were not visually verified in that browser. No authentication bypass was added. The preview cards use synthetic illustrative values and do not display real financial data.
+On 2026-11-15, the user confirmed physical iPhone verification of the corrected dashboard spacing, Settings Plan card, premium previews, and upgrade navigation. No other device functionality is inferred from that confirmation.
 
-No physical iPhone or Android device test of the Stage B UI polish was performed. The successful iOS and Android exports validate JavaScript bundling, not native-device appearance or interaction.
+The browser preview remained unauthenticated and showed the Create Account screen behind the app's authentication gate. The signed-in premium preview, limit page, Arabic layout, and dark/light variants were not visually verified in that browser. No authentication bypass was added. The preview cards use synthetic illustrative values and do not display real financial data. No Android device test is claimed.
 
 ## Scope and next phase
 
-No financial calculations, ledger entries, entitlement limits, storage migrations, authentication/PIN, backups, restore, exports, dependencies, or version values were changed for this polish. `main` and the verified v1.1.3 baseline remain untouched. Stage C and live purchasing were not started; Apple and RevenueCat purchase infrastructure remains unconfigured.
+No financial calculations, ledger entries, entitlement limits, storage migrations, authentication/PIN, backups, restore, exports, dependencies, or version values were changed for this polish. `main` and the verified v1.1.3 baseline remain untouched. Stage C is now authorized and in progress; Stage D/E and live purchasing remain unstarted.

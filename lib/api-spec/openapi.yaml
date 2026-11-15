@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: account
+    description: Optional online account operations
+  - name: admin
+    description: MFA-protected administrative operations
 paths:
   /healthz:
     get:
@@ -24,7 +28,89 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /account/access:
+    get:
+      operationId: getAccountAccess
+      tags: [account]
+      summary: Get verified account and online Pro access
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Verified account access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountAccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /admin/access-check:
+    get:
+      operationId: checkAdminAccess
+      tags: [admin]
+      summary: Verify server-authorized administrator access
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Authorized administrator with verified MFA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /admin/audit:
+    get:
+      operationId: getAdminAudit
+      tags: [admin]
+      summary: Read recent administrative audit events
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recent administrative audit records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAuditResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: A valid online account session is required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: The online account does not have the required role and MFA
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServiceUnavailable:
+      description: Supabase account infrastructure is not configured or unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +119,70 @@ components:
           type: string
       required:
         - status
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    AccountAccess:
+      type: object
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        emailVerified:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [USER, ADMIN, SUPER_ADMIN]
+        isPro:
+          type: boolean
+        proSource:
+          type: string
+          enum: [free, promotional, super_admin]
+        paidPurchasesAvailable:
+          type: boolean
+          enum: [false]
+      required: [accountId, emailVerified, roles, isPro, proSource, paidPurchasesAvailable]
+    AdminAccess:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [authorized]
+      required: [status]
+    AdminAuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        target_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        outcome:
+          type: string
+          enum: [allowed, denied, succeeded, failed]
+        occurred_at:
+          type: string
+          format: date-time
+      required: [id, action, outcome, occurred_at]
+    AdminAuditResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAuditEntry"
+      required: [entries]
 
