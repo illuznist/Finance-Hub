@@ -3,6 +3,15 @@ const assert = require("node:assert/strict");
 const C = require("../crypto.ts");
 const B = require("../backup.ts");
 const J = require("../restoreJournal.ts");
+const ts = require("typescript");
+const fs = require("node:fs");
+require.extensions[".ts"] = (module, filename) => {
+  module._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    fileName: filename,
+  }).outputText, filename);
+};
+const M = require("../../finance/migration.ts");
 
 const fixedRandom = (() => {
   let seed = 0;
@@ -121,6 +130,9 @@ test("prepared restore journal restores the exact old finance document", async (
   }, fixedRandom);
   await storage.setItem("@finance_state_v4", '{"schemaVersion":2,"accounts":[{"id":"new"}]}');
   await storage.setItem("@finance_theme_v1", "light");
+  const journal = JSON.parse(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+  assert.equal(journal.version, 2);
+  assert.equal(Object.hasOwn(journal, "originalValues"), false);
   assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
   assert.equal(await storage.getItem("@finance_state_v4"), '{"schemaVersion":2,"accounts":[]}');
   assert.equal(await storage.getItem("@finance_theme_v1"), "dark");
@@ -160,7 +172,10 @@ test("restore journal refuses to change finance data when its protected key is m
     "@finance_theme_v1": "system",
   }, fixedRandom);
   await secrets.remove(J.RESTORE_JOURNAL_SECRET_KEY);
-  await assert.rejects(() => J.recoverInterruptedRestore(storage, secrets), /cannot be opened/);
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, secrets),
+    error => error.code === "RESTORE_KEY_MISSING",
+  );
   assert.equal(await storage.getItem("@finance_state_v4"), '{"after":true}');
 });
 
@@ -174,7 +189,211 @@ test("restore journal refuses a tampered recovery snapshot without overwriting c
   const journal = JSON.parse(await storage.getItem(J.RESTORE_JOURNAL_KEY));
   journal.ciphertext = `${journal.ciphertext[0] === "A" ? "B" : "A"}${journal.ciphertext.slice(1)}`;
   await storage.setItem(J.RESTORE_JOURNAL_KEY, JSON.stringify(journal));
-  await assert.rejects(() => J.recoverInterruptedRestore(storage, secrets), /integrity check/);
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, secrets),
+    error => error.code === "RESTORE_DECRYPT_FAILED",
+  );
   assert.equal(await storage.getItem("@finance_state_v4"), '{"after":true}');
   assert.ok(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+});
+
+test("no-journal startup removes an orphan key when SecureStore is available", async () => {
+  const storage = memoryStorage();
+  const secrets = memorySecretStore({ [J.RESTORE_JOURNAL_SECRET_KEY]: "orphan" });
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets), "none");
+  assert.equal(await secrets.get(J.RESTORE_JOURNAL_SECRET_KEY), null);
+});
+
+test("no-journal startup is not blocked by SecureStore read failure", async () => {
+  const storage = memoryStorage();
+  const secrets = memorySecretStore();
+  secrets.get = async () => { throw new Error("keychain unavailable"); };
+  const warnings = [];
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets, (...args) => warnings.push(args)), "none");
+  assert.equal(warnings[0][0], "RESTORE_KEY_READ_FAILED");
+  const empty = {
+    userName: "", currency: "SAR", monthlyBudget: 0, expenses: [], emis: [], loans: [],
+    accounts: [], incomes: [], savingsGoals: [], transactions: [], schemaVersion: 1,
+    notificationSettings: { enabled: true }, securitySettings: { pinEnabled: false },
+    lastResetMonth: "", lastResetYear: "",
+  };
+  assert.equal((await M.loadFinanceState(storage, empty)).currency, "SAR");
+});
+
+test("no-journal startup is not blocked when orphan-key cleanup fails", async () => {
+  const storage = memoryStorage();
+  const secrets = memorySecretStore({ [J.RESTORE_JOURNAL_SECRET_KEY]: "orphan" });
+  secrets.remove = async () => { throw new Error("keychain locked"); };
+  const warnings = [];
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets, (...args) => warnings.push(args)), "none");
+  assert.equal(await secrets.get(J.RESTORE_JOURNAL_SECRET_KEY), "orphan");
+  assert.equal(warnings[0][0], "RESTORE_KEY_DELETE_FAILED");
+});
+
+test("completed rollback stays usable when SecureStore cannot delete its orphaned key", async () => {
+  const original = '{"schemaVersion":2,"accounts":[]}';
+  const storage = memoryStorage({ "@finance_state_v4": original });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, { "@finance_state_v4": original }, fixedRandom);
+  await storage.setItem("@finance_state_v4", '{"partial":true}');
+  secrets.remove = async () => { throw new Error("keychain locked"); };
+  const warnings = [];
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets, (...args) => warnings.push(args)), "rolled-back");
+  assert.equal(await storage.getItem("@finance_state_v4"), original);
+  assert.equal(await storage.getItem(J.RESTORE_JOURNAL_KEY), null);
+  assert.ok(await secrets.get(J.RESTORE_JOURNAL_SECRET_KEY));
+  assert.equal(warnings[0][0], "RESTORE_KEY_DELETE_FAILED");
+});
+
+test("active restore blocks with a diagnostic when the recovery key cannot be read", async () => {
+  const storage = memoryStorage({ "@finance_state_v4": '{"before":true}' });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, {
+    "@finance_state_v4": await storage.getItem("@finance_state_v4"),
+  }, fixedRandom);
+  await storage.setItem("@finance_state_v4", '{"after":true}');
+  secrets.get = async () => { throw new Error("keychain unavailable"); };
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, secrets),
+    error => error.code === "RESTORE_KEY_READ_FAILED" && error.stage === "Reading recovery key",
+  );
+  assert.equal(await storage.getItem("@finance_state_v4"), '{"after":true}');
+  assert.ok(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+});
+
+test("committed recovery remains accessible when journal cleanup fails", async () => {
+  const storage = memoryStorage({ "@finance_state_v4": '{"after":true}' });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, {
+    "@finance_state_v4": '{"before":true}',
+  }, fixedRandom);
+  await J.commitRestoreJournal(storage);
+  const removeItem = storage.removeItem;
+  storage.removeItem = async key => {
+    if (key === J.RESTORE_JOURNAL_KEY) throw new Error("storage temporarily unavailable");
+    await removeItem(key);
+  };
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets), "committed");
+  assert.equal(await storage.getItem("@finance_state_v4"), '{"after":true}');
+  assert.ok(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+});
+
+test("prepared rollback stays retryable after a saved-value write failure", async () => {
+  const original = '{"schemaVersion":2,"accounts":[]}';
+  const storage = memoryStorage({ "@finance_state_v4": original });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, { "@finance_state_v4": original }, fixedRandom);
+  await storage.setItem("@finance_state_v4", '{"partial":true}');
+  const setItem = storage.setItem;
+  let fail = true;
+  storage.setItem = async (key, value) => {
+    if (key === "@finance_state_v4" && fail) throw new Error("storage temporarily unavailable");
+    await setItem(key, value);
+  };
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, secrets),
+    error => error.code === "RESTORE_ORIGINAL_VALUE_WRITE_FAILED",
+  );
+  assert.equal(await storage.getItem("@finance_state_v4"), '{"partial":true}');
+  assert.ok(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+  fail = false;
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
+  assert.equal(await storage.getItem("@finance_state_v4"), original);
+});
+
+test("failed journal read produces a stable recovery diagnostic", async () => {
+  const storage = memoryStorage();
+  storage.getItem = async () => { throw new Error("AsyncStorage unavailable"); };
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, memorySecretStore()),
+    error => error.code === "RESTORE_JOURNAL_READ_FAILED" && error.stage === "Reading restore journal",
+  );
+});
+
+test("failed journal cleanup retains a retryable prepared restore", async () => {
+  const original = '{"schemaVersion":2,"accounts":[]}';
+  const storage = memoryStorage({ "@finance_state_v4": original });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, { "@finance_state_v4": original }, fixedRandom);
+  await storage.setItem("@finance_state_v4", '{"partial":true}');
+  const removeItem = storage.removeItem;
+  let fail = true;
+  storage.removeItem = async key => {
+    if (key === J.RESTORE_JOURNAL_KEY && fail) throw new Error("AsyncStorage unavailable");
+    await removeItem(key);
+  };
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, secrets),
+    error => error.code === "RESTORE_JOURNAL_CLEAR_FAILED",
+  );
+  assert.equal(await storage.getItem("@finance_state_v4"), original);
+  assert.ok(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+  fail = false;
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
+  assert.equal(await storage.getItem(J.RESTORE_JOURNAL_KEY), null);
+});
+
+test("legacy v1 journals are encrypted-only before original records are restored", async () => {
+  const original = '{"schemaVersion":2,"accounts":[]}';
+  const storage = memoryStorage({ "@finance_state_v4": original });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, { "@finance_state_v4": original }, fixedRandom);
+  const legacy = JSON.parse(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+  legacy.version = 1;
+  legacy.originalValues = { "@finance_state_v4": original };
+  await storage.setItem(J.RESTORE_JOURNAL_KEY, JSON.stringify(legacy));
+  await storage.setItem("@finance_state_v4", '{"partial":true}');
+  const writes = [];
+  const setItem = storage.setItem;
+  let failFirstRestore = true;
+  storage.setItem = async (key, value) => {
+    if (key === J.RESTORE_JOURNAL_KEY) writes.push(JSON.parse(value));
+    if (key === "@finance_state_v4" && failFirstRestore) {
+      failFirstRestore = false;
+      throw new Error("temporary storage failure");
+    }
+    await setItem(key, value);
+  };
+  await assert.rejects(
+    () => J.recoverInterruptedRestore(storage, secrets),
+    error => error.code === "RESTORE_ORIGINAL_VALUE_WRITE_FAILED",
+  );
+  assert.equal(writes[0].version, 2);
+  assert.equal(Object.hasOwn(writes[0], "originalValues"), false);
+  const retainedJournal = JSON.parse(await storage.getItem(J.RESTORE_JOURNAL_KEY));
+  assert.equal(retainedJournal.version, 2);
+  assert.equal(Object.hasOwn(retainedJournal, "originalValues"), false);
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
+  assert.equal(await storage.getItem("@finance_state_v4"), original);
+});
+
+test("finance storage loads normally after a successful interrupted rollback", async () => {
+  const originalState = {
+    schemaVersion: 2,
+    userName: "Test",
+    currency: "SAR",
+    monthlyBudget: 0,
+    expenses: [],
+    emis: [],
+    loans: [],
+    accounts: [],
+    incomes: [],
+    savingsGoals: [],
+    transactions: [],
+  };
+  const original = JSON.stringify(originalState);
+  const storage = memoryStorage({ "@finance_state_v4": original });
+  const secrets = memorySecretStore();
+  await J.createRestoreJournal(storage, secrets, { "@finance_state_v4": original }, fixedRandom);
+  await storage.setItem("@finance_state_v4", '{"partial":true}');
+  assert.equal(await J.recoverInterruptedRestore(storage, secrets), "rolled-back");
+  const empty = {
+    userName: "", currency: "SAR", monthlyBudget: 0, expenses: [], emis: [], loans: [],
+    accounts: [], incomes: [], savingsGoals: [], transactions: [], schemaVersion: 1,
+    notificationSettings: { enabled: true }, securitySettings: { pinEnabled: false },
+    lastResetMonth: "", lastResetYear: "",
+  };
+  const loaded = await M.loadFinanceState(storage, empty);
+  assert.equal(loaded.currency, "SAR");
+  assert.deepEqual(loaded.accounts, []);
 });

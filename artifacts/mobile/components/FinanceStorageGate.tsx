@@ -26,7 +26,15 @@ export function FinanceStorageGate({ children }: { children: React.ReactNode }) 
               {t("Load step: {step}", { step: t(finance.storageErrorStage) })}
             </Text>
           ) : null}
+          {finance.storageErrorCode ? (
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18, writingDirection: "ltr" }}>
+              {t("Recovery code: {code}", { code: finance.storageErrorCode })}
+            </Text>
+          ) : null}
           <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{t("Do not clear app storage. The original data is retained if migration cannot finish. If a save failed, keep this app open and retry.")}</Text>
+          {finance.storageErrorNextAction ? (
+            <Text style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 19 }}>{t(finance.storageErrorNextAction)}</Text>
+          ) : null}
           <Pressable
             testID="finance-storage-retry"
             accessibilityRole="button"

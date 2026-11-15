@@ -25,6 +25,7 @@ import {
   migrateLegacyPinBeforeFinanceLoad,
   recoverProtectedRestoreJournal,
 } from "@/security/deviceSecurity";
+import { RestoreRecoveryError } from "@/security/restoreJournal";
 import { captureNetWorthSnapshots } from "@/finance/netWorth";
 import type { NetWorthSnapshot } from "@/finance/analyticsTypes";
 import { buildAnalyticsReport } from "@/finance/analytics";
@@ -237,6 +238,8 @@ interface FinanceContextType extends FinanceState {
   transactions: Transaction[];
   storageError: string | null;
   storageErrorStage: string | null;
+  storageErrorCode: string | null;
+  storageErrorNextAction: string | null;
   storageRetrying: boolean;
   storageRecoveryNotice: string | null;
   isReady: boolean;
@@ -441,6 +444,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const retryingRef = useRef(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [storageErrorStage, setStorageErrorStage] = useState<string | null>(null);
+  const [storageErrorCode, setStorageErrorCode] = useState<string | null>(null);
+  const [storageErrorNextAction, setStorageErrorNextAction] = useState<string | null>(null);
   const [storageRetrying, setStorageRetrying] = useState(false);
   const [storageRecoveryNotice, setStorageRecoveryNotice] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -452,6 +457,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let stage = "Checking interrupted restore";
     setStorageError(null);
     setStorageErrorStage(null);
+    setStorageErrorCode(null);
+    setStorageErrorNextAction(null);
     try {
       const recovery = await recoverProtectedRestoreJournal(AsyncStorage);
       if (recovery === "rolled-back") {
@@ -487,11 +494,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setIsReady(true);
       setStorageError(null);
       setStorageErrorStage(null);
+      setStorageErrorCode(null);
+      setStorageErrorNextAction(null);
       setState(loaded);
-    } catch {
+    } catch (error) {
       readyRef.current = false;
-      setStorageError("Saved data could not be loaded. No records have been reset.");
-      setStorageErrorStage(stage);
+      if (error instanceof RestoreRecoveryError) {
+        setStorageError(error.message);
+        setStorageErrorStage(error.stage);
+        setStorageErrorCode(error.code);
+        setStorageErrorNextAction(error.nextAction);
+      } else {
+        setStorageError("Saved data could not be loaded. No records have been reset.");
+        setStorageErrorStage(stage);
+      }
     } finally {
       loadingRef.current = false;
     }
@@ -508,6 +524,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     queueWrite(next).catch(() => {
       readyRef.current = false;
       setStorageError("Changes could not be saved. Your records are unchanged; keep the app open and retry safely.");
+      setStorageErrorStage("Saving recovered records");
+      setStorageErrorCode(null);
+      setStorageErrorNextAction(null);
     });
   }, [queueWrite]);
 
@@ -517,6 +536,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setStorageRetrying(true);
     setStorageError(null);
     setStorageErrorStage(null);
+    setStorageErrorCode(null);
+    setStorageErrorNextAction(null);
     let stage = "Checking interrupted restore";
     try {
       if (!readyRef.current && stateRef.current === defaultState) {
@@ -534,10 +555,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       readyRef.current = true;
       setStorageError(null);
       setStorageErrorStage(null);
-    } catch {
+      setStorageErrorCode(null);
+      setStorageErrorNextAction(null);
+    } catch (error) {
       readyRef.current = false;
-      setStorageError("Saved data could not be retried safely.");
-      setStorageErrorStage(stage);
+      if (error instanceof RestoreRecoveryError) {
+        setStorageError(error.message);
+        setStorageErrorStage(error.stage);
+        setStorageErrorCode(error.code);
+        setStorageErrorNextAction(error.nextAction);
+      } else {
+        setStorageError("Saved data could not be retried safely.");
+        setStorageErrorStage(stage);
+      }
     } finally {
       retryingRef.current = false;
       setStorageRetrying(false);
@@ -831,14 +861,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           await recoverProtectedRestoreJournal(AsyncStorage);
           readyRef.current = true;
           setStorageError(null);
-        } catch {
+          setStorageErrorStage(null);
+          setStorageErrorCode(null);
+          setStorageErrorNextAction(null);
+        } catch (recoveryError) {
           readyRef.current = false;
-          setStorageError("A restore was interrupted. The protected recovery copy is still present. Do not clear app storage; tap Retry safely.");
+          if (recoveryError instanceof RestoreRecoveryError) {
+            setStorageError(recoveryError.message);
+            setStorageErrorStage(recoveryError.stage);
+            setStorageErrorCode(recoveryError.code);
+            setStorageErrorNextAction(recoveryError.nextAction);
+          } else {
+            setStorageError("A restore was interrupted. The protected recovery copy is still present. Do not clear app storage; tap Retry safely.");
+          }
           throw new Error("Restore did not finish. Keep the app open and use Retry safely to recover the previous records.");
         }
       } else {
         readyRef.current = false;
         setStorageError("Restore could not start safely. Your current records are unchanged; tap Retry safely before continuing.");
+        setStorageErrorCode(null);
+        setStorageErrorNextAction(null);
       }
       throw new Error(error instanceof Error ? error.message : "Restore did not finish; previous records were retained.");
     }
@@ -847,6 +889,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setState(restored);
     readyRef.current = true;
     setStorageError(null);
+    setStorageErrorStage(null);
+    setStorageErrorCode(null);
+    setStorageErrorNextAction(null);
     try {
       await clearProtectedRestoreJournal(financeStorageAdapter);
     } catch {
@@ -894,6 +939,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         transactions,
         storageError,
         storageErrorStage,
+        storageErrorCode,
+        storageErrorNextAction,
         storageRetrying,
         storageRecoveryNotice,
         isReady,

@@ -30,6 +30,7 @@ import {
   RESTORE_FINANCE_DOCUMENT_KEY,
   RESTORE_THEME_PREFERENCE_KEY,
   type JournalStorage,
+  type RestoreRecoveryDiagnosticCode,
 } from "./restoreJournal.ts";
 
 export const LEGACY_PIN_STORAGE_KEY = "@finance_pin_v1";
@@ -259,10 +260,49 @@ export async function recoverProtectedRestoreJournal(
   storage: JournalStorage,
 ): Promise<"none" | "rolled-back" | "committed"> {
   const { recoverInterruptedRestore } = await import("./restoreJournal.ts");
-  return recoverInterruptedRestore(storage, {
-    get: readSecret,
-    set: writeSecret,
-    remove: deleteSecret,
+  const logDiagnostic = (
+    code: RestoreRecoveryDiagnosticCode,
+    stage: string,
+    error: unknown,
+  ) => logRestoreDiagnostic(code, stage, error);
+  try {
+    return await recoverInterruptedRestore(storage, {
+      get: readSecret,
+      set: writeSecret,
+      remove: deleteSecret,
+    }, logDiagnostic);
+  } catch (error) {
+    const diagnostic = error as { code?: RestoreRecoveryDiagnosticCode; stage?: string; cause?: unknown };
+    logRestoreDiagnostic(
+      diagnostic.code ?? "RESTORE_JOURNAL_READ_FAILED",
+      diagnostic.stage ?? "Checking interrupted restore",
+      diagnostic.cause ?? error,
+    );
+    throw error;
+  }
+}
+
+function logRestoreDiagnostic(
+  code: RestoreRecoveryDiagnosticCode,
+  stage: string,
+  error: unknown,
+): void {
+  if (typeof __DEV__ === "undefined" || !__DEV__) return;
+  const exception = error instanceof Error ? error : null;
+  let message = exception?.message ?? String(error);
+  if (/[{}\[\]]/.test(message) || /\b(?:balance|account|transaction|income|expense|pin|password|secret|ciphertext)\b/i.test(message)) {
+    message = "[redacted potentially sensitive exception message]";
+  } else {
+    message = message
+      .replace(/\b[0-9a-f]{48,}\b/gi, "[redacted]")
+      .replace(/\b[A-Za-z0-9+/]{48,}={0,2}\b/g, "[redacted]")
+      .slice(0, 240);
+  }
+  console.warn("[Finance Hub restore recovery]", {
+    code,
+    stage,
+    exceptionName: exception?.name ?? typeof error,
+    exceptionMessage: message,
   });
 }
 
