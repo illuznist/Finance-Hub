@@ -17,6 +17,9 @@ import type { Transaction } from "@/finance/ledger";
 import { getAccountBalance, getTransactionsByDateRange, monthRange, newId, minorUnits, localDate } from "@/finance/ledger";
 import { assertBackupFinanceCompleteness, loadFinanceState, createWriteQueue, migrateFinanceState } from "@/finance/migration";
 import * as ledgerService from "@/finance/service";
+import { archiveAccountInState, reactivateAccountInState } from "@/finance/accountArchive";
+import { canCreateResource } from "@/finance/entitlements";
+import { useEntitlements } from "@/context/EntitlementContext";
 import {
   clearProtectedRestoreJournal,
   commitProtectedRestoreJournal,
@@ -148,6 +151,7 @@ export interface Account {
   color: string;
   openingBalance?: number;
   currency?: string;
+  archivedAt?: string;
 }
 
 export interface Income {
@@ -256,7 +260,7 @@ interface FinanceContextType extends FinanceState {
   addExpense: (e: Omit<Expense, "id"> & { id?: string }) => void;
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
-  addEMI: (e: Omit<EMI, "id">) => void;
+  addEMI: (e: Omit<EMI, "id">) => boolean;
   updateEMI: (id: string, updates: Partial<Omit<EMI, "id" | "paymentHistory" | "paidInstallments" | "legacyPaidInstallments">>) => void;
   deleteEMI: (id: string) => void;
   recordEMIPayment: (id: string, payment: Omit<EMIPayment, "id" | "status">) => boolean;
@@ -268,7 +272,9 @@ interface FinanceContextType extends FinanceState {
   recordLoanPayment: (id: string, payment: Omit<LoanPayment, "id">) => boolean;
   updateLoanPayment: (loanId: string, paymentId: string, updates: Partial<Pick<LoanPayment, "amount" | "date" | "notes" | "accountId">>) => boolean;
   deleteLoanPayment: (loanId: string, paymentId: string) => boolean;
-  addAccount: (a: Omit<Account, "id">) => void;
+  addAccount: (a: Omit<Account, "id">) => boolean;
+  archiveAccount: (id: string) => boolean;
+  reactivateAccount: (id: string) => boolean;
   updateAccount: (id: string, updates: Partial<Account>) => void;
   deleteAccount: (id: string) => boolean;
   addIncome: (i: Omit<Income, "id"> & { id?: string }) => void;
@@ -435,6 +441,7 @@ function monthLabel(yyyymm: string): string {
 }
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
+  const entitlements = useEntitlements();
   const [state, setState] = useState<FinanceState>(defaultState);
   const [calendarKey, setCalendarKey] = useState(() => `${localDate()}:${new Date().getTimezoneOffset()}`);
   const [monthResetInfo, setMonthResetInfo] = useState<{ count: number; month: string } | null>(null);
@@ -643,9 +650,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addEMI = useCallback(
-    (e: Omit<EMI, "id">) =>
-      persist((prev) => ({ ...prev, emis: [...prev.emis, normalizeEMI({ ...e, currency: e.currency ?? prev.currency, id: genId() })] })),
-    [persist]
+    (e: Omit<EMI, "id">): boolean => attempt((prev) => {
+      if (!canCreateResource(prev, "emi", entitlements.isPro).allowed) {
+        throw new Error("Free plan EMI limit reached.");
+      }
+      return { ...prev, emis: [...prev.emis, normalizeEMI({ ...e, currency: e.currency ?? prev.currency, id: genId() })] };
+    }),
+    [attempt, entitlements.isPro]
   );
   const updateEMI = useCallback(
     (id: string, updates: Partial<Omit<EMI, "id" | "paymentHistory" | "paidInstallments" | "legacyPaidInstallments">>) =>
@@ -689,10 +700,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       attempt((prev) => {
         const id = funding?.id ?? genId();
         if (prev.loans.some(l => l.id === id)) return prev;
+        if (!canCreateResource(prev, "loan", entitlements.isPro).allowed) {
+          throw new Error("Free plan loan limit reached.");
+        }
         const next = { ...prev, loans: [...prev.loans, normalizeLoan({ ...loan, currency: loan.currency ?? prev.currency, id })] };
         return funding ? ledgerService.recordLoanFunding(next, id, funding) : next;
       }),
-    [attempt]
+    [attempt, entitlements.isPro]
   );
   const updateLoan = useCallback(
     (id: string, updates: Partial<Loan>): boolean => {
@@ -729,13 +743,39 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addAccount = useCallback(
-    (a: Omit<Account, "id">) =>
-      persist((prev) => ({ ...prev, accounts: [...prev.accounts, { ...a, id: genId(), openingBalance: a.openingBalance ?? a.balance, currency: a.currency ?? prev.currency }] })),
-    [persist]
+    (a: Omit<Account, "id">): boolean =>
+      attempt((prev) => {
+        if (!canCreateResource(prev, "account", entitlements.isPro).allowed) {
+          throw new Error("Free plan active account limit reached.");
+        }
+        return { ...prev, accounts: [...prev.accounts, { ...a, id: genId(), openingBalance: a.openingBalance ?? a.balance, currency: a.currency ?? prev.currency }] };
+      }),
+    [attempt, entitlements.isPro]
+  );
+  const archiveAccount = useCallback(
+    (id: string): boolean => attempt((prev) => {
+      const result = archiveAccountInState(prev, id, new Date().toISOString());
+      if (!result.ok) throw new Error("Account no longer exists.");
+      return result.state;
+    }),
+    [attempt]
+  );
+  const reactivateAccount = useCallback(
+    (id: string): boolean => attempt((prev) => {
+      const result = reactivateAccountInState(prev, id, entitlements.isPro);
+      if (!result.ok) {
+        throw new Error(result.reason === "active_wallet_limit" ? "Free plan active account limit reached." : "Account no longer exists.");
+      }
+      return result.state;
+    }),
+    [attempt, entitlements.isPro]
   );
   const updateAccount = useCallback(
     (id: string, updates: Partial<Account>) =>
       persist((prev) => {
+        if (Object.prototype.hasOwnProperty.call(updates, "archivedAt")) {
+          throw new Error("Use the account archive or reactivation action to change archive status.");
+        }
         if (updates.currency || updates.balance !== undefined || updates.openingBalance !== undefined) {
           throw new Error("Use balance reconciliation to correct an existing account. Opening balances and currency are protected.");
         }
@@ -978,6 +1018,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         updateLoanPayment,
         deleteLoanPayment,
         addAccount,
+        archiveAccount,
+        reactivateAccount,
         updateAccount,
         deleteAccount,
         addIncome,

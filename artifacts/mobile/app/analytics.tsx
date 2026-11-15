@@ -9,6 +9,8 @@ import { Chips, Field, Input, ToggleRow, money, shortDate, ui, type Colors } fro
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useFinance } from "@/context/FinanceContext";
+import { useEntitlements } from "@/context/EntitlementContext";
+import { ProFeatureGate } from "@/components/ProFeatureGate";
 import { PERIODS, SPENDING_LABELS, buildAnalyticsReport, reportingRange } from "@/finance/analytics";
 import type { AnalyticsReport, DateRange, NetWorthItem, PeriodPreset } from "@/finance/analyticsTypes";
 import { useColors } from "@/hooks/useColors";
@@ -303,6 +305,7 @@ export default function AnalyticsScreen() {
   const { t } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const today = finance.calendarKey.slice(0, 10);
 
@@ -340,6 +343,8 @@ export default function AnalyticsScreen() {
     if (extra.sourceKey) params.sourceKey = extra.sourceKey;
     router.push({ pathname: "/transactions", params } as never);
   };
+
+  if (!entitlements.isPro) return <ProFeatureGate feature="Advanced analytics" />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

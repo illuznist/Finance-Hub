@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { BrandAttribution } from "@/components/BrandAttribution";
 import {
   type NotificationSettings,
   type SecuritySettings,
@@ -25,12 +26,14 @@ import {
   useFinance,
 } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
+import { useEntitlements } from "@/context/EntitlementContext";
 import { useTheme, type ThemeMode } from "@/context/ThemeContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
-import { formatNumber, parseLocalizedNumberInput } from "@/i18n/localization";
+import { formatAppNumber, formatNumber, parseLocalizedNumberInput } from "@/i18n/localization";
+import { FREE_PLAN_LIMITS, getPlanUsage } from "@/finance/entitlements";
 
 function SectionHeader({ title }: { title: string }) {
   const colors = useColors();
@@ -319,6 +322,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const finance = useFinance();
   const auth = useAuth();
+  const entitlements = useEntitlements();
   const theme = useTheme();
   const preferences = usePreferences();
   const t = preferences.t;
@@ -333,6 +337,7 @@ export default function SettingsScreen() {
 
   const notif = finance.notificationSettings;
   const security = finance.securitySettings;
+  const planUsage = getPlanUsage(finance);
 
   async function updateNotif(updates: Partial<NotificationSettings>) {
     const next = { ...notif, ...updates };
@@ -550,6 +555,46 @@ export default function SettingsScreen() {
           </View>
           <Text style={[styles.currencyNote, { color: colors.mutedForeground, marginTop: 8 }]}>{t("Date entry always uses the Gregorian calendar.")}</Text>
         </View>
+
+        <SectionHeader title="PLAN" />
+        <Pressable
+          testID="settings-plan"
+          accessibilityRole="button"
+          onPress={() => router.push("/pro")}
+          style={({ pressed }) => [styles.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}
+        >
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
+              <Feather name="star" size={17} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Current plan")}</Text>
+              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginTop: 3 }]}>
+                {entitlements.isPro ? t("Pro") : t("Free plan")}
+              </Text>
+            </View>
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
+          </View>
+          <View style={[styles.rowDivider, { backgroundColor: colors.border, marginStart: 0 }]} />
+          {([
+            ["Active wallets", "account"],
+            ["Active loans", "loan"],
+            ["Active EMI agreements", "emi"],
+          ] as const).map(([label, key]) => (
+            <View key={key} style={[styles.planUsageRow, { flexDirection: preferences.isRTL ? "row-reverse" : "row" }]}>
+              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground }]}>{t(label)}</Text>
+              <Text style={[styles.settingValue, { color: colors.foreground }]}>
+                {entitlements.isPro
+                  ? t("{count} active", { count: formatAppNumber(planUsage[key]) })
+                  : t("{used} of {limit}", {
+                    used: formatAppNumber(planUsage[key]),
+                    limit: formatAppNumber(FREE_PLAN_LIMITS[key]),
+                  })}
+              </Text>
+            </View>
+          ))}
+          <Text style={[styles.planLink, { color: colors.primary }]}>{t("View Pro plan")}</Text>
+        </Pressable>
 
         {/* Profile */}
         <SectionHeader title="PROFILE" />
@@ -911,16 +956,25 @@ export default function SettingsScreen() {
 
         {/* About */}
         <SectionHeader title="ABOUT" />
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Pressable
+          testID="settings-about"
+          accessibilityRole="button"
+          onPress={() => router.push("/about")}
+          style={({ pressed }) => [styles.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}
+        >
           <View style={styles.settingRow}>
             <View style={[styles.settingIconWrap, { backgroundColor: colors.primary + "20" }]}>
               <Feather name="info" size={17} color={colors.primary} />
             </View>
-            <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("Version")}</Text>
-            <View style={{ flex: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingLabel, { color: colors.foreground }]}>{t("About FinanceApp")}</Text>
+              <Text style={[styles.settingSubLabel, { color: colors.mutedForeground, marginTop: 3 }]}>{t("Version")}</Text>
+            </View>
             <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>{getApplicationVersion()}</Text>
+            <Feather name={preferences.isRTL ? "chevron-left" : "chevron-right"} size={16} color={colors.mutedForeground} />
           </View>
-        </View>
+        </Pressable>
+        <BrandAttribution />
 
       </ScrollView>
 
@@ -1098,5 +1152,16 @@ const styles = StyleSheet.create({
   themeTabText: {
     fontSize: TYPOGRAPHY.bodySmall,
     fontFamily: "Inter_600SemiBold",
+  },
+  planUsageRow: {
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  planLink: {
+    fontSize: TYPOGRAPHY.bodySmall,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 8,
   },
 });

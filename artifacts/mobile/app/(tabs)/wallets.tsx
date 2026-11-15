@@ -34,6 +34,8 @@ import { financialAlert as Alert } from "@/utils/financialAlert";
 import { router } from "expo-router";
 import { formatAppCurrency, formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
 import { usePreferences } from "@/context/PreferencesContext";
+import { useEntitlements } from "@/context/EntitlementContext";
+import { canCreateResource } from "@/finance/entitlements";
 
 function fmt(amount: number, currency: string): string {
   return formatAppCurrency(amount, currency, { maximumFractionDigits: 0 });
@@ -53,10 +55,12 @@ function AccountCard({
   account,
   currency,
   onDelete,
+  onArchiveToggle,
 }: {
   account: Account;
   currency: string;
   onDelete: () => void;
+  onArchiveToggle: () => void;
 }) {
   const colors = useColors();
   const { t } = usePreferences();
@@ -73,13 +77,32 @@ function AccountCard({
         <View style={styles.accountIconWrap}>
           <Feather name={icon as any} size={20} color="#FFFFFF" />
         </View>
-        <TouchableOpacity onPress={onDelete} style={styles.accountDeleteBtn}>
-          <Feather name="x" size={14} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
+        <View style={styles.accountActions}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t(account.archivedAt ? "Reactivate account" : "Archive account")}
+            testID={`account-archive-${account.id}`}
+            onPress={onArchiveToggle}
+            style={styles.accountDeleteBtn}
+          >
+            <Feather name={account.archivedAt ? "rotate-ccw" : "archive"} size={13} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t("Remove account")}
+            testID={`account-remove-${account.id}`}
+            onPress={onDelete}
+            style={styles.accountDeleteBtn}
+          >
+            <Feather name="x" size={14} color="rgba(255,255,255,0.85)" />
+          </TouchableOpacity>
+        </View>
       </View>
       <Text style={styles.accountName}>{account.name}</Text>
       <Text style={styles.accountType}>
-        {t("{type} Account", { type: t(account.type.charAt(0).toUpperCase() + account.type.slice(1)) })}
+        {account.archivedAt
+          ? t("Archived")
+          : t("{type} Account", { type: t(account.type.charAt(0).toUpperCase() + account.type.slice(1)) })}
       </Text>
       <Text style={styles.accountBalance}>{fmt(account.balance, currency)}</Text>
     </LinearGradient>
@@ -253,24 +276,35 @@ function SavingsGoalRow({
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolean; onClose: () => void; onLimitReached: () => void }) {
   const colors = useColors();
   const { t, isRTL } = usePreferences();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const [name, setName] = useState("");
   const [balance, setBalance] = useState("0");
   const [type, setType] = useState<"bank" | "cash" | "savings">("bank");
   const [colorIdx, setColorIdx] = useState(0);
+  const [error, setError] = useState("");
   const submitted = useRef(false);
-  useEffect(() => { if (visible) submitted.current = false; }, [visible]);
+  useEffect(() => { if (visible) { submitted.current = false; setError(""); } }, [visible]);
 
   function submit() {
     const parsedBalance = parseLocalizedNumberInput(balance);
     if (submitted.current || !name.trim() || parsedBalance === null) return;
+    if (!canCreateResource(finance, "account", entitlements.isPro).allowed) {
+      onLimitReached();
+      return;
+    }
     submitted.current = true;
-    finance.addAccount({ name: name.trim(), balance: parsedBalance, type, color: PALETTE[colorIdx] });
+    const saved = finance.addAccount({ name: name.trim(), balance: parsedBalance, type, color: PALETTE[colorIdx] });
+    if (!saved) {
+      submitted.current = false;
+      setError(t("Could not save account."));
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setName(""); setBalance("0"); setType("bank"); setColorIdx(0);
+    setName(""); setBalance("0"); setType("bank"); setColorIdx(0); setError("");
     onClose();
   }
 
@@ -292,12 +326,14 @@ function AddAccountModal({ visible, onClose }: { visible: boolean; onClose: () =
           </View>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Opening balance")} ({finance.currency})</Text>
           <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={balance} onChangeText={setBalance} />
+          <Text style={[styles.accountLimitNote, { color: colors.mutedForeground }]}>{t("Only active accounts can be used for new transactions.")}</Text>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Color")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
             {PALETTE.map((col, i) => (
               <Pressable key={col} onPress={() => setColorIdx(i)} style={[styles.colorDot, { backgroundColor: col, borderWidth: colorIdx === i ? 3 : 0, borderColor: "#FFFFFF" }]} />
             ))}
           </View>
+          {error ? <Text style={[styles.accountLimitNote, { color: colors.destructive, marginBottom: 12 }]}>{t(error)}</Text> : null}
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: colors.muted, flex: 1 }]}><Text style={[styles.btnText, { color: colors.mutedForeground }]}>{t("Cancel")}</Text></Pressable>
             <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("Add")}</Text></Pressable>
@@ -365,7 +401,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
           </View>
           {kind === "received" ? (
             <>
-              <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} />
+              <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} allowArchivedValue={Boolean(editing)} />
               <TextInput accessibilityLabel={t("Income received date")} value={date} onChangeText={setDate} style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground }]} placeholder="YYYY-MM-DD" />
             </>
           ) : (
@@ -376,7 +412,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
               <Text style={{ color: colors.mutedForeground, fontSize: TYPOGRAPHY.supporting, marginTop: -8, marginBottom: 12 }}>
                 {t("Only a specific date is included in cash forecasts; the monthly plan remains an estimate.")}
               </Text>
-              {!!expectedDate ? <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} /> : null}
+              {!!expectedDate ? <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={currency} allowArchivedValue={Boolean(editing)} /> : null}
             </>
           )}
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Name")}</Text>
@@ -475,6 +511,7 @@ export default function WalletsScreen() {
   const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const toast = useToast();
   const params = useLocalSearchParams<{ incomeId?: string }>();
   const router = useRouter();
@@ -484,6 +521,8 @@ export default function WalletsScreen() {
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const activeAccounts = finance.accounts.filter((account) => !account.archivedAt);
+  const archivedAccounts = finance.accounts.filter((account) => Boolean(account.archivedAt));
   useEffect(() => {
     if (!params.incomeId || !finance.isReady) return;
     const selected = finance.incomes.find(income => income.id === params.incomeId);
@@ -499,6 +538,47 @@ export default function WalletsScreen() {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 600);
   }, []);
+
+  function openAddAccount() {
+    if (!canCreateResource(finance, "account", entitlements.isPro).allowed) {
+      router.push("/pro?limit=account");
+      return;
+    }
+    setShowAddAccount(true);
+  }
+
+  function confirmAccountArchiveChange(account: Account) {
+    if (account.archivedAt) {
+      if (!canCreateResource(finance, "account", entitlements.isPro).allowed) {
+        router.push("/pro?limit=account");
+        return;
+      }
+      Alert.alert(
+        t("Reactivate {name}?", { name: account.name }),
+        t("Reactivating this account makes it available for new entries. Its existing history and balance will remain unchanged."),
+        [
+          { text: t("Cancel"), style: "cancel" },
+          { text: t("Reactivate account"), onPress: () => {
+            if (finance.reactivateAccount(account.id)) toast.show(t("Account reactivated."));
+            else router.push("/pro?limit=account");
+          } },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert(
+      t("Archive {name}?", { name: account.name }),
+      t("This account will be hidden from new entries, but its balance and transaction history will remain unchanged."),
+      [
+        { text: t("Cancel"), style: "cancel" },
+        { text: t("Archive account"), onPress: () => {
+          if (finance.archiveAccount(account.id)) toast.show(t("Account archived. History and balance are retained."));
+          else toast.show(t("Could not save account."));
+        } },
+      ],
+    );
+  }
 
   const totalGoalTarget = finance.savingsGoals.filter(g => (g.currency ?? finance.currency) === finance.currency).reduce((s, g) => s + g.targetAmount, 0);
   const totalGoalSaved = finance.savingsGoals.filter(g => (g.currency ?? finance.currency) === finance.currency).reduce((s, g) => s + g.savedAmount, 0);
@@ -547,13 +627,14 @@ export default function WalletsScreen() {
         {/* Accounts */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Accounts")}</Text>
-          <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowAddAccount(true); }} style={[styles.addSmallBtn, { backgroundColor: colors.primary }]}>
+          <Pressable testID="wallet-add-account" accessibilityRole="button" accessibilityLabel={t("Add Account")} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openAddAccount(); }} style={[styles.addSmallBtn, { backgroundColor: colors.primary }]}>
             <Feather name="plus" size={16} color={colors.primaryForeground} />
           </Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingEnd: 4 }}>
-          {finance.accounts.map((acc) => (
+          {activeAccounts.map((acc) => (
             <AccountCard key={acc.id} account={acc} currency={acc.currency ?? finance.currency}
+              onArchiveToggle={() => confirmAccountArchiveChange(acc)}
               onDelete={() => {
                 Alert.alert(t("Remove account?"), t("Remove {name}? Its opening balance will leave FinanceApp totals. Existing transactions and payment-history records keep an account from being removed. This does not close or change your actual bank account.", { name: acc.name }), [
                   { text: t("Cancel"), style: "cancel" },
@@ -565,8 +646,30 @@ export default function WalletsScreen() {
               }}
             />
           ))}
-          {finance.accounts.length === 0 && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>{t("No accounts added")}</Text>}
+          {activeAccounts.length === 0 && <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>{t("No active accounts")}</Text>}
         </ScrollView>
+        {archivedAccounts.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            <Text style={[styles.archivedHeading, { color: colors.mutedForeground, textAlign: isRTL ? "right" : "left" }]}>{t("Archived accounts")}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingEnd: 4 }}>
+              {archivedAccounts.map((acc) => (
+                <AccountCard key={acc.id} account={acc} currency={acc.currency ?? finance.currency}
+                  onArchiveToggle={() => confirmAccountArchiveChange(acc)}
+                  onDelete={() => {
+                    Alert.alert(t("Remove account?"), t("Remove {name}? Its opening balance will leave FinanceApp totals. Existing transactions and payment-history records keep an account from being removed. This does not close or change your actual bank account.", { name: acc.name }), [
+                      { text: t("Cancel"), style: "cancel" },
+                      { text: t("Remove account"), style: "destructive", onPress: () => {
+                        if (finance.deleteAccount(acc.id)) toast.show(t("Account removed"));
+                        else toast.show(t("Account kept because it is referenced by financial history"));
+                      } },
+                    ]);
+                  }}
+                />
+              ))}
+            </ScrollView>
+            <Text style={[styles.accountLimitNote, { color: colors.mutedForeground }]}>{t("Archived accounts remain available for history and balances; reactivate one when a slot is available.")}</Text>
+          </View>
+        ) : null}
 
         {/* Savings Goals */}
         <View style={styles.sectionHeader}>
@@ -666,7 +769,11 @@ export default function WalletsScreen() {
         </View>
       </ScrollView>
 
-      <AddAccountModal visible={showAddAccount} onClose={() => setShowAddAccount(false)} />
+      <AddAccountModal
+        visible={showAddAccount}
+        onClose={() => setShowAddAccount(false)}
+        onLimitReached={() => { setShowAddAccount(false); router.push("/pro?limit=account"); }}
+      />
       <AddIncomeModal visible={showAddIncome} onClose={() => setShowAddIncome(false)} editing={editingIncome} />
       <AddGoalModal visible={showAddGoal} onClose={() => setShowAddGoal(false)} />
     </View>
@@ -690,6 +797,9 @@ const styles = StyleSheet.create({
   accountCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
   accountIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
   accountDeleteBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.2)", alignItems: "center", justifyContent: "center" },
+  accountActions: { flexDirection: "row", gap: 5 },
+  archivedHeading: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3, textTransform: "uppercase" },
+  accountLimitNote: { fontSize: TYPOGRAPHY.supporting, lineHeight: 18, fontFamily: "Inter_400Regular" },
   accountName: { fontSize: TYPOGRAPHY.cardTitle, fontFamily: "Inter_600SemiBold", color: "#FFFFFF" },
   accountType: { fontSize: TYPOGRAPHY.supporting, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", marginBottom: 8 },
   accountBalance: { fontSize: 20, fontFamily: "Inter_600SemiBold", color: "#FFFFFF", fontVariant: ["tabular-nums"] },

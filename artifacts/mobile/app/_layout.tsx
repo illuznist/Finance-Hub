@@ -29,6 +29,7 @@ import {
   useAuth,
 } from "@/context/AuthContext";
 import { FinanceProvider, useFinance } from "@/context/FinanceContext";
+import { EntitlementProvider } from "@/context/EntitlementContext";
 import { FinanceStorageGate } from "@/components/FinanceStorageGate";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { PreferencesProvider } from "@/context/PreferencesContext";
@@ -192,6 +193,8 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="analytics" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="forecast" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="pro" options={{ headerShown: false, presentation: "card" }} />
+        <Stack.Screen name="about" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="transactions" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="budget" options={{ headerShown: false, presentation: "card" }} />
         <Stack.Screen name="recurring" options={{ headerShown: false, presentation: "card" }} />
@@ -227,6 +230,7 @@ export default function RootLayout() {
           <ThemeProvider>
           <PreferencesProvider>
           <AuthProvider>
+          <EntitlementProvider>
             <FinanceProvider>
               <GestureHandlerRootView>
                 <ToastProvider>
@@ -244,6 +248,7 @@ export default function RootLayout() {
                 </ToastProvider>
               </GestureHandlerRootView>
             </FinanceProvider>
+          </EntitlementProvider>
           </AuthProvider>
           </PreferencesProvider>
           </ThemeProvider>

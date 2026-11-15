@@ -548,7 +548,10 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
-  const eligible = accounts.filter(a => (a.currency ?? currency) === (editing?.currency ?? currency));
+  const eligible = accounts.filter(a =>
+    (a.currency ?? currency) === (editing?.currency ?? currency)
+    && (!a.archivedAt || a.id === accountId || a.id === destinationId)
+  );
   const pairAccountId = isTransferEdit ? transactions.find(x => x.transferGroupId === editing?.transferGroupId && x.id !== editing?.id)?.accountId : undefined;
   const accountOptions = [
     ...(kind === "transfer" ? [] : [{ key: UNASSIGNED, label: "Unassigned" }]),
@@ -648,9 +651,10 @@ function TransactionForm({ editing, initialCurrency, colors, topInset, bottomIns
 function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Colors; topInset: number; bottomInset: number; onClose: () => void }) {
   const { t } = usePreferences();
   const finance = useFinance();
+  const activeAccounts = finance.accounts.filter((account) => !account.archivedAt);
   const operationId = useRef(newId()).current;
   const saving = useRef(false);
-  const [accountId, setAccountId] = useState(finance.accounts[0]?.id ?? "");
+  const [accountId, setAccountId] = useState(activeAccounts[0]?.id ?? "");
   const [actual, setActual] = useState("");
   const [date, setDate] = useState(localDate());
   const [notes, setNotes] = useState("");
@@ -660,7 +664,7 @@ function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Col
   const save = () => {
     if (saving.current) return;
     setError(null);
-    if (!account) return setError("Choose an account.");
+    if (!account || account.archivedAt) return setError("Choose an active account.");
     const value = parseSigned(actual);
     if (value === null) return setError("Enter the actual balance with at most two decimals.");
     if (!validLocalDate(date)) return setError("Enter a valid date as YYYY-MM-DD.");
@@ -675,11 +679,11 @@ function ReconcileForm({ colors, topInset, bottomInset, onClose }: { colors: Col
       <Text style={[styles.body, { color: colors.mutedForeground }]}>
         {t("Enter the balance shown by your bank or wallet. A reconciliation entry records the difference; opening balances and history stay unchanged.")}
       </Text>
-      {finance.accounts.length === 0 ? (
-        <Text style={[styles.body, { color: colors.foreground, marginTop: 14 }]}>{t("No accounts to reconcile.")}</Text>
+      {activeAccounts.length === 0 ? (
+        <Text style={[styles.body, { color: colors.foreground, marginTop: 14 }]}>{t("No active accounts to reconcile.")}</Text>
       ) : (
         <Field label="Account" colors={colors}>
-          <OptionList options={finance.accounts.map(a => ({ key: a.id, label: a.name }))} value={accountId} onChange={setAccountId} colors={colors} testPrefix="reconcile-account" />
+          <OptionList options={activeAccounts.map(a => ({ key: a.id, label: a.name }))} value={accountId} onChange={setAccountId} colors={colors} testPrefix="reconcile-account" />
         </Field>
       )}
       {account ? (

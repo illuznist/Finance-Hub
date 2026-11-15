@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ForecastChart } from "@/components/forecast/ForecastChart";
 import { Button, Chips, Field, Input, money, parseMoney, shortDate, ui, type Colors } from "@/components/PlanningUI";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
+import { ProFeatureGate } from "@/components/ProFeatureGate";
+import { useEntitlements } from "@/context/EntitlementContext";
 import { useFinance } from "@/context/FinanceContext";
 import { addDays, monthBounds } from "@/finance/calendar";
 import { localDate, newId, validLocalDate } from "@/finance/ledger";
@@ -176,6 +178,7 @@ export default function ForecastScreen() {
   const colors = useColors();
   const { t, isRTL, language } = usePreferences();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -280,6 +283,8 @@ export default function ForecastScreen() {
     for (const event of events) grouped.set(event.date, [...(grouped.get(event.date) ?? []), event]);
     return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [displayed]);
+
+  if (!entitlements.isPro) return <ProFeatureGate feature="Cash-flow forecasting" />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

@@ -30,9 +30,11 @@ import { useToast } from "@/context/ToastContext";
 import { useColors } from "@/hooks/useColors";
 import { formatAppCurrency, formatAppDate, formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
 import { usePreferences } from "@/context/PreferencesContext";
+import { useEntitlements } from "@/context/EntitlementContext";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
 import { newId } from "@/finance/ledger";
+import { canCreateResource } from "@/finance/entitlements";
 import {
   getLoanObligation,
   getLoanOutstandingBalance,
@@ -232,10 +234,11 @@ function LoanCard({ loan, currency, onPress }: { loan: Loan; currency: string; o
   );
 }
 
-function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClose: () => void; editing?: Loan }) {
+function LoanFormModal({ visible, onClose, onLimitReached, editing }: { visible: boolean; onClose: () => void; onLimitReached: () => void; editing?: Loan }) {
   const colors = useColors();
   const { t, isRTL } = usePreferences();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const toast = useToast();
   const [name, setName] = useState(editing?.name ?? "");
   const [direction, setDirection] = useState<LoanDirection>(editing?.direction ?? "borrowed");
@@ -264,6 +267,10 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
 
   function submit() {
     if (formSubmitted.current) return;
+    if (!editing && !canCreateResource(finance, "loan", entitlements.isPro).allowed) {
+      onLimitReached();
+      return;
+    }
     const parsedPrincipal = parseLocalizedNumberInput(principal) ?? NaN;
     const parsedTotal = totalRepayment.trim() ? parseLocalizedNumberInput(totalRepayment) ?? NaN : undefined;
     const parsedRate = interestRate.trim() ? parseLocalizedNumberInput(interestRate) ?? NaN : undefined;
@@ -400,7 +407,7 @@ function LoanFormModal({ visible, onClose, editing }: { visible: boolean; onClos
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Repayment frequency")}</Text>
                 <ChoiceChips value={frequency} options={FREQUENCIES} onChange={setFrequency} />
                 <LoanField label={`Planned payment (${editing?.currency ?? finance.currency}, optional)`} value={plannedPayment} onChangeText={setPlannedPayment} placeholder="500" numeric />
-                <PaymentAccountPicker currency={editing?.currency ?? finance.currency} value={plannedAccount} onChange={setPlannedAccount} />
+                <PaymentAccountPicker currency={editing?.currency ?? finance.currency} value={plannedAccount} onChange={setPlannedAccount} allowArchivedValue={Boolean(editing)} />
               </>
             )}
 
@@ -484,7 +491,7 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
           <LoanField label="Payment date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder={todayString()} />
           {editing?.legacy
             ? <Text style={[styles.helperText, { color: colors.mutedForeground }]}>{t("Historical record: corrections do not change account balances. Review balances in Transactions.")}</Text>
-            : <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={loan.currency} />}
+            : <PaymentAccountPicker value={accountId} onChange={setAccountId} currency={loan.currency} allowArchivedValue={Boolean(editing)} />}
           <LoanField label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Add a note" multiline />
           {!!error && <Text accessibilityRole="alert" style={[styles.errorText, { color: colors.destructive }]}>{t(error)}</Text>}
           <View style={styles.modalActions}>
@@ -661,6 +668,7 @@ export default function LoansScreen() {
   const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const toast = useToast();
   const [filter, setFilter] = useState<LoanFilter>("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -688,6 +696,14 @@ export default function LoansScreen() {
     setSelectedLoan(undefined);
     setEditingLoan(loan);
     setFormOpen(true);
+  }
+
+  function openCreateLoan() {
+    if (!canCreateResource(finance, "loan", entitlements.isPro).allowed) {
+      router.push("/pro?limit=loan");
+      return;
+    }
+    openForm();
   }
 
   function openPayment(payment?: LoanPayment) {
@@ -726,7 +742,7 @@ export default function LoansScreen() {
           <HeaderAction
             label={t("Add loan")}
             testID="loan-add-button"
-            onPress={() => openForm()}
+            onPress={openCreateLoan}
           />
         }
       />
@@ -749,7 +765,7 @@ export default function LoansScreen() {
 
         <View style={styles.listHeader}>
           <Text style={[styles.sectionHeading, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Your Loans")}</Text>
-          <Pressable testID="loan-empty-add" accessibilityLabel={t("Add loan")} onPress={() => openForm()} style={styles.addInline}>
+          <Pressable testID="loan-empty-add" accessibilityLabel={t("Add loan")} onPress={openCreateLoan} style={styles.addInline}>
             <Feather name="plus" size={15} color={colors.primary} />
             <Text style={[styles.addInlineText, { color: colors.primary }]}>{t("Add")}</Text>
           </Pressable>
@@ -780,7 +796,7 @@ export default function LoansScreen() {
               {t(finance.loans.length === 0 ? "Track money borrowed or lent separately from EMI plans." : "Try another filter or add a new loan.")}
             </Text>
             {finance.loans.length === 0 && (
-              <Pressable onPress={() => openForm()} style={[styles.emptyButton, { backgroundColor: colors.primary }]}>
+                <Pressable onPress={openCreateLoan} style={[styles.emptyButton, { backgroundColor: colors.primary }]}>
                 <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{t("Add your first loan")}</Text>
               </Pressable>
             )}
@@ -799,6 +815,7 @@ export default function LoansScreen() {
           key={editingLoan?.id ?? "new-loan"}
           visible
           editing={editingLoan}
+          onLimitReached={() => { setFormOpen(false); router.push("/pro?limit=loan"); }}
           onClose={() => {
             setFormOpen(false);
             setEditingLoan(undefined);

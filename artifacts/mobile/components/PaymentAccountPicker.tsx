@@ -4,13 +4,19 @@ import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { usePreferences } from "@/context/PreferencesContext";
 
-export function PaymentAccountPicker({ value, onChange, currency }: {
-  value?: string; onChange: (id: string | undefined) => void; currency?: string;
+export function PaymentAccountPicker({ value, onChange, currency, allowArchivedValue = false }: {
+  value?: string; onChange: (id: string | undefined) => void; currency?: string; allowArchivedValue?: boolean;
 }) {
   const finance = useFinance();
   const colors = useColors();
   const { t } = usePreferences();
-  const options = [{ id: undefined, name: t("Unassigned") }, ...finance.accounts.filter(a => (a.currency ?? finance.currency) === (currency ?? finance.currency))];
+  const options = [
+    { id: undefined, name: t("Unassigned") },
+    ...finance.accounts.filter(a =>
+      (a.currency ?? finance.currency) === (currency ?? finance.currency)
+      && (!a.archivedAt || (allowArchivedValue && a.id === value))
+    ),
+  ];
   return (
     <View style={{ gap: 8, marginBottom: 16 }}>
       <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.mutedForeground }}>{t("Account")}</Text>

@@ -30,6 +30,8 @@ import { newId } from "@/finance/ledger";
 import { financialAlert as Alert } from "@/utils/financialAlert";
 import { formatAppCurrency, formatAppDate, formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
 import { usePreferences } from "@/context/PreferencesContext";
+import { useEntitlements } from "@/context/EntitlementContext";
+import { canCreateResource, isEMIActive } from "@/finance/entitlements";
 
 const TAB_BAR_HEIGHT = 90;
 const DONUT_SIZE = 106;
@@ -101,7 +103,7 @@ function monthlyRemaining(emi: EMI): number {
 }
 
 function isPlanActive(emi: EMI): boolean {
-  return emiPaidCount(emi) < emiDuration(emi) || balloonRemaining(emi) > 0;
+  return isEMIActive(emi);
 }
 
 function nextMonthlyPaymentDate(emi: EMI): string | undefined {
@@ -358,10 +360,11 @@ function ToggleRow({ label, detail, value, onToggle }: { label: string; detail: 
   );
 }
 
-function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose: () => void; editing?: EMI }) {
+function EMIFormModal({ visible, onClose, onLimitReached, editing }: { visible: boolean; onClose: () => void; onLimitReached: () => void; editing?: EMI }) {
   const colors = useColors();
   const { t, isRTL } = usePreferences();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const toast = useToast();
   const initialStart = editing?.startDate ?? todayString();
   const [name, setName] = useState(editing?.name ?? "");
@@ -380,7 +383,10 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
   const [accountId, setAccountId] = useState(editing?.linkedAccountId ?? "");
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState("");
-  const selectableAccounts = finance.accounts.filter((account) => account.type === "bank" || account.type === "cash");
+  const selectableAccounts = finance.accounts.filter((account) =>
+    (account.type === "bank" || account.type === "cash")
+    && (!account.archivedAt || account.id === accountId)
+  );
 
   function submit() {
     const amount = parseLocalizedNumberInput(financedAmount) ?? NaN;
@@ -402,6 +408,10 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
     }
     if (autoDebit && !selectableAccounts.some((account) => account.id === accountId)) {
       return setError("Choose a bank account or wallet for auto-debit tracking.");
+    }
+    if (!editing && !canCreateResource(finance, "emi", entitlements.isPro).allowed) {
+      onLimitReached();
+      return;
     }
 
     const shared = {
@@ -433,11 +443,12 @@ function EMIFormModal({ visible, onClose, editing }: { visible: boolean; onClose
       finance.updateEMI(editing.id, shared);
       toast.show(t("EMI plan updated"));
     } else {
-      finance.addEMI({
+      const saved = finance.addEMI({
         ...shared,
         paymentHistory: [],
         createdAt: new Date().toISOString(),
       });
+      if (!saved) return setError("EMI plan could not be saved. Try again.");
       toast.show(t("EMI plan added"));
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -786,6 +797,7 @@ export default function EMIsScreen() {
   const { t, isRTL } = usePreferences();
   const insets = useSafeAreaInsets();
   const finance = useFinance();
+  const entitlements = useEntitlements();
   const toast = useToast();
   const params = useLocalSearchParams<{ emiId?: string }>();
   const router = useRouter();
@@ -824,6 +836,14 @@ export default function EMIsScreen() {
     setFormOpen(true);
   }
 
+  function openCreateEMI() {
+    if (!canCreateResource(finance, "emi", entitlements.isPro).allowed) {
+      router.push("/pro?limit=emi");
+      return;
+    }
+    openEdit();
+  }
+
   function confirmDelete(emi: EMI) {
     Alert.alert(t("Delete EMI plan?"), t("Delete {name} and its payment-history details? Every confirmed payment will remain in Transactions and account balances will not change.", { name: emi.name }), [
       { text: t("Cancel"), style: "cancel" },
@@ -858,7 +878,7 @@ export default function EMIsScreen() {
           <HeaderAction
             label={t("Add EMI plan")}
             testID="emi-add-button"
-            onPress={() => openEdit()}
+            onPress={openCreateEMI}
           />
         }
       />
@@ -905,7 +925,7 @@ export default function EMIsScreen() {
               <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name="credit-card" size={21} color={colors.primary} /></View>
               <Text style={[styles.emptyText, { color: colors.foreground }]}>{t("No EMI plans yet")}</Text>
               <Text style={[styles.helperText, { color: colors.mutedForeground }]}>{t("Add a repayment plan to track monthly installments and final payments.")}</Text>
-              <Pressable testID="emi-empty-add" onPress={() => openEdit()} style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 4 }]}>
+              <Pressable testID="emi-empty-add" onPress={openCreateEMI} style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 4 }]}>
                 <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{t("Add EMI plan")}</Text>
               </Pressable>
             </View>
@@ -950,6 +970,7 @@ export default function EMIsScreen() {
           key={editing?.id ?? "new"}
           visible={formOpen}
           editing={editing}
+          onLimitReached={() => { setFormOpen(false); router.push("/pro?limit=emi"); }}
           onClose={() => {
             setFormOpen(false);
             setEditing(undefined);

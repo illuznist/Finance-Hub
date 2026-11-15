@@ -1,6 +1,6 @@
-# Finance Hub Phase 6 — Stage A Architecture Review
+# Finance Hub Phase 6 — Stage A Architecture and Stage B Implementation
 
-**Status:** Architecture proposal for approval. Stages B–F have not started.
+**Status:** Stage A approved; Stage B implemented and verified. Stages C–F have not started.
 **Prepared:** 2026-11-15
 **Protected baseline:** `finance-hub-v1.1.3-verified` at `980ba97d03f0041d05901e15878cb9bc0be5d35c`
 **Development branch:** `phase6/monetization`
@@ -49,12 +49,19 @@ Apply creation limits in one shared entitlement/policy service and call it from 
 - **Unlimited:** ordinary income and expense entries.
 - **Pro:** unlimited wallets/accounts, loans, and EMIs; advanced analytics and cash-flow forecasting.
 - Do not limit dashboard, transaction history, PIN/Face ID, language/calendar preferences, encrypted backup/restore, or export.
-- Count only active, non-archived accounts, loans, and EMI agreements. A paid-off/completed loan or EMI and a user-archived agreement do not consume an active slot. Keep completed and archived history visible and intact. Unarchiving is subject to the active limit; do not ask users to delete history to make room.
+- Count only active, non-archived wallets/bank accounts, loans, and EMI agreements. Completed loans and EMIs do not consume active slots. Archived wallets do not consume the active-wallet slot, but remain in the app with their original balance, linked transactions, and history.
 - If a user already has more than the Free limit, preserve every record. Block only creation of additional limited resources. Continue to allow viewing, editing, payment recording, export, backup, restore, and ordinary transaction entry.
 - If Pro expires or a paid purchase is refunded, preserve all data and allow existing records to be managed; only new limited-resource creation is restricted until the account is within Free limits.
 - `Deleted` means the user deliberately removed that record using the existing deletion flow. The paywall must never recommend deletion as a way to obtain access.
 
-**Counting assumption to confirm:** one active account slot is shared across every wallet/bank account type supported by the app. If “wallet or bank account” was meant to distinguish account types, adjust this rule before Stage B.
+### Wallet archival and replacement policy
+
+- One active-wallet slot is shared across every supported account type and currency.
+- Archiving is a reversible status change on the wallet record only. It must not delete, detach, rewrite, or recalculate any transaction, payment, opening balance, or historical balance.
+- Archived wallets remain visible in a separate history section, remain included in recorded balance/net-worth calculations, and are excluded from selectors for new transactions. Existing transactions and their account identity remain accessible.
+- A Free user may create one active replacement after archiving the current active wallet. The cap is concurrent active capacity, not a lifetime creation quota: users may replace a wallet when their banking relationship changes, but cannot have more than one active wallet at a time. This is intentional; the archived history is not deleted and does not grant simultaneous multi-wallet access.
+- Reactivating an archived wallet checks the same active-wallet limit. If a Free user already has an active wallet, reactivation is blocked with a clear upgrade/archive choice. Pro users may reactivate without that cap.
+- If imported or pre-existing data has multiple active wallets, keep every wallet and all history manageable. Block additional Free wallet creation and block reactivation only when it would further exceed the active limit; do not auto-archive or delete anything.
 
 ## 4. Guest purchases, linking, and offline behavior
 
@@ -94,6 +101,8 @@ Security controls required before production:
 
 Registered-account counts come from Supabase Auth. Anonymous local users are not registered accounts and must not be estimated or displayed as such. Paid purchase status and refunds come from RevenueCat. Promotional grants and admin activity come from the server audit log. If a metric cannot be verified from those systems, show it as unavailable rather than infer it.
 
+The portal must label **Paid Pro**, **Promotional Pro**, and **Super Admin Pro access** separately. Count a purchase as a paid sale only when RevenueCat reports a verified store transaction. Show refunds/revocations separately and exclude them from current paid-entitlement counts; promotional grants and Super Admin access are never paid sales or paid revenue. Revenue reporting comes from verified RevenueCat data, not from plan labels or local client flags. Do not store or display finance records, balances, savings, loan amounts, or notes in the admin backend.
+
 ## 6. Accounts, credentials, and cost estimate
 
 No account or credential is needed for this architecture review. Do not send credentials in chat.
@@ -128,7 +137,7 @@ Keep the portal separate from mobile code and deployment:
 - Supabase migrations/policies: a new `supabase/` directory for schema migrations and RLS policies, or an equivalently versioned migration location chosen before Stage C.
 - Mobile changes, only in approved stages: a centralized entitlement/policy module; localized plan/paywall/settings UI; purchase/restore adapter; explicit account-linking UI; branding attribution component; English/Arabic strings and tests.
 - Automated coverage: policy/over-limit preservation, store adapter, restore/refund/offline paths, account linking, RLS/authorization, audit logging, guest behavior, RTL/accessibility, app restart, and finance-record preservation.
-- `artifacts/mobile/PHASE6_MONETIZATION_IMPLEMENTATION_REPORT.md` will be updated as stages are approved and verified. This Stage A report is the only planned change in this commit.
+- `artifacts/mobile/PHASE6_MONETIZATION_IMPLEMENTATION_REPORT.md` is updated as approved stages are implemented and verified. Stage B changes are mobile-only.
 
 The existing Express service and database package are currently scaffolds. Do not assume the current empty `lib/db` schema contains customer or finance data.
 
@@ -143,18 +152,27 @@ The existing Express service and database package are currently scaffolds. Do no
 
 Each stage must be reviewed and approved before the next one or a merge to `main`.
 
-## 10. Stage A decision
+## 10. Stage A decision and current boundary
 
-Approval requested for the architecture and policy above:
+The user approved the overall technical direction and clarified the wallet counting and admin reporting rules above. Stage A is approved. Only Stage B is authorized now.
 
-1. Supabase Auth/PostgreSQL RLS for optional accounts and roles.
-2. Existing Express API as the trusted webhook/admin boundary.
-3. RevenueCat for Apple non-consumable purchase verification and entitlements.
-4. A separate private Replit Admin Portal protected by Supabase MFA and server-side roles.
-5. The proposed active-resource counting and grandfathering rules.
-6. Continue on `phase6/monetization`; keep `main` frozen and do not deploy, publish, or enable live payments.
+Continue on `phase6/monetization` and preserve the verified v1.1.3 `main` baseline. Stage B is implemented on this branch: local Free/Pro policies and enforcement, localized plan/upgrade screens and Settings usage, reversible wallet archival, Pro feature gates for analytics and forecasting, and reusable Ctrl Studios attribution.
 
-No Stage B–F work should begin until this proposal is approved. Provider setup, paid services, production credentials, admin identity bootstrap, and any public deployment remain separate approval points.
+The development purchase adapter is in-memory, visibly test-only, and incapable of granting Pro in production. No app or finance data is uploaded for entitlements. The iOS purchase control remains unavailable until Apple purchase infrastructure is configured and separately approved.
+
+Do **not** start Stage C or later, connect or create paid external services, create production credentials, bootstrap the owner/admin account, deploy the admin portal, publish the app, or enable live purchases without separate approval.
+
+## 11. Stage B implementation and verification
+
+- Free caps are centralized at one active wallet/account, one unsettled loan, and three active EMI agreements. Completed loans and fully completed EMIs do not consume slots; an EMI with a remaining balloon payment remains active.
+- Creation is blocked in both the UI and FinanceContext. Existing over-limit data remains viewable and manageable; no records are automatically deleted, archived, or rewritten.
+- Wallet archive/reactivation only changes the wallet's optional archive marker. The ledger, opening balance, existing transactions, recorded balances, and historical totals remain unchanged. Archived wallets stay visible and are excluded from selectors for new entries; reactivation observes the same active cap.
+- Analytics and cash-flow forecasting are Pro-gated. Settings shows plan and active-resource usage; the localized plan page does not advertise a live price or accept a production payment.
+- Localization audit: all discovered UI translation candidates are covered in English and Arabic, including the brand attribution and Arabic-Indic counts.
+- `pnpm --filter @workspace/mobile test`: 237 passing tests; localization audit reports 100% direct key coverage and no missing/duplicate translations.
+- `pnpm --filter @workspace/mobile typecheck`: passed. Release-metadata validation confirms FinanceApp 1.1.3.
+- iOS Expo export completed successfully. The restarted Expo preview serves cleanly; its browser view remains at the sign-in screen, so the signed-in plan screens were not visually verified there. No physical-device Stage B purchase/UI test was performed.
+- The optional `archivedAt` field is retained by the existing migration, so the finance schema version is unchanged.
 
 ## Sources
 
