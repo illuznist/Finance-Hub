@@ -7,8 +7,9 @@
 - The device-local account, PIN, and biometric authentication remain separate from Supabase Auth.
 - Online sign-in/out changes only the online Supabase session. It does not sign in/out of the local app, change the local finance profile, or move finance records.
 - Finance records, backups, ledger calculations, and local entitlements remain device-local.
-- The owner created a new Supabase project in the Ctrl Studios organization. It is not connected to Replit; no credentials were read, requested, or set by this work.
+- The owner created a new Frankfurt Supabase project in the Ctrl Studios organization and connected its four required variables through Replit Secrets. The values were not read or recorded by this work.
 - The retired Tokyo project's exposed credentials were not used.
+- The owner confirmed both authentication redirect URLs and email confirmation are configured in Supabase Auth.
 - No official Ctrl Studios email is embedded or assumed.
 - No Super Admin has been assigned. The bootstrap procedure has not been run.
 - RevenueCat purchases and the Admin Portal remain reserved for Stages D and E.
@@ -52,15 +53,12 @@ These are source-level and local checks only. Supabase registration, recovery em
 
 Stage C must not be marked complete until a project is configured, the migration is applied, and the required backend/device checks pass.
 
-## Supabase setup required before live verification
+## Remaining Supabase setup and approval gates
 
-1. Use only the new Ctrl Studios Supabase project and its newly issued keys; do not use the retired Tokyo project's exposed credentials.
-2. Add `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the mobile environment. The key must start with `sb_publishable_`.
-3. Add `SUPABASE_URL` and `SUPABASE_SECRET_KEY` as API Server-only Replit Secrets. The key must start with `sb_secret_`; it bypasses RLS and must never enter Expo public variables or browser code.
-4. Keep the `mobile://auth/callback` redirect for installed builds and allow the exact Expo Go callback URL for the current dev session.
-5. Configure email confirmation and the approved sender address in Supabase Auth after the official Ctrl Studios email is ready. Enable TOTP MFA and verify the owner's factor before any administrative access.
-6. Review the SQL migration and request separate approval before applying it. Do not apply it as part of key configuration.
-7. After project variables are configured, register a test user and run the account, RLS-isolation, MFA, admin-denial, and recovery-flow checks described in the delivery notes.
-8. Super Admin bootstrap remains a separate, explicitly approved action requiring verified email and MFA. No email address is compiled into the app or script.
+1. Use only the Frankfurt project and its newly issued keys; do not use the retired Tokyo project's exposed credentials.
+2. The four required Replit Secrets are present. Source and active iOS/web bundles use the publishable key only; the server secret is not included in those bundles.
+3. The owner confirmed both `mobile://auth/callback` and the current Expo Go callback are allowlisted, and email confirmation is enabled. Sender delivery and actual confirmation/recovery flows still need a test account and real-device verification.
+4. Review `supabase/STAGE_C_MIGRATION_REVIEW.md` for the static security review, read-only preflight SQL, and post-migration checks. Migration execution remains pending explicit approval.
+5. TOTP MFA must be enrolled and verified on the owner account before any administrative access. Super Admin bootstrap remains a separate, explicitly approved action requiring verified email and MFA.
 
-No production credentials have been read or connected, no migration has been applied, and no account bootstrap has been performed.
+No secret values have been read or recorded. No migration has been applied, no test user has been created, and no account bootstrap has been performed.

@@ -112,6 +112,12 @@ begin
 end;
 $$;
 
+-- This RPC is restricted to the trusted server role. The application bootstrap
+-- command separately requires owner approval, verified email, and verified MFA.
+revoke all on function public.bootstrap_super_admin(uuid, uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.bootstrap_super_admin(uuid, uuid) to service_role;
+
 do $$
 declare
   table_name text;
@@ -124,7 +130,7 @@ begin
     'webhook_inbox'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
-    execute format('revoke all on table public.%I from anon, authenticated', table_name);
+    execute format('revoke all on table public.%I from public, anon, authenticated', table_name);
     execute format('grant all on table public.%I to service_role', table_name);
   end loop;
 end
@@ -152,9 +158,9 @@ begin
 end;
 $$;
 
-revoke all on function public.assign_default_user_role() from public, anon, authenticated;
-revoke all on function public.bootstrap_super_admin(uuid, uuid) from public, anon, authenticated;
-grant execute on function public.bootstrap_super_admin(uuid, uuid) to service_role;
+revoke all on function public.assign_default_user_role()
+  from public, anon, authenticated, service_role;
+
 drop trigger if exists assign_default_user_role_on_signup on auth.users;
 create trigger assign_default_user_role_on_signup
   after insert on auth.users
