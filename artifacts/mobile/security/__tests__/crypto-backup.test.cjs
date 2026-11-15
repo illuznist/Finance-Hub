@@ -204,6 +204,16 @@ test("no-journal startup removes an orphan key when SecureStore is available", a
   assert.equal(await secrets.get(J.RESTORE_JOURNAL_SECRET_KEY), null);
 });
 
+test("restore diagnostic guard accepts equivalent errors across module boundaries", () => {
+  const bridgedError = {
+    name: "RestoreRecoveryError",
+    code: "RESTORE_KEY_READ_FAILED",
+    stage: "Reading recovery key",
+    message: "The protected recovery key could not be read.",
+  };
+  assert.equal(J.isRestoreRecoveryError(bridgedError), true);
+});
+
 test("no-journal startup is not blocked by SecureStore read failure", async () => {
   const storage = memoryStorage();
   const secrets = memorySecretStore();

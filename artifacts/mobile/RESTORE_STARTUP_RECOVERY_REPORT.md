@@ -18,6 +18,7 @@ Committed journals are already marked as completed. If their cleanup fails, the 
 - If rollback has completed but SecureStore cannot remove the now-orphaned key, the journal is already gone and the app may continue; the key is retried for cleanup later.
 - Development logs include the diagnostic code, stage, exception type, and a sanitized exception message. They do not log finance records, PINs, passwords, keys, or decrypted snapshots.
 - Retry continues to show a loading state and prevents duplicate attempts. Recovery errors now show the operation, stable code, safe explanation, and a next step in English and Arabic.
+- Startup now displays a fallback diagnostic code for unexpected failures too, and recognizes recovery errors by their diagnostic shape so module boundaries cannot hide the code.
 
 ## Diagnostic codes
 
