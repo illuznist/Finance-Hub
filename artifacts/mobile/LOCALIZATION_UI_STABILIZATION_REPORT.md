@@ -61,4 +61,5 @@
 - Authoritative Expo app version is now **1.1.3** in `app.json`.
 - The account compatibility migration now treats a `null` opening balance like a missing value, restoring it from the retained account balance.
 - The exact pre-repair finance document is backed up before the repaired document is written. Ledger movements and existing balances are preserved.
+- Safe retry shows progress and the failed load stage without exposing raw storage details.
 - See `V1_1_3_SAVED_DATA_LOAD_FIX_REPORT.md` for the failure path, safety properties, regression coverage, and verification status.

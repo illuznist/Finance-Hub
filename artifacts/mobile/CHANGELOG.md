@@ -5,6 +5,7 @@
 - Fixed a saved-data migration edge case where an account's opening balance was stored as `null`.
 - Recovered the opening balance from the retained account balance and saved an exact compatibility backup before migration writes.
 - Preserved existing ledger movements and account balances; no app storage reset is performed.
+- Made safe retries visibly show progress and the failed load stage without displaying stored financial values.
 
 ## 1.1.2
 

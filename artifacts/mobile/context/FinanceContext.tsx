@@ -236,9 +236,11 @@ interface FinanceContextType extends FinanceState {
   recordScheduledPayment: (item: UpcomingPayment, accountId: string | undefined, date: string, amount?: number, operationId?: string) => boolean;
   transactions: Transaction[];
   storageError: string | null;
+  storageErrorStage: string | null;
+  storageRetrying: boolean;
   storageRecoveryNotice: string | null;
   isReady: boolean;
-  retryStorage: () => void;
+  retryStorage: () => Promise<void>;
   setExpensePaid: (id: string, paid: boolean, accountId?: string, date?: string) => boolean;
   addTransaction: (input: Parameters<typeof ledgerService.addManualMovement>[1]) => boolean;
   deleteTransaction: (id: string) => boolean;
@@ -436,49 +438,65 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
   const loadingRef = useRef(false);
   const readyRef = useRef(false);
+  const retryingRef = useRef(false);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [storageErrorStage, setStorageErrorStage] = useState<string | null>(null);
+  const [storageRetrying, setStorageRetrying] = useState(false);
   const [storageRecoveryNotice, setStorageRecoveryNotice] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const queueWrite = useMemo(() => createWriteQueue(AsyncStorage), []);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    void (async () => {
+    let stage = "Checking interrupted restore";
+    setStorageError(null);
+    setStorageErrorStage(null);
+    try {
       const recovery = await recoverProtectedRestoreJournal(AsyncStorage);
       if (recovery === "rolled-back") {
         setStorageRecoveryNotice("An interrupted restore was rolled back. Your previous finance records were retained.");
       } else if (recovery === "committed") {
         setStorageRecoveryNotice("A completed restore was recovered after restart.");
       }
+      stage = "Checking saved PIN security";
       await migrateLegacyPinBeforeFinanceLoad(AsyncStorage);
+      stage = "Migrating saved finance records";
       const initial = await loadFinanceState(AsyncStorage, defaultState);
       // Finance migration may create a compatibility copy from the old document;
       // strip its device-only plaintext PIN after that recovery copy is complete.
+      stage = "Checking saved PIN security";
       await migrateLegacyPinBeforeFinanceLoad(AsyncStorage);
       let loaded = initial;
+      stage = "Validating finance schedules";
       loaded = { ...loaded, emis: loaded.emis.map(normalizeEMI) };
       loaded = { ...loaded, loans: loaded.loans.map(normalizeLoan) };
 
       // Legacy paid flags are historical records, not recurring occurrences.
+      stage = "Preparing finance summaries";
       const nowMonth = currentYYYYMM();
       const nowYear = currentYYYY();
       loaded = { ...loaded, lastResetMonth: nowMonth, lastResetYear: nowYear };
       loaded = budgets.ensureBudgetPeriod(recurring.generateDueOccurrences(loaded), nowMonth);
       loaded = captureNetWorthSnapshots(loaded);
 
+      stage = "Saving migrated records";
       await queueWrite(loaded);
       stateRef.current = loaded;
       readyRef.current = true;
       setIsReady(true);
       setStorageError(null);
+      setStorageErrorStage(null);
       setState(loaded);
-    })().catch(() => {
+    } catch {
       readyRef.current = false;
       setStorageError("Saved data could not be loaded. No records have been reset.");
-    }).finally(() => { loadingRef.current = false; });
+      setStorageErrorStage(stage);
+    } finally {
+      loadingRef.current = false;
+    }
   }, [queueWrite]);
-  useEffect(load, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const persist = useCallback((updater: (prev: FinanceState) => FinanceState) => {
     if (!readyRef.current) throw new Error("Finance storage is unavailable. Retry before making changes.");
@@ -494,15 +512,35 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [queueWrite]);
 
   const retryStorage = useCallback(async () => {
-    if (!readyRef.current && stateRef.current === defaultState) { load(); return; }
+    if (retryingRef.current) return;
+    retryingRef.current = true;
+    setStorageRetrying(true);
+    setStorageError(null);
+    setStorageErrorStage(null);
+    let stage = "Checking interrupted restore";
     try {
+      if (!readyRef.current && stateRef.current === defaultState) {
+        await load();
+        return;
+      }
       const recovery = await recoverProtectedRestoreJournal(AsyncStorage);
-      if (recovery !== "none") { load(); return; }
+      if (recovery !== "none") {
+        await load();
+        return;
+      }
+      stage = "Saving recovered records";
+      setStorageErrorStage(stage);
       await queueWrite(stateRef.current);
-      readyRef.current = true; setStorageError(null);
+      readyRef.current = true;
+      setStorageError(null);
+      setStorageErrorStage(null);
     } catch {
       readyRef.current = false;
       setStorageError("Saved data could not be retried safely.");
+      setStorageErrorStage(stage);
+    } finally {
+      retryingRef.current = false;
+      setStorageRetrying(false);
     }
   }, [load, queueWrite]);
 
@@ -855,6 +893,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         accounts,
         transactions,
         storageError,
+        storageErrorStage,
+        storageRetrying,
         storageRecoveryNotice,
         isReady,
         retryStorage,

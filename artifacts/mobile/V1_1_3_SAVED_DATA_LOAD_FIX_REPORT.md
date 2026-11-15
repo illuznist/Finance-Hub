@@ -13,6 +13,7 @@ The migration already repaired accounts whose `openingBalance` field was absent,
 - Existing transactions and payment histories are not replayed, removed, or rewritten. A regression test checks that a retained balance of 1,000 and an existing 150 ledger movement still load as 1,150.
 - This is a compatibility repair for existing records, not a default change. New accounts continue to start at zero.
 - No app storage is cleared or reset.
+- Retry now shows a progress indicator, prevents duplicate taps while running, and displays the safe load stage if the same generic error returns. It does not display stored financial values or raw storage exceptions.
 
 ## Version and verification
 
