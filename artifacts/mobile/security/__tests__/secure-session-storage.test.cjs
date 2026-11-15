@@ -10,9 +10,9 @@ const source = fs.readFileSync(sourcePath, "utf8")
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const module = { exports: {} };
-new Function("module", "exports", compiled)(module, module.exports);
-const { createSecureSessionStorage, SECURE_SESSION_CHUNK_LIMIT_BYTES } = module.exports;
+const cjsModule = { exports: {} };
+new Function("module", "exports", compiled)(cjsModule, cjsModule.exports);
+const { createSecureSessionStorage, SECURE_SESSION_CHUNK_LIMIT_BYTES } = cjsModule.exports;
 
 function createStore() {
   const values = new Map();

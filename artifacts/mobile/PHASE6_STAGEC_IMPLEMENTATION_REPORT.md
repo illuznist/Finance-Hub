@@ -33,7 +33,19 @@ If the account endpoint is unavailable, the app reports online entitlement statu
 
 ## Verification status
 
-The local regression suite, TypeScript checks, migration review, and Expo checks are to be recorded after the implementation batch. Supabase registration, recovery emails, session restoration against a real project, RLS isolation, MFA authorization, audit persistence, and iPhone account flows are **not yet tested**.
+The following local checks passed:
+
+- Mobile regression suite: 240 tests passed, including financial-ledger, migration/recovery, localization, entitlement, and secure-session-storage coverage.
+- API authorization and migration-safety suite: 15 tests passed.
+- Mobile and API TypeScript checks passed.
+- API production bundle built successfully.
+- Expo dependency alignment check passed.
+- Expo Doctor passed all 20 checks.
+- Frozen pnpm installation and `git diff --check` passed.
+- The running API health route returned 200; account and admin routes returned generic 401 responses without a session.
+- The browser preview loaded the existing local-account gate. The protected Settings/account UI was not visually checked because the preview is not signed in.
+
+These are source-level and local checks only. Supabase registration, recovery emails, session restoration against a real project, live RLS isolation, MFA authorization, audit persistence, and iPhone online-account flows are **not yet tested**.
 
 Stage C must not be marked complete until a project is configured, the migration is applied, and the required backend/device checks pass.
 
