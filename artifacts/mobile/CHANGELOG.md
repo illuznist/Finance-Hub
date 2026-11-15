@@ -1,5 +1,11 @@
 # FinanceApp changelog
 
+## 1.1.3
+
+- Fixed a saved-data migration edge case where an account's opening balance was stored as `null`.
+- Recovered the opening balance from the retained account balance and saved an exact compatibility backup before migration writes.
+- Preserved existing ledger movements and account balances; no app storage reset is performed.
+
 ## 1.1.2
 
 - Fixed Arabic language switching so Expo Go no longer enters an automatic RTL reload loop.

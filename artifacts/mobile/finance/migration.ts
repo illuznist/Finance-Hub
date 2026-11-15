@@ -101,7 +101,7 @@ export function migrateFinanceState(raw: string | null, empty: FinanceState): Fi
     // schema 1 never mutates this field when
     // posting ledger entries (current balances are derived in the service).
     // Use that same compatibility rule even when ledger entries already exist.
-    const openingBalance = legacy || a.openingBalance === undefined
+    const openingBalance = legacy || a.openingBalance === undefined || a.openingBalance === null
       ? a.balance
       : a.openingBalance;
     if (typeof openingBalance !== "number") throw new Error("An account is missing its opening balance.");
@@ -209,7 +209,9 @@ export async function loadFinanceState(storage: FinanceStorage, empty: FinanceSt
   const original = raw === null ? null : JSON.parse(raw) as Partial<FinanceState>;
   const legacy = original !== null && (original.schemaVersion === undefined || original.schemaVersion === 0);
   const planningUpgrade = original !== null && (original.schemaVersion !== SCHEMA_VERSION || !original.planning);
-  const repairedAccounts = original?.accounts?.some(a => a.openingBalance === undefined) ?? false;
+  const repairedAccounts = original?.accounts?.some(
+    a => a.openingBalance === undefined || a.openingBalance === null,
+  ) ?? false;
   if (raw !== null && (legacy || repairedAccounts || planningUpgrade)) {
     const backupKey = legacy ? LEGACY_BACKUP_KEY : planningUpgrade ? PLANNING_BACKUP_KEY : COMPATIBILITY_BACKUP_KEY;
     // Preserve the compatibility backup too when this document needs both repairs.

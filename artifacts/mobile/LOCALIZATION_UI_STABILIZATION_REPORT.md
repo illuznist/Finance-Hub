@@ -55,3 +55,10 @@
 - The private workspace package remains `0.0.0`; native build-number and version-code configuration remains unchanged.
 - `CHANGELOG.md` includes the Arabic RTL restart-loop fix and the aligned SDK 58 patch set.
 - See `V1_1_2_ARABIC_RTL_CRASH_FIX_REPORT.md` for the root-cause analysis, restart fallback, regression tests, and native-device verification status.
+
+## v1.1.3 saved-data recovery update
+
+- Authoritative Expo app version is now **1.1.3** in `app.json`.
+- The account compatibility migration now treats a `null` opening balance like a missing value, restoring it from the retained account balance.
+- The exact pre-repair finance document is backed up before the repaired document is written. Ledger movements and existing balances are preserved.
+- See `V1_1_3_SAVED_DATA_LOAD_FIX_REPORT.md` for the failure path, safety properties, regression coverage, and verification status.

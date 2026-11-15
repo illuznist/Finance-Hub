@@ -387,6 +387,20 @@ test("zero-balance accounts missing opening balances recover as zero", () => {
   assert.ok(loaded.accounts.every(a => a.openingBalance === 0));
   assert.equal(balance(loaded), 0); assert.equal(loaded.transactions.length, 0);
 });
+test("null opening balances are repaired from the retained balance with an exact backup", async () => {
+  let state = S.addManualMovement({ ...base(), schemaVersion: 2 }, manual());
+  state.accounts[0].openingBalance = null;
+  const raw = JSON.stringify(state);
+  const data = new Map([[M.FINANCE_STORAGE_KEY, raw]]);
+  const storage = { getItem: async k => data.get(k) ?? null, setItem: async (k, v) => { data.set(k, v); } };
+
+  const loaded = await M.loadFinanceState(storage, empty());
+  assert.equal(loaded.accounts[0].openingBalance, 1000);
+  assert.equal(balance(loaded), 1150);
+  assert.deepEqual(loaded.transactions, state.transactions);
+  assert.equal(data.get(M.COMPATIBILITY_BACKUP_KEY), raw);
+  assert.equal(balance(await M.loadFinanceState(storage, empty())), 1150);
+});
 test("schema 1 opening repair preserves existing ledger impact exactly once", () => {
   const state = S.addManualMovement(base(), manual());
   delete state.accounts[0].openingBalance;
