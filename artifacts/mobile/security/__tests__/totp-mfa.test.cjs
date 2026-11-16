@@ -65,6 +65,23 @@ test("enrollment and factor removal are explicit user actions, never startup aut
   assert.match(mfa, /onPress=\{\(\) => void removeFactor\(operation\.target, false\)\}/);
 });
 
+test("the development assurance diagnostic is opt-in and exposes only current/next levels", () => {
+  const settings = read("components/OnlineAccountSettings.tsx");
+  const start = settings.indexOf("function DevelopmentAssuranceCheck()");
+  const end = settings.indexOf("function PrimaryButton(", start);
+  const diagnostic = settings.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, "the diagnostic should be a focused component");
+  assert.match(settings, /online\.user \? \([\s\S]*?\{__DEV__ \? <DevelopmentAssuranceCheck \/> : null\}/);
+  assert.match(diagnostic, /onPress=\{\(\) => void checkCurrentSession\(\)\}/);
+  assert.match(diagnostic, /auth\.mfa\.getAuthenticatorAssuranceLevel\(\)/);
+  assert.match(diagnostic, /setLevels\(\{ currentLevel: data\.currentLevel, nextLevel: data\.nextLevel \}\)/);
+  assert.match(diagnostic, /levels\.currentLevel/);
+  assert.match(diagnostic, /levels\.nextLevel/);
+  assert.doesNotMatch(diagnostic, /useEffect|challenge\(|unenroll\(|signOut\(|refreshSession|admin|access_token|refresh_token|user\.id|console\./i);
+  assert.doesNotMatch(diagnostic, /currentAuthenticationMethods/);
+});
+
 test("admin authorization remains server-enforced and unchanged by the mobile MFA flow", () => {
   const authorization = fs.readFileSync(
     path.resolve(mobileRoot, "../api-server/src/middlewares/requireAdmin.ts"),
