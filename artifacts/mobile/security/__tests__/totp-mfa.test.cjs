@@ -49,7 +49,7 @@ test("online account MFA uses Supabase verification, enforces AAL2, and never lo
   assert.match(mfa, /auth\.mfa\.unenroll/);
   assert.match(mfa, /currentLevel !== "aal2"/);
   assert.match(mfa, /kind: "confirm-removal"/);
-  assert.match(settings, /<OnlineAccountSecuritySection deferChallenge=\{__DEV__\}\s*\/>/);
+  assert.match(settings, /<OnlineAccountSecuritySection\s*\/>/);
   assert.match(mfa, /SvgXml xml=\{operation\.draft\.qrCode\}/);
   assert.doesNotMatch(mfa, /console\.(?:log|warn|error)/i);
   assert.doesNotMatch(mfa, /\b(?:AsyncStorage|SecureStore|localStorage)\b/);
@@ -65,24 +65,23 @@ test("enrollment and factor removal are explicit user actions, never startup aut
   assert.match(mfa, /onPress=\{\(\) => void removeFactor\(operation\.target, false\)\}/);
 });
 
-test("the development assurance diagnostic is opt-in and exposes only current/next levels", () => {
-  const settings = read("components/OnlineAccountSettings.tsx");
+test("AAL1 starts one challenge and rechecks AAL2 after verification without auto-retrying", () => {
   const mfa = read("components/OnlineAccountMfa.tsx");
-  const start = settings.indexOf("function DevelopmentAssuranceCheck()");
-  const end = settings.indexOf("function PrimaryButton(", start);
-  const diagnostic = settings.slice(start, end);
+  const assess = mfa.match(/const assessMfa = useCallback\(async \(options:[\s\S]*?\n  \}, \[userId\]\);/)?.[0];
+  const verify = mfa.match(/async function verifyLoginCode\(\) \{([\s\S]*?)\n  \}/)?.[1];
+  const effect = mfa.match(/useEffect\(\(\) => \{\s*void assessMfa\(\);([\s\S]*?)\}, \[assessMfa\]\);/)?.[1];
 
-  assert.ok(start >= 0 && end > start, "the diagnostic should be a focused component");
-  assert.match(settings, /online\.user \? \([\s\S]*?\{__DEV__ \? <DevelopmentAssuranceCheck \/> : null\}/);
-  assert.match(diagnostic, /onPress=\{\(\) => void checkCurrentSession\(\)\}/);
-  assert.match(diagnostic, /auth\.mfa\.getAuthenticatorAssuranceLevel\(\)/);
-  assert.match(diagnostic, /setLevels\(\{ currentLevel: data\.currentLevel, nextLevel: data\.nextLevel \}\)/);
-  assert.match(diagnostic, /levels\.currentLevel/);
-  assert.match(diagnostic, /levels\.nextLevel/);
-  assert.doesNotMatch(diagnostic, /useEffect|challenge\(|unenroll\(|signOut\(|refreshSession|admin|access_token|refresh_token|user\.id|console\./i);
-  assert.doesNotMatch(diagnostic, /currentAuthenticationMethods/);
-  assert.match(mfa, /if \(deferChallenge\) \{[\s\S]*?setGate\("challenge-required"\);[\s\S]*?return;\s*\}\s*const \{ data: challenge/);
-  assert.match(mfa, /testID="online-mfa-start-deferred-challenge"/);
+  assert.ok(assess, "MFA assessment should be stable across gate state changes");
+  assert.ok(verify, "code verification should recheck the session assurance");
+  assert.ok(effect, "the signed-in settings gate should assess MFA once on mount");
+  assert.match(assess, /getAuthenticatorAssuranceLevel/);
+  assert.match(assess, /if \(options\.challengeIfNeeded === false\) \{[\s\S]*?setGate\("error"\);[\s\S]*?return;\s*\}\s*const \{ data: challenge/);
+  assert.match(assess, /client\.auth\.mfa\.challenge\(/);
+  assert.match(verify, /verifyFactorCode/);
+  assert.match(verify, /assessMfa\(\{ challengeIfNeeded: false \}\)/);
+  assert.match(mfa, /MFA verification did not reach AAL2/);
+  assert.doesNotMatch(effect, /mfa\.challenge/);
+  assert.doesNotMatch(mfa, /deferChallenge|challenge-required|deferredFactorId|DevelopmentAssuranceCheck/);
 });
 
 test("admin authorization remains server-enforced and unchanged by the mobile MFA flow", () => {

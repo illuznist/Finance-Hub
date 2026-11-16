@@ -1777,14 +1777,8 @@ const ARABIC_TRANSLATIONS: Record<string, string> = {
   "Remove the incomplete setup before starting another enrollment.": "أزل الإعداد غير المكتمل قبل بدء تسجيل جديد.",
   "Authenticator setup could not be started. Remove the incomplete setup before trying again.": "تعذّر بدء إعداد المصادقة. أزل الإعداد غير المكتمل قبل المحاولة مجددًا.",
   "MFA management could not be completed. Try again.": "تعذّرت إدارة المصادقة متعددة العوامل. حاول مرة أخرى.",
+  "MFA verification did not reach AAL2. Tap Try again to start a new challenge.": "لم يصل التحقق متعدد العوامل إلى AAL2. اضغط على «حاول مرة أخرى» لبدء تحدٍ جديد.",
   "Add a second authenticator before changing your only one. If you lose all factors, use your verified account-recovery process. This app cannot bypass MFA; your local PIN and finance records remain separate.": "أضف تطبيق مصادقة ثانيًا قبل تغيير تطبيقك الوحيد. إذا فقدت جميع عوامل التحقق، فاستخدم إجراء استرداد الحساب المعتمد لديك. لا يمكن لهذا التطبيق تجاوز التحقق متعدد العوامل؛ يبقى رمز PIN المحلي وسجلاتك المالية منفصلين.",
-  "Development-only assurance check": "فحص مستوى التحقق (للتطوير فقط)",
-  "Check current session": "فحص الجلسة الحالية",
-  "Current and next assurance levels": "مستوى التحقق الحالي والتالي",
-  "Assurance check unavailable.": "تعذّر فحص مستوى التحقق.",
-  "Two-step verification required": "يلزم التحقق بخطوتين",
-  "Your session needs verification before authenticator management.": "تحتاج جلستك إلى التحقق قبل إدارة تطبيقات المصادقة.",
-  "Start two-step verification": "بدء التحقق بخطوتين",
 };
 
 const ARABIC_DIGITS: Record<string, string> = {

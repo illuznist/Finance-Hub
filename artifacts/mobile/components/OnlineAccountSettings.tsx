@@ -6,7 +6,6 @@ import { OnlineAccountSecuritySection } from "@/components/OnlineAccountMfa";
 import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
-import { supabaseClient } from "@/lib/supabase";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { classifyOnlineAuthError } from "@/security/onlineAuthError";
 
@@ -158,8 +157,7 @@ export function OnlineAccountSettings() {
         </View>
       ) : online.user ? (
         <>
-          {__DEV__ ? <DevelopmentAssuranceCheck /> : null}
-          <OnlineAccountSecuritySection deferChallenge={__DEV__} />
+          <OnlineAccountSecuritySection />
           <ActionButton
             testID="online-account-recovery"
             label={t("Send password recovery email")}
@@ -269,75 +267,6 @@ export function OnlineAccountSettings() {
   );
 }
 
-type AssuranceLevelResult = {
-  currentLevel: string | null;
-  nextLevel: string | null;
-};
-
-function DevelopmentAssuranceCheck() {
-  const colors = useColors();
-  const { t } = usePreferences();
-  const [levels, setLevels] = useState<AssuranceLevelResult | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
-
-  async function checkCurrentSession() {
-    setChecking(true);
-    setLevels(null);
-    setUnavailable(false);
-    try {
-      const client = supabaseClient;
-      if (!client) {
-        setUnavailable(true);
-        return;
-      }
-      const { data, error } = await client.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (error || !data) {
-        setUnavailable(true);
-        return;
-      }
-      setLevels({ currentLevel: data.currentLevel, nextLevel: data.nextLevel });
-    } catch {
-      setUnavailable(true);
-    } finally {
-      setChecking(false);
-    }
-  }
-
-  return (
-    <View style={[styles.assuranceCheck, { backgroundColor: colors.input, borderColor: colors.border }]}>
-      <Text style={[styles.body, { color: colors.mutedForeground }]}>{t("Development-only assurance check")}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: checking, busy: checking }}
-        testID="online-assurance-check"
-        onPress={() => void checkCurrentSession()}
-        disabled={checking}
-        style={[styles.actionButton, { borderColor: colors.border, flexDirection: "row", gap: 8, opacity: checking ? 0.6 : 1 }]}
-      >
-        {checking ? <ActivityIndicator size="small" color={colors.primary} /> : null}
-        <Text style={[styles.actionText, { color: colors.foreground }]}>
-          {t(checking ? "Please wait…" : "Check current session")}
-        </Text>
-      </Pressable>
-      {levels ? (
-        <Text
-          accessibilityLabel={t("Current and next assurance levels")}
-          testID="online-assurance-result"
-          style={[styles.bodyStrong, { color: colors.foreground }]}
-        >
-          {String(levels.currentLevel)} / {String(levels.nextLevel)}
-        </Text>
-      ) : null}
-      {unavailable ? (
-        <Text accessibilityRole="alert" style={[styles.message, { color: colors.warning }]}>
-          {t("Assurance check unavailable.")}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
 function PrimaryButton({
   label,
   onPress,
@@ -410,7 +339,6 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   actionButton: { minHeight: 44, borderWidth: 1, borderRadius: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 14, paddingVertical: 9 },
   actionText: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", textAlign: "center" },
-  assuranceCheck: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
   continueButton: { minHeight: 40, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
   link: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   message: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", lineHeight: 20 },

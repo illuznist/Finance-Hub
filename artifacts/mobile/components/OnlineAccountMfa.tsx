@@ -22,13 +22,13 @@ type MfaFactor = {
   friendly_name?: string;
 };
 
-type GateState = "checking" | "ready" | "choose-factor" | "challenge" | "challenge-required" | "stale" | "unsupported" | "error";
+type GateState = "checking" | "ready" | "choose-factor" | "challenge" | "stale" | "unsupported" | "error";
 type LoginChallenge = { factorId: string; challengeId: string };
 type SetupDraft = { factorId: string; challengeId: string; secret: string; qrCode: string };
 
 const MFA_REQUEST_FAILED = Symbol("mfa-request-failed");
 
-export function OnlineAccountSecuritySection({ deferChallenge = false }: { deferChallenge?: boolean }) {
+export function OnlineAccountSecuritySection() {
   const colors = useColors();
   const { t, isRTL } = usePreferences();
   const online = useOnlineAccount();
@@ -36,7 +36,6 @@ export function OnlineAccountSecuritySection({ deferChallenge = false }: { defer
   const [gate, setGate] = useState<GateState>("checking");
   const [factors, setFactors] = useState<MfaFactor[]>([]);
   const [loginChallenge, setLoginChallenge] = useState<LoginChallenge | null>(null);
-  const [deferredFactorId, setDeferredFactorId] = useState<string | null>(null);
   const [factorListUnavailable, setFactorListUnavailable] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,11 +51,10 @@ export function OnlineAccountSecuritySection({ deferChallenge = false }: { defer
     },
   });
 
-  const assessMfa = useCallback(async () => {
+  const assessMfa = useCallback(async (options: { challengeIfNeeded?: boolean } = {}) => {
     const requestId = ++assessmentId.current;
     setGate("checking");
     setLoginChallenge(null);
-    setDeferredFactorId(null);
     setCode("");
     setErrorKey(null);
     setFactorListUnavailable(false);
@@ -114,9 +112,9 @@ export function OnlineAccountSecuritySection({ deferChallenge = false }: { defer
         return;
       }
 
-      if (deferChallenge) {
-        setDeferredFactorId(verifiedTotpFactors[0].id);
-        setGate("challenge-required");
+      if (options.challengeIfNeeded === false) {
+        setGate("error");
+        setErrorKey("MFA verification did not reach AAL2. Tap Try again to start a new challenge.");
         return;
       }
 
@@ -132,7 +130,7 @@ export function OnlineAccountSecuritySection({ deferChallenge = false }: { defer
       setGate("error");
       setErrorKey("Could not check MFA. Check your connection and Supabase MFA settings, then retry.");
     }
-  }, [deferChallenge, userId]);
+  }, [userId]);
 
   useEffect(() => {
     void assessMfa();
@@ -185,7 +183,7 @@ export function OnlineAccountSecuritySection({ deferChallenge = false }: { defer
       await verifyFactorCode(loginChallenge.factorId, loginChallenge.challengeId, currentCode);
       setLoginChallenge(null);
       setCode("");
-      await assessMfa();
+      await assessMfa({ challengeIfNeeded: false });
     } catch {
       setCode("");
       setErrorKey("The code could not be verified. Check it and try again.");
@@ -209,22 +207,6 @@ export function OnlineAccountSecuritySection({ deferChallenge = false }: { defer
           colors={colors}
           loading
         />
-      ) : gate === "challenge-required" ? (
-        <View style={[styles.gateCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <GateHeading title={t("Two-step verification required")} colors={colors} />
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            {t("Your session needs verification before authenticator management.")}
-          </Text>
-          <MfaButton
-            testID="online-mfa-start-deferred-challenge"
-            label={t("Start two-step verification")}
-            onPress={() => {
-              if (deferredFactorId) void startLoginChallenge(deferredFactorId);
-            }}
-            disabled={busy || !deferredFactorId}
-            variant="primary"
-          />
-        </View>
       ) : gate === "challenge" ? (
         <View style={[styles.gateCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
           <GateHeading title={t("Two-step verification")} colors={colors} />
