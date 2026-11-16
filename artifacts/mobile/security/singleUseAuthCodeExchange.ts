@@ -6,14 +6,29 @@
 export function createSingleUseAuthCodeExchange<T>(
   exchange: (code: string) => Promise<T>,
 ): (code: string) => Promise<T> {
-  const exchanges = new Map<string, Promise<T>>();
+  const exchanges = new Map<string, { promise: Promise<T>; settled: boolean }>();
 
   return (code: string) => {
     const existing = exchanges.get(code);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.settled) {
+        return Promise.reject(
+          Object.assign(new Error("This authorization code has already been exchanged."), {
+            name: "AuthCodeAlreadyExchangedError",
+            code: "auth_code_already_exchanged",
+          }),
+        );
+      }
+      return existing.promise;
+    }
 
     const pending = Promise.resolve().then(() => exchange(code));
-    exchanges.set(code, pending);
+    const entry = { promise: pending, settled: false };
+    exchanges.set(code, entry);
+    void pending.then(
+      () => { entry.settled = true; },
+      () => { entry.settled = true; },
+    );
     return pending;
   };
 }

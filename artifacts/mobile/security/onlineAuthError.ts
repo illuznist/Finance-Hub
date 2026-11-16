@@ -36,7 +36,8 @@ export function classifyRecoveryLinkError(error: unknown): RecoveryLinkErrorCate
     return "rate-limit";
   }
   if (
-    /otp_expired|flow_state_expired|flow_state_not_found|bad_code_verifier|invalid_grant/.test(code) ||
+    /otp_expired|flow_state_expired|flow_state_not_found|bad_code_verifier|invalid_grant|auth_code_already_exchanged/.test(code) ||
+    name === "authcodealreadyexchangederror" ||
     /expired|already used|invalid.*(?:auth )?code|invalid grant/.test(message)
   ) {
     return "expired-or-used";

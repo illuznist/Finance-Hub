@@ -49,6 +49,7 @@ export default function OnlineAuthCallbackScreen() {
   const [saving, setSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const handledCode = useRef<string | null>(null);
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
   const urlParams = url ? Linking.parse(url).queryParams : null;
   const urlCode = firstQueryString(urlParams?.code);
@@ -75,6 +76,8 @@ export default function OnlineAuthCallbackScreen() {
       setCallbackProcessing(false);
       return;
     }
+    if (handledCode.current === callbackCode) return;
+    handledCode.current = callbackCode;
 
     let active = true;
     setCallbackErrorKey(null);

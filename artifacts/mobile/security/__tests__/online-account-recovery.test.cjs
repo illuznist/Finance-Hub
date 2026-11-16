@@ -46,6 +46,10 @@ test("the same PKCE recovery code is exchanged once even across duplicate link d
     { code: "one-time-code" },
   ]);
   assert.equal(calls, 1);
+  await assert.rejects(
+    exchangeOnce("one-time-code"),
+    error => error.code === "auth_code_already_exchanged",
+  );
 });
 
 test("an unsuccessful PKCE code exchange is not silently retried by a duplicate link event", async () => {
@@ -85,6 +89,7 @@ test("password recovery uses the allowlisted Expo callback and PKCE recovery eve
   assert.match(callback, /testID="online-recovery-password-confirm"/);
   assert.match(callback, /urlCode/);
   assert.match(callback, /classifyRecoveryLinkError/);
+  assert.match(callback, /handledCode\.current === callbackCode/);
   assert.match(callback, /Password updated successfully\./);
   assert.doesNotMatch(settingsSource(), /console\.(?:log|warn|error)\([^)]*(?:password|token|recovery)/i);
 });
