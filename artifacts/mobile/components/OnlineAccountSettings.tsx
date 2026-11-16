@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetAccountAccess } from "@workspace/api-client-react";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { OnlineAccountSecuritySection } from "@/components/OnlineAccountMfa";
 import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
@@ -22,15 +22,6 @@ export function OnlineAccountSettings() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const access = useGetAccountAccess({
-    query: {
-      enabled: Boolean(online.user),
-      queryKey: ["/api/account/access", online.user?.id ?? "signed-out"],
-      retry: false,
-      staleTime: 60_000,
-    },
-  });
 
   async function submit() {
     setError(null);
@@ -58,7 +49,7 @@ export function OnlineAccountSettings() {
         setConfirmPassword("");
       } else if (mode === "sign-in") {
         await online.signIn(email, password);
-        setNotice(t("Online account connected. Your financial records remain on this device."));
+        setNotice(null);
         setMode(null);
         setPassword("");
         setConfirmPassword("");
@@ -90,7 +81,6 @@ export function OnlineAccountSettings() {
     try {
       await online.signOut();
       setNotice(t("Online account signed out. Your local profile and financial records are unchanged."));
-      access.refetch();
     } catch {
       setError(t("Online account action failed. Please try again."));
     } finally {
@@ -161,32 +151,7 @@ export function OnlineAccountSettings() {
         </View>
       ) : online.user ? (
         <>
-          <View style={styles.statusBlock}>
-            <StatusRow label={t("Online account")} value={online.user.email ?? ""} colors={colors} />
-            <StatusRow
-              label={t("Email verification")}
-              value={t(online.isVerified ? "Verified" : "Not verified")}
-              colors={colors}
-            />
-            <StatusRow
-              label={t("Current online plan")}
-              value={
-                access.data?.proSource === "super_admin"
-                  ? t("Super Admin Pro")
-                  : access.data?.proSource === "promotional"
-                    ? t("Promotional Pro")
-                    : access.data?.proSource === "free"
-                      ? t("Free plan")
-                      : t("Unavailable")
-              }
-              colors={colors}
-            />
-            {!access.data ? (
-              <Text style={[styles.body, { color: colors.mutedForeground }]}>
-                {access.isLoading ? t("Checking online access…") : t("Online access status is unavailable.")}
-              </Text>
-            ) : null}
-          </View>
+          <OnlineAccountSecuritySection />
           <ActionButton
             testID="online-account-recovery"
             label={t("Send password recovery email")}
@@ -296,15 +261,6 @@ export function OnlineAccountSettings() {
   );
 }
 
-function StatusRow({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
-  return (
-    <View style={styles.statusRow}>
-      <Text style={[styles.body, styles.statusLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.bodyStrong, { color: colors.foreground }]}>{value}</Text>
-    </View>
-  );
-}
-
 function PrimaryButton({
   label,
   onPress,
@@ -370,9 +326,6 @@ const styles = StyleSheet.create({
   body: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_400Regular", lineHeight: 19 },
   bodyStrong: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_600SemiBold", textAlign: "auto", flexShrink: 1 },
   status: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", lineHeight: 20 },
-  statusBlock: { gap: 8 },
-  statusRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  statusLabel: { flex: 1 },
   form: { gap: 10 },
   actions: { gap: 8 },
   input: { width: "100%", minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, fontSize: TYPOGRAPHY.body, fontFamily: "Inter_400Regular" },
