@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useGetAccountAccess } from "@workspace/api-client-react";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { classifyOnlineAuthError } from "@/security/onlineAuthError";
 
 type FormMode = "sign-in" | "sign-up" | "recovery" | null;
 
@@ -66,8 +67,17 @@ export function OnlineAccountSettings() {
         setNotice(t("If the account exists, a password recovery email has been sent."));
         setMode(null);
       }
-    } catch {
-      setError(t("Online account action failed. Please try again."));
+    } catch (submitError) {
+      const category = classifyOnlineAuthError(submitError);
+      setError(
+        t(
+          category === "rate-limit"
+            ? "Too many requests. Please wait a little and try again."
+            : category === "network"
+              ? "Could not connect to the account service. Check your connection and try again."
+              : "Online account action failed. Please try again.",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -116,6 +126,39 @@ export function OnlineAccountSettings() {
           </Text>
           <PrimaryButton label={t("Continue without online account")} disabled={busy} onPress={() => setMode(null)} />
         </>
+      ) : online.user && mode === "recovery" ? (
+        <View style={styles.form}>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>
+            {t("Enter your account email to receive a secure password reset link.")}
+          </Text>
+          <TextInput
+            accessibilityLabel={t("Email")}
+            testID="online-account-email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+            value={email}
+            onChangeText={setEmail}
+            placeholder={t("Email")}
+            placeholderTextColor={colors.mutedForeground}
+            style={inputStyle}
+          />
+          {error ? <Text accessibilityRole="alert" style={[styles.message, { color: colors.destructive }]}>{error}</Text> : null}
+          <PrimaryButton
+            testID="online-account-submit"
+            label={t(busy ? "Please wait…" : "Send recovery email")}
+            disabled={busy}
+            loading={busy}
+            onPress={() => void submit()}
+          />
+          <ActionButton
+            label={t("Cancel")}
+            disabled={busy}
+            onPress={() => { setMode(null); setError(null); }}
+            colors={colors}
+          />
+        </View>
       ) : online.user ? (
         <>
           <View style={styles.statusBlock}>
@@ -144,7 +187,18 @@ export function OnlineAccountSettings() {
               </Text>
             ) : null}
           </View>
-          <ActionButton label={t("Send password recovery email")} disabled={busy} onPress={() => { setMode("recovery"); setNotice(null); setError(null); }} colors={colors} />
+          <ActionButton
+            testID="online-account-recovery"
+            label={t("Send password recovery email")}
+            disabled={busy}
+            onPress={() => {
+              setEmail(online.user?.email ?? "");
+              setMode("recovery");
+              setNotice(null);
+              setError(null);
+            }}
+            colors={colors}
+          />
           <ActionButton label={t("Sign out of online account")} disabled={busy} onPress={() => void signOutOnline()} colors={colors} />
         </>
       ) : (
@@ -199,6 +253,7 @@ export function OnlineAccountSettings() {
                 testID="online-account-submit"
                 label={t(busy ? "Please wait…" : mode === "sign-up" ? "Create online account" : mode === "sign-in" ? "Sign in" : "Send recovery email")}
                 disabled={busy}
+                loading={busy}
                 onPress={() => void submit()}
               />
               <ActionButton
@@ -255,22 +310,25 @@ function PrimaryButton({
   onPress,
   disabled,
   testID,
+  loading = false,
 }: {
   label: string;
   onPress: () => void;
   disabled: boolean;
   testID?: string;
+  loading?: boolean;
 }) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, busy: loading }}
       testID={testID}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: disabled ? 0.6 : 1 }]}
+      style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: disabled ? 0.6 : 1, flexDirection: "row", gap: 8 }]}
     >
+      {loading ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
       <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{label}</Text>
     </Pressable>
   );

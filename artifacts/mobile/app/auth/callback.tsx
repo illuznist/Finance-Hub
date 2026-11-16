@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -26,6 +26,7 @@ export default function OnlineAuthCallbackScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
   const handledUrl = useRef<string | null>(null);
 
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
@@ -69,6 +70,7 @@ export default function OnlineAuthCallbackScreen() {
       online.clearPasswordRecovery();
       setPassword("");
       setConfirmPassword("");
+      setPasswordUpdated(true);
     } catch {
       setPasswordError(t("Password could not be updated. Please try again."));
     } finally {
@@ -121,7 +123,15 @@ export default function OnlineAuthCallbackScreen() {
               style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
             />
             {passwordError ? <Text accessibilityRole="alert" style={[styles.note, { color: colors.destructive }]}>{passwordError}</Text> : null}
-            <Pressable testID="online-recovery-save" onPress={() => void saveNewPassword()} disabled={saving} style={[styles.button, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1 }]}>
+            <Pressable
+              testID="online-recovery-save"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: saving, busy: saving }}
+              onPress={() => void saveNewPassword()}
+              disabled={saving}
+              style={[styles.button, { backgroundColor: colors.primary, opacity: saving ? 0.65 : 1, flexDirection: "row", gap: 8 }]}
+            >
+              {saving ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
               <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{t(saving ? "Saving…" : "Update password")}</Text>
             </Pressable>
           </View>
@@ -131,6 +141,8 @@ export default function OnlineAuthCallbackScreen() {
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>
               {callbackError
                 ? t("This account link could not be completed.")
+                : passwordUpdated
+                  ? t("Password updated successfully.")
                 : callbackDone || online.user
                   ? t("Online account confirmed.")
                   : t("Complete your online account setup")}
@@ -138,6 +150,8 @@ export default function OnlineAuthCallbackScreen() {
             <Text style={[styles.note, { color: colors.mutedForeground }]}>
               {callbackError
                 ? t("Open the latest link from your email, or request another password recovery email.")
+                : passwordUpdated
+                  ? t("Your online account password has been changed. Your local financial records are unchanged.")
                 : t("Your online account is separate from your local Finance Hub profile and financial records.")}
             </Text>
             <Pressable testID="online-callback-done" onPress={() => router.replace("/settings")} style={[styles.button, { backgroundColor: colors.primary }]}>
