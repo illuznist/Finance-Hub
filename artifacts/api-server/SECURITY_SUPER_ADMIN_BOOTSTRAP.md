@@ -52,6 +52,8 @@ The helper fails closed unless it confirms:
 - The single-Super-Admin unique index exists and is valid.
 - The effective table-level `service_role` privileges on `admin_audit_logs`
   are exactly `SELECT` and `INSERT`, with no other table privileges.
+- PostgreSQL 17's effective `MAINTAIN` privilege is explicitly rejected, in
+  addition to being rejected by the general ACL allowlist.
 - No effective column-level `UPDATE` or `REFERENCES` privilege exists for
   `service_role`, including privileges inherited through role memberships or
   granted to `PUBLIC`.
@@ -116,6 +118,8 @@ are separately approved:
   audit reads, ordinary and denied-access audit inserts, and the bootstrap
   audit insert. It does not make rows immutable against the database owner or
   other privileged administrative connections.
+- `REVOKE ALL PRIVILEGES` also removes PostgreSQL 17's `MAINTAIN` privilege.
+  The readiness helper independently rejects effective `MAINTAIN` access.
 - Direct column-level `UPDATE` and `REFERENCES` grants are revoked from
   `service_role`. Grants inherited from another role or `PUBLIC` are not
   revoked, because that could affect unrelated users; the readiness check

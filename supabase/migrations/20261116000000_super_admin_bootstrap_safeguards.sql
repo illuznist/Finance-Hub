@@ -337,6 +337,11 @@ begin
         'service_role',
         audit_table_oid,
         'TRIGGER'
+      )
+      and not pg_catalog.has_table_privilege(
+        'service_role',
+        audit_table_oid,
+        'MAINTAIN'
       );
 
     audit_column_privileges_ok :=

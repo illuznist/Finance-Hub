@@ -113,7 +113,14 @@ test("follow-up bootstrap migration binds the confirmed target and avoids false 
     bootstrapSafeguardsMigration,
     /revoke update \(%i\)[\s\S]*revoke references \(%i\)/i,
   );
-  for (const privilege of ["UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+  for (const privilege of [
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+    "MAINTAIN",
+  ]) {
     assert.match(
       bootstrapSafeguardsMigration,
       new RegExp(`has_table_privilege\\([\\s\\S]*'${privilege}'`, "i"),

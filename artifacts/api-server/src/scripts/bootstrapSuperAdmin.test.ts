@@ -157,6 +157,29 @@ test("bootstrap rejects incorrect audit privileges before owner lookup", async (
   assert.deepEqual(calls, ["readiness-check"]);
 });
 
+test("bootstrap rejects effective PostgreSQL MAINTAIN privilege", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ...readyBootstrap,
+      ready: false,
+      audit_privileges_ok: false,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
 test("bootstrap rejects effective column UPDATE or REFERENCES grants", async () => {
   for (const privilege of ["UPDATE", "REFERENCES"]) {
     const { client, calls } = fakeClient(
