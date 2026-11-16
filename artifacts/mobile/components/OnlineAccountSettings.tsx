@@ -62,8 +62,10 @@ export function OnlineAccountSettings() {
       const category = classifyOnlineAuthError(submitError);
       setError(
         t(
-          category === "rate-limit"
-            ? "Too many requests. Please wait a little and try again."
+          category === "rate-limit" && mode === "recovery"
+            ? "Too many password recovery emails were requested. Please wait before requesting another."
+            : category === "rate-limit"
+              ? "Too many requests. Please wait a little and try again."
             : category === "network"
               ? "Could not connect to the account service. Check your connection and try again."
               : "Online account action failed. Please try again.",

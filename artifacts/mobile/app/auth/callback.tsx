@@ -11,7 +11,11 @@ import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
-import { classifyRecoveryLinkError } from "@/security/onlineAuthError";
+import {
+  classifyRecoveryLinkError,
+  type OnlineAuthErrorCategory,
+} from "@/security/onlineAuthError";
+import { updatePasswordWithCleanup } from "@/security/passwordRecoveryUpdate";
 
 function firstQueryString(value: string | string[] | undefined): string | null {
   if (typeof value === "string") return value;
@@ -33,6 +37,16 @@ function recoveryErrorMessage(category: ReturnType<typeof classifyRecoveryLinkEr
   }
 }
 
+function passwordUpdateMessageKey(category: OnlineAuthErrorCategory): string {
+  if (category === "rate-limit") {
+    return "Supabase rate-limited this password update. Wait, then try signing in with the new password before requesting another recovery email.";
+  }
+  if (category === "network") {
+    return "We couldn't confirm whether the password changed. Try signing in with the new password before requesting another recovery email.";
+  }
+  return "The password update was not confirmed. Try signing in with the new password before requesting another recovery email.";
+}
+
 export default function OnlineAuthCallbackScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -48,7 +62,11 @@ export default function OnlineAuthCallbackScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordUpdateCategory, setPasswordUpdateCategory] = useState<OnlineAuthErrorCategory | null>(null);
+  const [passwordFollowUpWarning, setPasswordFollowUpWarning] = useState<string | null>(null);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const [returningToSignIn, setReturningToSignIn] = useState(false);
+  const [returnToSignInError, setReturnToSignInError] = useState<string | null>(null);
   const handledCode = useRef<string | null>(null);
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
   const urlParams = url ? Linking.parse(url).queryParams : null;
@@ -104,6 +122,8 @@ export default function OnlineAuthCallbackScreen() {
 
   async function saveNewPassword() {
     setPasswordError(null);
+    setPasswordUpdateCategory(null);
+    setPasswordFollowUpWarning(null);
     if (password.length < 8) {
       setPasswordError(t("Use at least 8 characters for your password."));
       return;
@@ -114,15 +134,50 @@ export default function OnlineAuthCallbackScreen() {
     }
     setSaving(true);
     try {
-      await online.completePasswordRecovery(password);
-      online.clearPasswordRecovery();
-      setPassword("");
-      setConfirmPassword("");
-      setPasswordUpdated(true);
-    } catch {
-      setPasswordError(t("Password could not be updated. Please try again."));
+      const result = await updatePasswordWithCleanup(
+        () => online.completePasswordRecovery(password),
+        () => {
+          setPasswordUpdated(true);
+          setPasswordError(null);
+          setPasswordUpdateCategory(null);
+          setPassword("");
+          setConfirmPassword("");
+        },
+        online.clearPasswordRecovery,
+      );
+      if (result.status === "unconfirmed") {
+        setPasswordUpdateCategory(result.category);
+      } else if (result.cleanupFailed) {
+        setPasswordFollowUpWarning(
+          "Password updated, but recovery cleanup did not finish. Continue to online sign-in with your new password. Your local financial records are unchanged.",
+        );
+      }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function continueToOnlineSignIn() {
+    setReturnToSignInError(null);
+    setReturningToSignIn(true);
+    online.clearPasswordRecovery();
+    try {
+      await online.signOut();
+    } catch {
+      setReturnToSignInError(
+        "Password update is confirmed, but the recovery session could not be signed out. Open Settings, sign out of the online account, then sign in with your new password.",
+      );
+      setReturningToSignIn(false);
+      return;
+    }
+    try {
+      router.replace("/settings");
+    } catch {
+      setReturnToSignInError(
+        "Password update is confirmed and the recovery session is closed, but Settings could not be opened. Use Back to return to Settings and sign in with your new password.",
+      );
+    } finally {
+      setReturningToSignIn(false);
     }
   }
 
@@ -143,7 +198,50 @@ export default function OnlineAuthCallbackScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 32 + Math.max(insets.bottom, Platform.OS === "web" ? 34 : 0), gap: 14 }}
         bottomOffset={24}
       >
-        {online.needsPasswordRecovery ? (
+        {passwordUpdated ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="check-circle" size={24} color={colors.success} />
+            <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>
+              {t("Password updated successfully.")}
+            </Text>
+            <Text style={[styles.note, { color: colors.mutedForeground }]}>
+              {t("Your online account password has been changed. Sign in with your new password. Your local financial records are unchanged.")}
+            </Text>
+            {passwordFollowUpWarning ? (
+              <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
+                {t(passwordFollowUpWarning)}
+              </Text>
+            ) : null}
+            {returnToSignInError ? (
+              <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
+                {t(returnToSignInError)}
+              </Text>
+            ) : null}
+            <Pressable
+              testID="online-recovery-continue-sign-in"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: returningToSignIn, busy: returningToSignIn }}
+              onPress={() => void continueToOnlineSignIn()}
+              disabled={returningToSignIn}
+              style={[styles.button, { backgroundColor: colors.primary, opacity: returningToSignIn ? 0.65 : 1, flexDirection: "row", gap: 8 }]}
+            >
+              {returningToSignIn ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
+              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>
+                {t(returningToSignIn ? "Please wait…" : "Continue to online sign-in")}
+              </Text>
+            </Pressable>
+            {returnToSignInError ? (
+              <Pressable
+                testID="online-recovery-open-settings"
+                accessibilityRole="button"
+                onPress={() => router.replace("/settings")}
+              style={[styles.button, { borderWidth: 1, borderColor: colors.border, flexDirection: "row", gap: 8 }]}
+              >
+                <Text style={[styles.buttonText, { color: colors.foreground }]}>{t("Open Settings")}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : online.needsPasswordRecovery ? (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.title, { color: colors.foreground }]}>{t("Set a new password")}</Text>
             <TextInput
@@ -171,6 +269,31 @@ export default function OnlineAuthCallbackScreen() {
               style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
             />
             {passwordError ? <Text accessibilityRole="alert" style={[styles.note, { color: colors.destructive }]}>{passwordError}</Text> : null}
+            {passwordUpdateCategory ? (
+              <>
+                <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
+                  {t(passwordUpdateMessageKey(passwordUpdateCategory))}
+                </Text>
+                <Pressable
+                  testID="online-recovery-continue-sign-in"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: returningToSignIn, busy: returningToSignIn }}
+                  onPress={() => void continueToOnlineSignIn()}
+                  disabled={returningToSignIn}
+                  style={[styles.button, { borderWidth: 1, borderColor: colors.border, opacity: returningToSignIn ? 0.65 : 1, flexDirection: "row", gap: 8 }]}
+                >
+                  {returningToSignIn ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+                  <Text style={[styles.buttonText, { color: colors.foreground }]}>
+                    {t(returningToSignIn ? "Please wait…" : "Continue to online sign-in")}
+                  </Text>
+                </Pressable>
+                {returnToSignInError ? (
+                  <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
+                    {t(returnToSignInError)}
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
             <Pressable
               testID="online-recovery-save"
               accessibilityRole="button"
@@ -194,8 +317,6 @@ export default function OnlineAuthCallbackScreen() {
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>
               {callbackErrorKey
                 ? t("This account link could not be completed.")
-                : passwordUpdated
-                  ? t("Password updated successfully.")
                 : callbackDone || online.user
                   ? t("Online account confirmed.")
                   : t("Complete your online account setup")}
@@ -203,8 +324,6 @@ export default function OnlineAuthCallbackScreen() {
             <Text style={[styles.note, { color: colors.mutedForeground }]}>
               {callbackErrorKey
                 ? t(callbackErrorKey)
-                : passwordUpdated
-                  ? t("Your online account password has been changed. Your local financial records are unchanged.")
                 : t("Your online account is separate from your local Finance Hub profile and financial records.")}
             </Text>
             <Pressable testID="online-callback-done" onPress={() => router.replace("/settings")} style={[styles.button, { backgroundColor: colors.primary }]}>

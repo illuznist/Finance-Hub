@@ -129,7 +129,6 @@ export function OnlineAccountProvider({ children }: { children: React.ReactNode 
     if (!supabaseClient) throw new Error("Online accounts are not configured.");
     const { error } = await supabaseClient.auth.updateUser({ password });
     if (error) throw error;
-    setNeedsPasswordRecovery(false);
   }, []);
 
   const handleAuthCallback = useCallback((code: string) => {
