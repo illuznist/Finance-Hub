@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { checkAdminAccess, useGetAccountAccess } from "@workspace/api-client-react";
+import { useGetAccountAccess } from "@workspace/api-client-react";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -7,19 +7,9 @@ import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
-import { formatAppNumber } from "@/i18n/localization";
 import { classifyOnlineAuthError } from "@/security/onlineAuthError";
 
 type FormMode = "sign-in" | "sign-up" | "recovery" | null;
-type AdminCheckState = "idle" | "running" | "complete";
-
-let devAdminAccessCheckAttempted = false;
-
-function getHttpStatus(error: unknown): number | null {
-  if (!error || typeof error !== "object" || !("status" in error)) return null;
-  const status = (error as { status?: unknown }).status;
-  return typeof status === "number" ? status : null;
-}
 
 export function OnlineAccountSettings() {
   const colors = useColors();
@@ -32,8 +22,6 @@ export function OnlineAccountSettings() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [adminCheckState, setAdminCheckState] = useState<AdminCheckState>("idle");
-  const [adminCheckResult, setAdminCheckResult] = useState<string | null>(null);
 
   const access = useGetAccountAccess({
     query: {
@@ -107,29 +95,6 @@ export function OnlineAccountSettings() {
       setError(t("Online account action failed. Please try again."));
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function runDevAdminAccessCheck() {
-    if (!__DEV__ || devAdminAccessCheckAttempted || busy) return;
-    devAdminAccessCheckAttempted = true;
-    setAdminCheckState("running");
-    setAdminCheckResult(null);
-
-    try {
-      await checkAdminAccess();
-      setAdminCheckResult(`${t("HTTP status")}: ${formatAppNumber(200)}`);
-    } catch (requestError) {
-      const status = getHttpStatus(requestError);
-      setAdminCheckResult(
-        status === 403
-          ? t("HTTP 403 — expected for USER")
-          : status === null
-            ? t("No HTTP response received")
-            : `${t("HTTP status")}: ${formatAppNumber(status)}`,
-      );
-    } finally {
-      setAdminCheckState("complete");
     }
   }
 
@@ -235,31 +200,6 @@ export function OnlineAccountSettings() {
             colors={colors}
           />
           <ActionButton label={t("Sign out of online account")} disabled={busy} onPress={() => void signOutOnline()} colors={colors} />
-          {__DEV__ ? (
-            <View style={[styles.devCheck, { borderTopColor: colors.border }]}>
-              <Text style={[styles.body, { color: colors.mutedForeground }]}>
-                {t("Development-only authorization check. Runs once using this signed-in session.")}
-              </Text>
-              <ActionButton
-                testID="dev-admin-access-check"
-                label={
-                  adminCheckState === "running"
-                    ? t("Checking…")
-                    : adminCheckState === "complete" || devAdminAccessCheckAttempted
-                      ? t("Check already run")
-                      : t("Run one-time admin check")
-                }
-                disabled={busy || adminCheckState !== "idle" || devAdminAccessCheckAttempted}
-                onPress={() => void runDevAdminAccessCheck()}
-                colors={colors}
-              />
-              {adminCheckResult ? (
-                <Text accessibilityRole="status" style={[styles.body, { color: colors.foreground }]}>
-                  {adminCheckResult}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
         </>
       ) : (
         <>
@@ -432,7 +372,6 @@ const styles = StyleSheet.create({
   status: { fontSize: TYPOGRAPHY.bodySmall, fontFamily: "Inter_500Medium", lineHeight: 20 },
   statusBlock: { gap: 8 },
   statusRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  devCheck: { gap: 8, paddingTop: 10, borderTopWidth: 1 },
   statusLabel: { flex: 1 },
   form: { gap: 10 },
   actions: { gap: 8 },
