@@ -50,14 +50,22 @@ The helper fails closed unless it confirms:
 - The old two-argument RPC is absent, and execute access is restricted to the
   trusted server role.
 - The single-Super-Admin unique index exists and is valid.
-- The effective `service_role` privileges on `admin_audit_logs` are exactly
-  `SELECT` and `INSERT`, with no other table privileges.
+- The effective table-level `service_role` privileges on `admin_audit_logs`
+  are exactly `SELECT` and `INSERT`, with no other table privileges.
+- No effective column-level `UPDATE` or `REFERENCES` privilege exists for
+  `service_role`, including privileges inherited through role memberships or
+  granted to `PUBLIC`.
 
 If the helper is missing, the signature is incompatible, or any check fails,
 the CLI stops before looking up the owner account. It does not call the
 bootstrap RPC. The regular bootstrap command repeats this check immediately
 before owner identity lookup, so an earlier successful preflight is not treated
 as permanent authorization.
+
+The index check verifies the index relation, uniqueness/readiness/validity,
+single `role` key column, and an exact normalized `role = 'SUPER_ADMIN'`
+predicate. It does not accept a predicate merely because the text
+`SUPER_ADMIN` appears in it.
 
 ## Approved bootstrap procedure
 
@@ -108,6 +116,20 @@ are separately approved:
   audit reads, ordinary and denied-access audit inserts, and the bootstrap
   audit insert. It does not make rows immutable against the database owner or
   other privileged administrative connections.
+- Direct column-level `UPDATE` and `REFERENCES` grants are revoked from
+  `service_role`. Grants inherited from another role or `PUBLIC` are not
+  revoked, because that could affect unrelated users; the readiness check
+  rejects them instead.
+
+## Readiness-check limits
+
+The readiness helper verifies the RPC signature, security-definer settings,
+permissions, audit privilege boundary, and unique-index definition through
+PostgreSQL catalog metadata. Checks of the bootstrap function's behavioral
+guards also inspect normalized function-definition text for expected fragments.
+That text check detects some drift but is not a semantic proof of function
+security. Keep the function under source review and run the permanent
+regression tests; do not treat a green preflight as a replacement for review.
 
 ## Recovery if the wrong account is promoted
 

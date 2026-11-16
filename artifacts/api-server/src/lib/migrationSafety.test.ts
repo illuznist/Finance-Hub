@@ -99,6 +99,20 @@ test("follow-up bootstrap migration binds the confirmed target and avoids false 
     /grant execute on function public\.check_super_admin_bootstrap_readiness\(\)\s+to service_role/i,
   );
   assert.match(bootstrapSafeguardsMigration, /has_table_privilege/i);
+  assert.match(bootstrapSafeguardsMigration, /has_column_privilege/i);
+  assert.match(bootstrapSafeguardsMigration, /audit_column_privileges_ok/i);
+  assert.match(bootstrapSafeguardsMigration, /pg_attribute/i);
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /aclexplode\(\s*coalesce\(\s*column_attribute\.attacl/i,
+  );
+  assert.match(bootstrapSafeguardsMigration, /pg_has_role/i);
+  assert.match(bootstrapSafeguardsMigration, /when privilege\.grantee = 0 then true/i);
+  assert.match(bootstrapSafeguardsMigration, /when column_privilege\.grantee = 0 then true/i);
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /revoke update \(%i\)[\s\S]*revoke references \(%i\)/i,
+  );
   for (const privilege of ["UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
     assert.match(
       bootstrapSafeguardsMigration,
@@ -106,6 +120,21 @@ test("follow-up bootstrap migration binds the confirmed target and avoids false 
     );
   }
   assert.match(bootstrapSafeguardsMigration, /single_super_admin_guard_ok/i);
+  assert.match(bootstrapSafeguardsMigration, /i\.indrelid[\s\S]*public\.user_roles/i);
+  assert.match(bootstrapSafeguardsMigration, /i\.indisready[\s\S]*i\.indisvalid/i);
+  assert.match(bootstrapSafeguardsMigration, /i\.indnatts = 1[\s\S]*i\.indnkeyatts = 1/i);
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /pg_get_indexdef\(i\.indexrelid, 1, true\)[\s\S]*= 'role'/i,
+  );
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /pg_get_expr\(i\.indpred, i\.indrelid\)[\s\S]*'role=''super_admin''::text'/i,
+  );
+  assert.doesNotMatch(
+    bootstrapSafeguardsMigration,
+    /pg_get_expr\(i\.indpred, i\.indrelid\)\s+ilike/i,
+  );
   const readinessFunction = bootstrapSafeguardsMigration.slice(
     bootstrapSafeguardsMigration.indexOf(
       "create or replace function public.check_super_admin_bootstrap_readiness()",
