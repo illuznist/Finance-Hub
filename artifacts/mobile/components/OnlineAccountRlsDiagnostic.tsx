@@ -6,27 +6,25 @@ import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
 import { supabaseClient } from "@/lib/supabase";
 import { TYPOGRAPHY } from "@/constants/typography";
+import {
+  classifyProtectedMetadataResponse,
+  type ProtectedMetadataOutcome,
+} from "@/security/rlsProbeResult";
 
 type RoleOutcome = "passed" | "unexpected" | "unavailable";
-type MetadataOutcome = "blocked" | "accessible" | "unavailable";
 
 type DiagnosticResult = {
   ownRole: RoleOutcome;
   otherRole: RoleOutcome;
   protectedMetadata: {
-    grants: MetadataOutcome;
-    purchaseLinks: MetadataOutcome;
-    auditLogs: MetadataOutcome;
-    webhookInbox: MetadataOutcome;
+    grants: ProtectedMetadataOutcome;
+    purchaseLinks: ProtectedMetadataOutcome;
+    auditLogs: ProtectedMetadataOutcome;
+    webhookInbox: ProtectedMetadataOutcome;
   };
 };
 
 const USER_ID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-
-function summarizeMetadataProbe(error: { code?: string } | null): MetadataOutcome {
-  if (!error) return "accessible";
-  return error.code === "42501" ? "blocked" : "unavailable";
-}
 
 export function OnlineAccountRlsDiagnostic() {
   const colors = useColors();
@@ -59,29 +57,29 @@ export function OnlineAccountRlsDiagnostic() {
       const [ownRole, otherRole, grants, purchaseLinks, auditLogs, webhookInbox] = await Promise.all([
         client.from("user_roles").select("role").eq("user_id", currentUserId),
         client.from("user_roles").select("role").eq("user_id", comparisonUserId),
-        client.from("promotional_grants").select("id", { head: true }).limit(0),
-        client.from("revenuecat_identity_links").select("id", { head: true }).limit(0),
-        client.from("admin_audit_logs").select("id", { head: true }).limit(0),
-        client.from("webhook_inbox").select("event_id", { head: true }).limit(0),
+        client.from("promotional_grants").select("id").limit(1),
+        client.from("revenuecat_identity_links").select("id").limit(1),
+        client.from("admin_audit_logs").select("id").limit(1),
+        client.from("webhook_inbox").select("event_id").limit(1),
       ]);
 
       const ownRoles = ownRole.data?.map((row) => row.role) ?? [];
+      const signedInUserConfirmed =
+        !ownRole.error && ownRoles.length === 1 && ownRoles[0] === "USER";
       setResult({
         ownRole: ownRole.error
           ? "unavailable"
-          : ownRoles.length === 1 && ownRoles[0] === "USER"
-            ? "passed"
-            : "unexpected",
+          : signedInUserConfirmed ? "passed" : "unexpected",
         otherRole: otherRole.error
           ? "unavailable"
           : otherRole.data?.length === 0
             ? "passed"
             : "unexpected",
         protectedMetadata: {
-          grants: summarizeMetadataProbe(grants.error),
-          purchaseLinks: summarizeMetadataProbe(purchaseLinks.error),
-          auditLogs: summarizeMetadataProbe(auditLogs.error),
-          webhookInbox: summarizeMetadataProbe(webhookInbox.error),
+          grants: classifyProtectedMetadataResponse(grants, signedInUserConfirmed),
+          purchaseLinks: classifyProtectedMetadataResponse(purchaseLinks, signedInUserConfirmed),
+          auditLogs: classifyProtectedMetadataResponse(auditLogs, signedInUserConfirmed),
+          webhookInbox: classifyProtectedMetadataResponse(webhookInbox, signedInUserConfirmed),
         },
       });
     } catch {
@@ -93,14 +91,30 @@ export function OnlineAccountRlsDiagnostic() {
 
   const resultLabel = (outcome: RoleOutcome) =>
     t(outcome === "passed" ? "Passed" : outcome === "unexpected" ? "Unexpected access" : "Could not verify");
-  const metadataLabel = (outcome: MetadataOutcome) =>
-    t(outcome === "blocked" ? "Blocked" : outcome === "accessible" ? "Access not blocked" : "Could not verify");
+  const metadataLabel = (outcome: ProtectedMetadataOutcome) => {
+    switch (outcome) {
+      case "blocked":
+        return t("Blocked");
+      case "empty":
+        return t("No visible rows; not proof of blocking");
+      case "unexpected-access":
+        return t("Unexpected access");
+      case "missing-schema":
+        return t("Table or schema missing");
+      case "authentication-failed":
+        return t("Authentication/session failed");
+      case "network-failed":
+        return t("Network unavailable");
+      default:
+        return t("Could not verify");
+    }
+  };
 
   return (
     <View style={[styles.panel, { backgroundColor: colors.input, borderColor: colors.border }]}>
       <Text style={[styles.title, { color: colors.foreground }]}>{t("Development-only RLS check")}</Text>
       <Text style={[styles.body, { color: colors.mutedForeground }]}>
-        {t("Runs read-only checks only after you tap. IDs are masked and are not saved or logged.")}
+        {t("Tap for read-only checks. The account ID is masked; at most one metadata ID per table is checked and discarded. Nothing is saved or logged.")}
       </Text>
       <TextInput
         accessibilityLabel={t("Other ordinary account ID")}
