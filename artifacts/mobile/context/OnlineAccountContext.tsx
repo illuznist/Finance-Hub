@@ -15,6 +15,7 @@ import {
   onlineAccountConfigurationError,
   supabaseClient,
 } from "@/lib/supabase";
+import type { AuthCallbackOutcome } from "@/security/emailVerificationFlow";
 import { createSingleUseAuthCodeExchange } from "@/security/singleUseAuthCodeExchange";
 
 type OnlineAccountContextValue = {
@@ -29,7 +30,7 @@ type OnlineAccountContextValue = {
   signOut: () => Promise<void>;
   sendPasswordRecovery: (email: string) => Promise<void>;
   completePasswordRecovery: (password: string) => Promise<void>;
-  handleAuthCallback: (code: string) => Promise<boolean>;
+  handleAuthCallback: (code: string) => Promise<AuthCallbackOutcome>;
   needsPasswordRecovery: boolean;
   clearPasswordRecovery: () => void;
   setBusy: (busy: boolean) => void;
@@ -47,19 +48,23 @@ export function OnlineAccountProvider({ children }: { children: React.ReactNode 
   const [loading, setLoading] = useState(onlineAccountConfigured);
   const [busy, setBusy] = useState(false);
   const [needsPasswordRecovery, setNeedsPasswordRecovery] = useState(false);
-  const authCodeExchange = useRef<((code: string) => Promise<boolean>) | null>(null);
+  const authCodeExchange = useRef<((code: string) => Promise<AuthCallbackOutcome>) | null>(null);
+  const lastAuthCallback = useRef<{ code: string; promise: Promise<AuthCallbackOutcome> } | null>(null);
 
   if (!authCodeExchange.current) {
     authCodeExchange.current = createSingleUseAuthCodeExchange(async (code) => {
-      if (!supabaseClient) return false;
+      if (!supabaseClient) throw new Error("Online accounts are not configured.");
       const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
       if (error) throw error;
       setSession(data.session);
       // auth-js returns redirectType at runtime after code exchange, though
       // its current public AuthTokenResponse type omits that field.
       const redirectType = (data as typeof data & { redirectType?: string }).redirectType;
-      if (redirectType === "recovery") setNeedsPasswordRecovery(true);
-      return true;
+      if (redirectType === "recovery") {
+        setNeedsPasswordRecovery(true);
+        return "recovery";
+      }
+      return "confirmed";
     });
   }
 
@@ -132,8 +137,11 @@ export function OnlineAccountProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const handleAuthCallback = useCallback((code: string) => {
-    if (!supabaseClient) return Promise.resolve(false);
-    return authCodeExchange.current!(code);
+    if (!supabaseClient) return Promise.reject(new Error("Online accounts are not configured."));
+    if (lastAuthCallback.current?.code === code) return lastAuthCallback.current.promise;
+    const promise = authCodeExchange.current!(code);
+    lastAuthCallback.current = { code, promise };
+    return promise;
   }, []);
 
   const value = useMemo<OnlineAccountContextValue>(() => ({

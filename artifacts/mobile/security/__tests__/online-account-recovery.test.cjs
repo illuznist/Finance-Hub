@@ -7,6 +7,10 @@ const {
   classifyRecoveryLinkError,
 } = require("../onlineAuthError.ts");
 const { createSingleUseAuthCodeExchange } = require("../singleUseAuthCodeExchange.ts");
+const {
+  continueAfterEmailVerification,
+  resolveEmailVerificationScreenStatus,
+} = require("../emailVerificationFlow.ts");
 
 const mobileRoot = path.resolve(__dirname, "../..");
 const read = relativePath => fs.readFileSync(path.join(mobileRoot, relativePath), "utf8");
@@ -89,7 +93,8 @@ test("password recovery uses the allowlisted Expo callback and PKCE recovery eve
   assert.match(callback, /testID="online-recovery-password-confirm"/);
   assert.match(callback, /urlCode/);
   assert.match(callback, /classifyRecoveryLinkError/);
-  assert.match(callback, /handledCode\.current === callbackCode/);
+  assert.match(callback, /callbackAttempt\.current/);
+  assert.match(callback, /attempt\.promise/);
   assert.match(callback, /Password updated successfully\./);
   assert.doesNotMatch(settingsSource(), /console\.(?:log|warn|error)\([^)]*(?:password|token|recovery)/i);
 });
@@ -114,6 +119,66 @@ test("password recovery email rate limits use email-specific guidance", () => {
   const settings = read("components/OnlineAccountSettings.tsx");
   assert.match(settings, /category === "rate-limit" && mode === "recovery"/);
   assert.match(settings, /Too many password recovery emails were requested/);
+});
+
+test("a session-refresh failure cannot downgrade a completed email-link confirmation", () => {
+  assert.equal(resolveEmailVerificationScreenStatus("confirmed", false), "confirmed");
+  const callback = read("app/auth/callback.tsx");
+  const context = read("context/OnlineAccountContext.tsx");
+  assert.match(callback, /setCallbackOutcome\(outcome\)/);
+  assert.match(context, /getSession\(\)[\s\S]*?\.catch\(\(\) => \{\s*if \(active\) setSession\(null\)/);
+});
+
+test("an already-verified session reaches a terminal state without a callback code", () => {
+  assert.equal(resolveEmailVerificationScreenStatus(null, true), "already-verified");
+  assert.equal(resolveEmailVerificationScreenStatus(null, false), "setup");
+});
+
+test("actual email-verification failures remain distinct from successful confirmation", () => {
+  assert.equal(resolveEmailVerificationScreenStatus("failed", false), "failed");
+  const callback = read("app/auth/callback.tsx");
+  assert.match(callback, /setCallbackOutcome\("failed"\)/);
+  assert.match(callback, /verificationErrorMessage/);
+});
+
+test("navigation failure does not change confirmed verification state", async () => {
+  const result = await continueAfterEmailVerification("confirmed", async () => {
+    throw new Error("navigation failed");
+  });
+  assert.deepEqual(result, { status: "confirmed", navigationFailed: true });
+  assert.equal(resolveEmailVerificationScreenStatus(result.status, false), "confirmed");
+});
+
+test("duplicate deep-link deliveries reuse one callback attempt and do not strand loading state", () => {
+  const callback = read("app/auth/callback.tsx");
+  const context = read("context/OnlineAccountContext.tsx");
+  assert.match(callback, /callbackAttempt\.current/);
+  assert.match(callback, /attempt\.promise/);
+  assert.match(context, /lastAuthCallback\.current\?\.code === code/);
+  assert.doesNotMatch(callback, /\[url, code, callbackCode/);
+  assert.match(callback, /finally\(\(\) => \{\s*if \(active\) setCallbackProcessing\(false\)/);
+});
+
+test("email verification continues to share the callback route without changing recovery handling", () => {
+  const context = read("context/OnlineAccountContext.tsx");
+  const callback = read("app/auth/callback.tsx");
+  assert.match(context, /redirectType === "recovery"/);
+  assert.match(context, /return "confirmed"/);
+  assert.match(callback, /online\.needsPasswordRecovery \|\| callbackOutcome === "recovery"/);
+  assert.match(callback, /continueAfterEmailVerification/);
+});
+
+test("email verification terminal states and navigation recovery are localized", () => {
+  const localization = read("i18n/localization.ts");
+  for (const phrase of [
+    "Email verified successfully.",
+    "This online account is already verified.",
+    "This email verification link could not be confirmed. If your account is already verified, continue to Settings; otherwise open the latest confirmation email.",
+    "Continue to Settings",
+    "Email verification status is unchanged, but Settings could not be opened. Use Back or tap Continue to try again.",
+  ]) {
+    assert.ok(localization.includes(`"${phrase}":`), phrase);
+  }
 });
 
 function settingsSource() {

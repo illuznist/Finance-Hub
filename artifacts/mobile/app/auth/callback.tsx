@@ -15,6 +15,11 @@ import {
   classifyRecoveryLinkError,
   type OnlineAuthErrorCategory,
 } from "@/security/onlineAuthError";
+import {
+  continueAfterEmailVerification,
+  resolveEmailVerificationScreenStatus,
+  type AuthCallbackOutcome,
+} from "@/security/emailVerificationFlow";
 import { updatePasswordWithCleanup } from "@/security/passwordRecoveryUpdate";
 
 function firstQueryString(value: string | string[] | undefined): string | null {
@@ -37,6 +42,21 @@ function recoveryErrorMessage(category: ReturnType<typeof classifyRecoveryLinkEr
   }
 }
 
+function verificationErrorMessage(category: ReturnType<typeof classifyRecoveryLinkError>): string {
+  switch (category) {
+    case "expired-or-used":
+      return "This email verification link has expired or was already used. Open the latest confirmation email. If your account is already verified, continue to Settings.";
+    case "missing-verifier":
+      return "This verification link has no matching Expo Go session. Open it on the same iPhone in the same Expo Go app where you created the account.";
+    case "rate-limit":
+      return "Supabase temporarily limited email verification. Wait a few minutes before opening the latest confirmation link again.";
+    case "network":
+      return "Email verification could not be completed because the connection failed. Check your connection, then open the latest confirmation link.";
+    default:
+      return "This email verification link could not be confirmed. If your account is already verified, continue to Settings; otherwise open the latest confirmation email.";
+  }
+}
+
 function passwordUpdateMessageKey(category: OnlineAuthErrorCategory): string {
   if (category === "rate-limit") {
     return "Supabase rate-limited this password update. Wait, then try signing in with the new password before requesting another recovery email.";
@@ -55,9 +75,11 @@ export default function OnlineAuthCallbackScreen() {
   const params = useLocalSearchParams<{ code?: string | string[] }>();
   const online = useOnlineAccount();
   const { t, isRTL } = usePreferences();
-  const [callbackDone, setCallbackDone] = useState(false);
+  const [callbackOutcome, setCallbackOutcome] = useState<AuthCallbackOutcome | "failed" | null>(null);
   const [callbackErrorKey, setCallbackErrorKey] = useState<string | null>(null);
   const [callbackProcessing, setCallbackProcessing] = useState(false);
+  const [navigationErrorKey, setNavigationErrorKey] = useState<string | null>(null);
+  const [continuing, setContinuing] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -67,58 +89,82 @@ export default function OnlineAuthCallbackScreen() {
   const [passwordUpdated, setPasswordUpdated] = useState(false);
   const [returningToSignIn, setReturningToSignIn] = useState(false);
   const [returnToSignInError, setReturnToSignInError] = useState<string | null>(null);
-  const handledCode = useRef<string | null>(null);
+  const callbackAttempt = useRef<{
+    code: string;
+    promise: Promise<AuthCallbackOutcome>;
+    isRecovery: boolean;
+  } | null>(null);
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
   const urlParams = url ? Linking.parse(url).queryParams : null;
   const urlCode = firstQueryString(urlParams?.code);
   const callbackCode = code ?? urlCode;
   const linkErrorCode = firstQueryString(urlParams?.error_code) ?? firstQueryString(urlParams?.error);
   const linkErrorDescription = firstQueryString(urlParams?.error_description);
+  const isRecoveryLink = firstQueryString(urlParams?.type) === "recovery";
+  const hasCallbackUrl = Boolean(url);
+  const effectiveCallbackCode =
+    callbackCode ?? (!hasCallbackUrl ? callbackAttempt.current?.code ?? null : null);
 
   useEffect(() => {
     if (!online.configured) {
+      setCallbackOutcome("failed");
       setCallbackErrorKey("Online accounts are not configured yet.");
       setCallbackProcessing(false);
       return;
     }
-    if (!url && !code) return;
-    if (!callbackCode) {
+    if (!hasCallbackUrl && !effectiveCallbackCode) return;
+    if (!effectiveCallbackCode) {
       setCallbackErrorKey(
         linkErrorCode || linkErrorDescription
-          ? recoveryErrorMessage(classifyRecoveryLinkError({
+          ? (isRecoveryLink ? recoveryErrorMessage : verificationErrorMessage)(classifyRecoveryLinkError({
               code: linkErrorCode ?? undefined,
               message: linkErrorDescription ?? undefined,
             }))
-          : "This recovery link did not include a code. Open the latest email link in Expo Go. If this continues, check the Supabase recovery email template.",
+          : isRecoveryLink
+            ? "This recovery link did not include a code. Open the latest email link in Expo Go. If this continues, check the Supabase recovery email template."
+            : "This account link did not include a code. Open the latest email link in Expo Go. If this continues, check the Supabase email template.",
       );
+      setCallbackOutcome("failed");
       setCallbackProcessing(false);
       return;
     }
-    if (handledCode.current === callbackCode) return;
-    handledCode.current = callbackCode;
 
     let active = true;
-    setCallbackErrorKey(null);
-    setCallbackProcessing(true);
-    void online.handleAuthCallback(callbackCode)
-      .then((handled) => {
+    let attempt = callbackAttempt.current;
+    if (attempt?.code !== effectiveCallbackCode) {
+      attempt = {
+        code: effectiveCallbackCode,
+        promise: online.handleAuthCallback(effectiveCallbackCode),
+        isRecovery: isRecoveryLink,
+      };
+      callbackAttempt.current = attempt;
+      setCallbackOutcome(null);
+      setCallbackErrorKey(null);
+      setNavigationErrorKey(null);
+      setCallbackProcessing(true);
+    }
+    void attempt.promise
+      .then((outcome) => {
         if (active) {
-          setCallbackDone(handled);
-          setCallbackErrorKey(
-            handled
-              ? null
-              : "This recovery link did not include a code. Open the latest email link in Expo Go. If this continues, check the Supabase recovery email template.",
-          );
+          setCallbackOutcome(outcome);
+          setCallbackErrorKey(null);
         }
       })
       .catch((callbackError) => {
-        if (active) setCallbackErrorKey(recoveryErrorMessage(classifyRecoveryLinkError(callbackError)));
+        if (active) {
+          setCallbackOutcome("failed");
+          setCallbackErrorKey(
+            (attempt.isRecovery ? recoveryErrorMessage : verificationErrorMessage)(
+              classifyRecoveryLinkError(callbackError),
+            ),
+          );
+        }
       })
       .finally(() => {
         if (active) setCallbackProcessing(false);
       });
     return () => { active = false; };
-  }, [url, code, callbackCode, linkErrorCode, linkErrorDescription, online.configured, online.handleAuthCallback]);
+  }, [effectiveCallbackCode, hasCallbackUrl, linkErrorCode, linkErrorDescription, isRecoveryLink, online.configured, online.handleAuthCallback]);
 
   async function saveNewPassword() {
     setPasswordError(null);
@@ -181,6 +227,23 @@ export default function OnlineAuthCallbackScreen() {
     }
   }
 
+  const verificationStatus = resolveEmailVerificationScreenStatus(callbackOutcome, online.isVerified);
+
+  async function continueToSettings() {
+    setNavigationErrorKey(null);
+    setContinuing(true);
+    const result = await continueAfterEmailVerification(
+      verificationStatus,
+      () => router.replace("/settings"),
+    );
+    if (result.navigationFailed) {
+      setNavigationErrorKey(
+        "Email verification status is unchanged, but Settings could not be opened. Use Back or tap Continue to try again.",
+      );
+    }
+    setContinuing(false);
+  }
+
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -241,7 +304,7 @@ export default function OnlineAuthCallbackScreen() {
               </Pressable>
             ) : null}
           </View>
-        ) : online.needsPasswordRecovery ? (
+        ) : online.needsPasswordRecovery || callbackOutcome === "recovery" ? (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.title, { color: colors.foreground }]}>{t("Set a new password")}</Text>
             <TextInput
@@ -316,28 +379,61 @@ export default function OnlineAuthCallbackScreen() {
               <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{t(saving ? "Saving…" : "Update password")}</Text>
             </Pressable>
           </View>
-        ) : callbackProcessing ? (
+        ) : callbackProcessing || (!callbackCode && online.loading) ? (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, alignItems: "center" }]}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.title, { color: colors.foreground }]}>{t("Verifying recovery link…")}</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              {t(callbackProcessing ? "Verifying account link…" : "Checking online account…")}
+            </Text>
           </View>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={callbackErrorKey ? "alert-circle" : "check-circle"} size={24} color={callbackErrorKey ? colors.warning : colors.success} />
+            <Feather
+              name={verificationStatus === "failed" ? "alert-circle" : "check-circle"}
+              size={24}
+              color={verificationStatus === "failed" ? colors.warning : colors.success}
+            />
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>
-              {callbackErrorKey
-                ? t("This account link could not be completed.")
-                : callbackDone || online.user
-                  ? t("Online account confirmed.")
-                  : t("Complete your online account setup")}
+              {t(
+                verificationStatus === "confirmed"
+                  ? "Email verified successfully."
+                  : verificationStatus === "already-verified"
+                    ? "This online account is already verified."
+                    : verificationStatus === "failed"
+                      ? "This account link could not be completed."
+                      : "Complete your online account setup",
+              )}
             </Text>
             <Text style={[styles.note, { color: colors.mutedForeground }]}>
               {callbackErrorKey
                 ? t(callbackErrorKey)
-                : t("Your online account is separate from your local Finance Hub profile and financial records.")}
+                : verificationStatus === "confirmed" || verificationStatus === "already-verified"
+                  ? t("Your online account is verified. Your local financial records remain on this device.")
+                  : t("Your online account is separate from your local Finance Hub profile and financial records.")}
             </Text>
-            <Pressable testID="online-callback-done" onPress={() => router.replace("/settings")} style={[styles.button, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{t("Return to Settings")}</Text>
+            {navigationErrorKey ? (
+              <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
+                {t(navigationErrorKey)}
+              </Text>
+            ) : null}
+            <Pressable
+              testID="online-callback-done"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: continuing, busy: continuing }}
+              onPress={() => void continueToSettings()}
+              disabled={continuing}
+              style={[styles.button, { backgroundColor: colors.primary, opacity: continuing ? 0.65 : 1, flexDirection: "row", gap: 8 }]}
+            >
+              {continuing ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
+              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>
+                {t(
+                  continuing
+                    ? "Please wait…"
+                    : verificationStatus === "confirmed" || verificationStatus === "already-verified"
+                      ? "Continue to Settings"
+                      : "Return to Settings",
+                )}
+              </Text>
             </Pressable>
           </View>
         )}
