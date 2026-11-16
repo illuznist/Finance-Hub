@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import * as Linking from "expo-linking";
@@ -14,6 +15,7 @@ import {
   onlineAccountConfigurationError,
   supabaseClient,
 } from "@/lib/supabase";
+import { createSingleUseAuthCodeExchange } from "@/security/singleUseAuthCodeExchange";
 
 type OnlineAccountContextValue = {
   configured: boolean;
@@ -27,7 +29,7 @@ type OnlineAccountContextValue = {
   signOut: () => Promise<void>;
   sendPasswordRecovery: (email: string) => Promise<void>;
   completePasswordRecovery: (password: string) => Promise<void>;
-  handleAuthCallback: (url: string) => Promise<boolean>;
+  handleAuthCallback: (code: string) => Promise<boolean>;
   needsPasswordRecovery: boolean;
   clearPasswordRecovery: () => void;
   setBusy: (busy: boolean) => void;
@@ -45,6 +47,21 @@ export function OnlineAccountProvider({ children }: { children: React.ReactNode 
   const [loading, setLoading] = useState(onlineAccountConfigured);
   const [busy, setBusy] = useState(false);
   const [needsPasswordRecovery, setNeedsPasswordRecovery] = useState(false);
+  const authCodeExchange = useRef<((code: string) => Promise<boolean>) | null>(null);
+
+  if (!authCodeExchange.current) {
+    authCodeExchange.current = createSingleUseAuthCodeExchange(async (code) => {
+      if (!supabaseClient) return false;
+      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+      setSession(data.session);
+      // auth-js returns redirectType at runtime after code exchange, though
+      // its current public AuthTokenResponse type omits that field.
+      const redirectType = (data as typeof data & { redirectType?: string }).redirectType;
+      if (redirectType === "recovery") setNeedsPasswordRecovery(true);
+      return true;
+    });
+  }
 
   useEffect(() => {
     if (!supabaseClient) {
@@ -115,15 +132,9 @@ export function OnlineAccountProvider({ children }: { children: React.ReactNode 
     setNeedsPasswordRecovery(false);
   }, []);
 
-  const handleAuthCallback = useCallback(async (url: string) => {
-    if (!supabaseClient) return false;
-    const parsed = Linking.parse(url);
-    const code = typeof parsed.queryParams?.code === "string" ? parsed.queryParams.code : null;
-    if (!code) return false;
-    const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
-    if (error) throw error;
-    setSession(data.session);
-    return true;
+  const handleAuthCallback = useCallback((code: string) => {
+    if (!supabaseClient) return Promise.resolve(false);
+    return authCodeExchange.current!(code);
   }, []);
 
   const value = useMemo<OnlineAccountContextValue>(() => ({

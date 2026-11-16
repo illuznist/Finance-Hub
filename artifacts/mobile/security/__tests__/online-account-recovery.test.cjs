@@ -77,7 +77,7 @@ test("password recovery uses the allowlisted Expo callback and PKCE recovery eve
   assert.match(context, /resetPasswordForEmail\([\s\S]*?redirectTo:\s*getRedirectUrl\(\)/);
   assert.match(context, /event === "PASSWORD_RECOVERY"/);
   assert.match(context, /exchangeCodeForSession\(code\)/);
-  assert.match(context, /data\.redirectType === "recovery"/);
+  assert.match(context, /redirectType === "recovery"/);
   assert.match(context, /createSingleUseAuthCodeExchange/);
   assert.match(supabase, /detectSessionInUrl:\s*false/);
   assert.match(context, /updateUser\(\{ password \}\)/);
