@@ -158,8 +158,8 @@ export function OnlineAccountSettings() {
         </View>
       ) : online.user ? (
         <>
-          <OnlineAccountSecuritySection />
           {__DEV__ ? <DevelopmentAssuranceCheck /> : null}
+          <OnlineAccountSecuritySection deferChallenge={__DEV__} />
           <ActionButton
             testID="online-account-recovery"
             label={t("Send password recovery email")}

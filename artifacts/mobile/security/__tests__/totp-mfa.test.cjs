@@ -49,7 +49,7 @@ test("online account MFA uses Supabase verification, enforces AAL2, and never lo
   assert.match(mfa, /auth\.mfa\.unenroll/);
   assert.match(mfa, /currentLevel !== "aal2"/);
   assert.match(mfa, /kind: "confirm-removal"/);
-  assert.match(settings, /<OnlineAccountSecuritySection\s*\/>/);
+  assert.match(settings, /<OnlineAccountSecuritySection deferChallenge=\{__DEV__\}\s*\/>/);
   assert.match(mfa, /SvgXml xml=\{operation\.draft\.qrCode\}/);
   assert.doesNotMatch(mfa, /console\.(?:log|warn|error)/i);
   assert.doesNotMatch(mfa, /\b(?:AsyncStorage|SecureStore|localStorage)\b/);
@@ -67,6 +67,7 @@ test("enrollment and factor removal are explicit user actions, never startup aut
 
 test("the development assurance diagnostic is opt-in and exposes only current/next levels", () => {
   const settings = read("components/OnlineAccountSettings.tsx");
+  const mfa = read("components/OnlineAccountMfa.tsx");
   const start = settings.indexOf("function DevelopmentAssuranceCheck()");
   const end = settings.indexOf("function PrimaryButton(", start);
   const diagnostic = settings.slice(start, end);
@@ -80,6 +81,8 @@ test("the development assurance diagnostic is opt-in and exposes only current/ne
   assert.match(diagnostic, /levels\.nextLevel/);
   assert.doesNotMatch(diagnostic, /useEffect|challenge\(|unenroll\(|signOut\(|refreshSession|admin|access_token|refresh_token|user\.id|console\./i);
   assert.doesNotMatch(diagnostic, /currentAuthenticationMethods/);
+  assert.match(mfa, /if \(deferChallenge\) \{[\s\S]*?setGate\("challenge-required"\);[\s\S]*?return;\s*\}\s*const \{ data: challenge/);
+  assert.match(mfa, /testID="online-mfa-start-deferred-challenge"/);
 });
 
 test("admin authorization remains server-enforced and unchanged by the mobile MFA flow", () => {

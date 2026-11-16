@@ -22,13 +22,13 @@ type MfaFactor = {
   friendly_name?: string;
 };
 
-type GateState = "checking" | "ready" | "choose-factor" | "challenge" | "stale" | "unsupported" | "error";
+type GateState = "checking" | "ready" | "choose-factor" | "challenge" | "challenge-required" | "stale" | "unsupported" | "error";
 type LoginChallenge = { factorId: string; challengeId: string };
 type SetupDraft = { factorId: string; challengeId: string; secret: string; qrCode: string };
 
 const MFA_REQUEST_FAILED = Symbol("mfa-request-failed");
 
-export function OnlineAccountSecuritySection() {
+export function OnlineAccountSecuritySection({ deferChallenge = false }: { deferChallenge?: boolean }) {
   const colors = useColors();
   const { t, isRTL } = usePreferences();
   const online = useOnlineAccount();
@@ -36,6 +36,7 @@ export function OnlineAccountSecuritySection() {
   const [gate, setGate] = useState<GateState>("checking");
   const [factors, setFactors] = useState<MfaFactor[]>([]);
   const [loginChallenge, setLoginChallenge] = useState<LoginChallenge | null>(null);
+  const [deferredFactorId, setDeferredFactorId] = useState<string | null>(null);
   const [factorListUnavailable, setFactorListUnavailable] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -55,6 +56,7 @@ export function OnlineAccountSecuritySection() {
     const requestId = ++assessmentId.current;
     setGate("checking");
     setLoginChallenge(null);
+    setDeferredFactorId(null);
     setCode("");
     setErrorKey(null);
     setFactorListUnavailable(false);
@@ -112,6 +114,12 @@ export function OnlineAccountSecuritySection() {
         return;
       }
 
+      if (deferChallenge) {
+        setDeferredFactorId(verifiedTotpFactors[0].id);
+        setGate("challenge-required");
+        return;
+      }
+
       const { data: challenge, error: challengeError } = await client.auth.mfa.challenge({
         factorId: verifiedTotpFactors[0].id,
       });
@@ -124,7 +132,7 @@ export function OnlineAccountSecuritySection() {
       setGate("error");
       setErrorKey("Could not check MFA. Check your connection and Supabase MFA settings, then retry.");
     }
-  }, [userId]);
+  }, [deferChallenge, userId]);
 
   useEffect(() => {
     void assessMfa();
@@ -201,6 +209,22 @@ export function OnlineAccountSecuritySection() {
           colors={colors}
           loading
         />
+      ) : gate === "challenge-required" ? (
+        <View style={[styles.gateCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
+          <GateHeading title={t("Two-step verification required")} colors={colors} />
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>
+            {t("Your session needs verification before authenticator management.")}
+          </Text>
+          <MfaButton
+            testID="online-mfa-start-deferred-challenge"
+            label={t("Start two-step verification")}
+            onPress={() => {
+              if (deferredFactorId) void startLoginChallenge(deferredFactorId);
+            }}
+            disabled={busy || !deferredFactorId}
+            variant="primary"
+          />
+        </View>
       ) : gate === "challenge" ? (
         <View style={[styles.gateCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
           <GateHeading title={t("Two-step verification")} colors={colors} />

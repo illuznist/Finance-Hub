@@ -1782,6 +1782,9 @@ const ARABIC_TRANSLATIONS: Record<string, string> = {
   "Check current session": "فحص الجلسة الحالية",
   "Current and next assurance levels": "مستوى التحقق الحالي والتالي",
   "Assurance check unavailable.": "تعذّر فحص مستوى التحقق.",
+  "Two-step verification required": "يلزم التحقق بخطوتين",
+  "Your session needs verification before authenticator management.": "تحتاج جلستك إلى التحقق قبل إدارة تطبيقات المصادقة.",
+  "Start two-step verification": "بدء التحقق بخطوتين",
 };
 
 const ARABIC_DIGITS: Record<string, string> = {
