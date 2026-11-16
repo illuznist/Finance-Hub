@@ -11,6 +11,27 @@ import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
+import { classifyRecoveryLinkError } from "@/security/onlineAuthError";
+
+function firstQueryString(value: string | string[] | undefined): string | null {
+  if (typeof value === "string") return value;
+  return Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
+}
+
+function recoveryErrorMessage(category: ReturnType<typeof classifyRecoveryLinkError>): string {
+  switch (category) {
+    case "expired-or-used":
+      return "This recovery link has expired or was already used. Request a new email and open its latest link once.";
+    case "missing-verifier":
+      return "This recovery link has no matching Expo Go session. Request a new link and open it on the same iPhone in the same Expo Go app.";
+    case "rate-limit":
+      return "Supabase temporarily limited link verification. Wait a few minutes before requesting another recovery email.";
+    case "network":
+      return "The recovery link could not be verified because the connection failed. Check your connection; the link may already have been used.";
+    default:
+      return "This recovery link could not be verified. No password was changed. Wait a few minutes, then request a fresh link.";
+  }
+}
 
 export default function OnlineAuthCallbackScreen() {
   const colors = useColors();
@@ -21,38 +42,62 @@ export default function OnlineAuthCallbackScreen() {
   const online = useOnlineAccount();
   const { t, isRTL } = usePreferences();
   const [callbackDone, setCallbackDone] = useState(false);
-  const [callbackError, setCallbackError] = useState(false);
+  const [callbackErrorKey, setCallbackErrorKey] = useState<string | null>(null);
+  const [callbackProcessing, setCallbackProcessing] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
-  const handledUrl = useRef<string | null>(null);
-
   const code = Array.isArray(params.code) ? params.code[0] : params.code;
+  const urlParams = url ? Linking.parse(url).queryParams : null;
+  const urlCode = firstQueryString(urlParams?.code);
+  const callbackCode = code ?? urlCode;
+  const linkErrorCode = firstQueryString(urlParams?.error_code) ?? firstQueryString(urlParams?.error);
+  const linkErrorDescription = firstQueryString(urlParams?.error_description);
 
   useEffect(() => {
     if (!online.configured) {
-      setCallbackError(true);
+      setCallbackErrorKey("Online accounts are not configured yet.");
+      setCallbackProcessing(false);
       return;
     }
     if (!url && !code) return;
-    const callbackUrl = url ?? Linking.createURL("auth/callback", { queryParams: { code } });
-    if (handledUrl.current === callbackUrl) return;
-    handledUrl.current = callbackUrl;
+    if (!callbackCode) {
+      setCallbackErrorKey(
+        linkErrorCode || linkErrorDescription
+          ? recoveryErrorMessage(classifyRecoveryLinkError({
+              code: linkErrorCode ?? undefined,
+              message: linkErrorDescription ?? undefined,
+            }))
+          : "This recovery link did not include a code. Open the latest email link in Expo Go. If this continues, check the Supabase recovery email template.",
+      );
+      setCallbackProcessing(false);
+      return;
+    }
+
     let active = true;
-    void online.handleAuthCallback(callbackUrl)
+    setCallbackErrorKey(null);
+    setCallbackProcessing(true);
+    void online.handleAuthCallback(callbackCode)
       .then((handled) => {
         if (active) {
           setCallbackDone(handled);
-          setCallbackError(!handled);
+          setCallbackErrorKey(
+            handled
+              ? null
+              : "This recovery link did not include a code. Open the latest email link in Expo Go. If this continues, check the Supabase recovery email template.",
+          );
         }
       })
-      .catch(() => {
-        if (active) setCallbackError(true);
+      .catch((callbackError) => {
+        if (active) setCallbackErrorKey(recoveryErrorMessage(classifyRecoveryLinkError(callbackError)));
+      })
+      .finally(() => {
+        if (active) setCallbackProcessing(false);
       });
     return () => { active = false; };
-  }, [url, code, online.configured, online.handleAuthCallback]);
+  }, [url, code, callbackCode, linkErrorCode, linkErrorDescription, online.configured, online.handleAuthCallback]);
 
   async function saveNewPassword() {
     setPasswordError(null);
@@ -135,11 +180,16 @@ export default function OnlineAuthCallbackScreen() {
               <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{t(saving ? "Saving…" : "Update password")}</Text>
             </Pressable>
           </View>
+        ) : callbackProcessing ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, alignItems: "center" }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.title, { color: colors.foreground }]}>{t("Verifying recovery link…")}</Text>
+          </View>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={callbackError ? "alert-circle" : "check-circle"} size={24} color={callbackError ? colors.warning : colors.success} />
+            <Feather name={callbackErrorKey ? "alert-circle" : "check-circle"} size={24} color={callbackErrorKey ? colors.warning : colors.success} />
             <Text accessibilityRole="header" style={[styles.title, { color: colors.foreground }]}>
-              {callbackError
+              {callbackErrorKey
                 ? t("This account link could not be completed.")
                 : passwordUpdated
                   ? t("Password updated successfully.")
@@ -148,8 +198,8 @@ export default function OnlineAuthCallbackScreen() {
                   : t("Complete your online account setup")}
             </Text>
             <Text style={[styles.note, { color: colors.mutedForeground }]}>
-              {callbackError
-                ? t("Open the latest link from your email, or request another password recovery email.")
+              {callbackErrorKey
+                ? t(callbackErrorKey)
                 : passwordUpdated
                   ? t("Your online account password has been changed. Your local financial records are unchanged.")
                 : t("Your online account is separate from your local Finance Hub profile and financial records.")}
