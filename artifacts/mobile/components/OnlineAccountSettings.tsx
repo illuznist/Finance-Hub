@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { OnlineAccountSecuritySection } from "@/components/OnlineAccountMfa";
+import { OnlineAccountRlsDiagnostic } from "@/components/OnlineAccountRlsDiagnostic";
 import { useOnlineAccount } from "@/context/OnlineAccountContext";
 import { usePreferences } from "@/context/PreferencesContext";
 import { useColors } from "@/hooks/useColors";
@@ -157,6 +158,7 @@ export function OnlineAccountSettings() {
         </View>
       ) : online.user ? (
         <>
+          {__DEV__ ? <OnlineAccountRlsDiagnostic /> : null}
           <OnlineAccountSecuritySection />
           <ActionButton
             testID="online-account-recovery"
