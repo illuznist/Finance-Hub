@@ -206,7 +206,30 @@ test("bootstrap rejects effective column UPDATE or REFERENCES grants", async () 
   }
 });
 
-test("bootstrap rejects PUBLIC or inherited audit write grants", async () => {
+test("bootstrap rejects unexpected PUBLIC audit privileges", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ...readyBootstrap,
+      ready: false,
+      audit_privileges_ok: false,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap rejects unexpected inherited audit privileges", async () => {
   const { client, calls } = fakeClient(
     {
       id: userId,

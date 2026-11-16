@@ -10,6 +10,10 @@ const bootstrapSafeguardsMigration = readFileSync(
   new URL("../../../../supabase/migrations/20261116000000_super_admin_bootstrap_safeguards.sql", import.meta.url),
   "utf8",
 );
+const bootstrapReadinessAclFixMigration = readFileSync(
+  new URL("../../../../supabase/migrations/20261117000000_fix_super_admin_readiness_empty_column_acl.sql", import.meta.url),
+  "utf8",
+);
 
 test("Stage C migration contains only account metadata and enables RLS on every table", () => {
   const tableNames = [
@@ -154,5 +158,62 @@ test("follow-up bootstrap migration binds the confirmed target and avoids false 
   assert.doesNotMatch(
     bootstrapSafeguardsMigration,
     /grant all on table public\.admin_audit_logs to service_role/i,
+  );
+});
+
+test("readiness ACL fix treats NULL column ACLs as having no ACL entries", () => {
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /create or replace function public\.check_super_admin_bootstrap_readiness\(\)/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /when column_attribute\.attacl is null\s+or pg_catalog\.cardinality\(column_attribute\.attacl\) = 0\s+then false/i,
+  );
+});
+
+test("readiness ACL fix skips aclexplode for empty column ACL arrays", () => {
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /pg_catalog\.cardinality\(column_attribute\.attacl\) = 0\s+then false/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /else exists\s*\([\s\S]*?pg_catalog\.aclexplode\(column_attribute\.attacl\)/i,
+  );
+  assert.doesNotMatch(
+    bootstrapReadinessAclFixMigration,
+    /aclexplode\(\s*coalesce\(\s*column_attribute\.attacl/i,
+  );
+});
+
+test("readiness ACL fix preserves the fail-closed privilege checks", () => {
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /privilege\.privilege_type not in \('SELECT', 'INSERT'\)/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /when privilege\.grantee = 0 then true/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /column_privilege\.grantee = 0 then true[\s\S]*?pg_catalog\.pg_has_role\([\s\S]*?column_privilege\.grantee,[\s\S]*?'USAGE'/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /has_table_privilege\([\s\S]*?'MAINTAIN'/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /has_column_privilege\([\s\S]*?'UPDATE'/i,
+  );
+  assert.match(
+    bootstrapReadinessAclFixMigration,
+    /has_column_privilege\([\s\S]*?'REFERENCES'/i,
+  );
+  assert.doesNotMatch(
+    bootstrapReadinessAclFixMigration,
+    /create function public\.bootstrap_super_admin/i,
   );
 });
