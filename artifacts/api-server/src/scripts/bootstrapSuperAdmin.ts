@@ -11,11 +11,45 @@ export type BootstrapSuperAdminApproval = {
   explicitlyApproved: boolean;
 };
 
+type BootstrapReadiness = {
+  ready: true;
+  rpc_signature_ok: true;
+  rpc_security_ok: true;
+  single_super_admin_guard_ok: true;
+  audit_privileges_ok: true;
+};
+
 const SUPABASE_USER_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function hasReadyBootstrapSafeguards(value: unknown): value is BootstrapReadiness {
+  if (typeof value !== "object" || value === null) return false;
+  const readiness = value as Record<string, unknown>;
+  return readiness.ready === true
+    && readiness.rpc_signature_ok === true
+    && readiness.rpc_security_ok === true
+    && readiness.single_super_admin_guard_ok === true
+    && readiness.audit_privileges_ok === true;
+}
+
+export async function checkBootstrapReadiness(
+  client: SupabaseClient,
+): Promise<BootstrapReadiness> {
+  const { data, error } = await client.rpc("check_super_admin_bootstrap_readiness");
+  if (error || !hasReadyBootstrapSafeguards(data)) {
+    logger.error(
+      { event: "super_admin_bootstrap_readiness_failed" },
+      "Super Admin bootstrap safeguards are not ready",
+    );
+    throw new Error(
+      "Super Admin bootstrap safeguards are not ready; no owner lookup or promotion was attempted.",
+    );
+  }
+  return data;
 }
 
 export async function bootstrapSuperAdmin(
@@ -43,6 +77,8 @@ export async function bootstrapSuperAdmin(
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedExpectedEmail)) {
     throw new Error("The expected owner email must be configured privately.");
   }
+
+  await checkBootstrapReadiness(client);
 
   const { data: userResult, error: userError } =
     await client.auth.admin.getUserById(targetUserId);
@@ -74,6 +110,23 @@ export async function bootstrapSuperAdmin(
 }
 
 async function main() {
+  const args = process.argv.slice(2);
+  const readinessOnly = args.length === 1 && args[0] === "--check-readiness";
+  if (args.length > 0 && !readinessOnly) {
+    throw new Error("Unsupported bootstrap command option.");
+  }
+
+  const client = getSupabaseAdminClient();
+  if (!client) {
+    throw new Error("Supabase server configuration is unavailable.");
+  }
+
+  if (readinessOnly) {
+    await checkBootstrapReadiness(client);
+    console.info("Super Admin bootstrap readiness passed.");
+    return;
+  }
+
   const explicitlyApproved = process.env.BOOTSTRAP_SUPER_ADMIN_APPROVED === "YES";
   if (!explicitlyApproved) {
     throw new Error("Explicit target-bound owner approval is required.");
@@ -84,10 +137,6 @@ async function main() {
     process.env.BOOTSTRAP_SUPER_ADMIN_CONFIRM_USER_ID?.trim() ?? "";
   const expectedOwnerEmail =
     process.env.BOOTSTRAP_SUPER_ADMIN_EXPECTED_EMAIL?.trim() ?? "";
-  const client = getSupabaseAdminClient();
-  if (!client) {
-    throw new Error("Supabase server configuration is unavailable.");
-  }
   const result = await bootstrapSuperAdmin(client, {
     targetUserId,
     confirmedTargetUserId,

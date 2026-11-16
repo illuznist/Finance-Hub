@@ -27,9 +27,42 @@ No account has been promoted by this change. It makes no live Supabase requests.
 5. Do not put the owner's email, UUID, or Supabase secret in source code, chat,
    logs, or screenshots.
 
-## Approved execution procedure
+## Read-only migration readiness preflight
 
-Only after the migration and this procedure are separately approved:
+After the migration is separately approved and applied, run this preflight from
+the trusted API-server environment:
+
+```sh
+pnpm --filter @workspace/api-server run bootstrap:super-admin:check
+```
+
+This command requires only the trusted server Supabase URL and secret key. It
+does not require owner UUID/email/approval inputs, does not call Supabase Auth,
+and never calls the bootstrap RPC. It invokes only the service-role-protected
+`check_super_admin_bootstrap_readiness()` helper, which returns status booleans
+without exposing credentials or user data.
+
+The helper fails closed unless it confirms:
+
+- The exact three-argument bootstrap RPC exists, has the expected argument
+  names, is `SECURITY DEFINER` with an empty search path, and has the expected
+  target-confirmation, idempotency, single-owner, and audit behavior.
+- The old two-argument RPC is absent, and execute access is restricted to the
+  trusted server role.
+- The single-Super-Admin unique index exists and is valid.
+- The effective `service_role` privileges on `admin_audit_logs` are exactly
+  `SELECT` and `INSERT`, with no other table privileges.
+
+If the helper is missing, the signature is incompatible, or any check fails,
+the CLI stops before looking up the owner account. It does not call the
+bootstrap RPC. The regular bootstrap command repeats this check immediately
+before owner identity lookup, so an earlier successful preflight is not treated
+as permanent authorization.
+
+## Approved bootstrap procedure
+
+Only after the migration, a successful read-only preflight, and this procedure
+are separately approved:
 
 1. Supply these values through the trusted API-server environment using the
    workspace secrets flow; do not commit them:
@@ -46,12 +79,15 @@ Only after the migration and this procedure are separately approved:
    pnpm --filter @workspace/api-server run bootstrap:super-admin
    ```
 
-3. On success, expect `Super Admin bootstrap completed.` The database inserts
-   the `SUPER_ADMIN` role and a success audit row in one transaction. The audit
-   row leaves `actor_user_id` and `granted_by` null because the CLI has no
-   authenticated human actor; it records the service-role RPC source, target-bound
-   approval mode, approved target UUID, and operation ID. It does not claim the
-   target promoted itself.
+3. The command repeats the read-only readiness check, then confirms the exact
+   target UUID, normalized expected email, verified email status, and verified
+   TOTP factor before calling the bootstrap RPC. On success, expect
+   `Super Admin bootstrap completed.` The database inserts the `SUPER_ADMIN`
+   role and a success audit row in one transaction. The audit row leaves
+   `actor_user_id` and `granted_by` null because the CLI has no authenticated
+   human actor; it records the service-role RPC source, target-bound approval
+   mode, approved target UUID, and operation ID. It does not claim the target
+   promoted itself.
 4. Remove all one-time bootstrap inputs from the environment after the run.
 5. Separately verify the role and audit row with approved read-only checks.
    `/api/account/access` should report `isPro: true`,
@@ -67,9 +103,11 @@ Only after the migration and this procedure are separately approved:
   or a missing verified TOTP factor stops the CLI before the RPC.
 - A database error during role or audit insertion rolls back both inserts.
   Failure output is generic and does not print the target email, UUID, or keys.
-- Once the prepared migration is separately approved and applied, it will
-  revoke `UPDATE`, `DELETE`, and `TRUNCATE` on `admin_audit_logs` from
-  `service_role`; trusted server read and insert operations remain available.
+- The migration preserves existing audit rows and sets `service_role` table
+  privileges to exactly `SELECT` and `INSERT`. This supports existing admin
+  audit reads, ordinary and denied-access audit inserts, and the bootstrap
+  audit insert. It does not make rows immutable against the database owner or
+  other privileged administrative connections.
 
 ## Recovery if the wrong account is promoted
 

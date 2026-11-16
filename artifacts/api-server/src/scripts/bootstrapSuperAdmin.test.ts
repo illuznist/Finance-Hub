@@ -2,11 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { bootstrapSuperAdmin } from "./bootstrapSuperAdmin";
+import {
+  bootstrapSuperAdmin,
+  checkBootstrapReadiness,
+} from "./bootstrapSuperAdmin";
 
 const userId = "550e8400-e29b-41d4-a716-446655440000";
 const otherUserId = "550e8400-e29b-41d4-a716-446655440001";
 const expectedEmail = "owner@example.test";
+const readyBootstrap = {
+  ready: true,
+  rpc_signature_ok: true,
+  rpc_security_ok: true,
+  single_super_admin_guard_ok: true,
+  audit_privileges_ok: true,
+};
 const verifiedTotp = {
   id: "totp-factor-id",
   factor_type: "totp",
@@ -29,6 +39,8 @@ function fakeClient(
   user: Partial<User>,
   rpcResult: string = "created",
   rpcError: { message: string } | null = null,
+  readinessResult: unknown = readyBootstrap,
+  readinessError: { message: string } | null = null,
 ) {
   const calls: string[] = [];
   let rpcArgs: Record<string, unknown> | undefined;
@@ -43,6 +55,10 @@ function fakeClient(
       },
     },
     rpc: async (_functionName: string, args: Record<string, unknown>) => {
+      if (_functionName === "check_super_admin_bootstrap_readiness") {
+        calls.push("readiness-check");
+        return { data: readinessResult, error: readinessError };
+      }
       calls.push("bootstrap-rpc");
       rpcArgs = args;
       return { data: rpcResult, error: rpcError };
@@ -63,6 +79,80 @@ test("Super Admin bootstrap requires explicit approval before querying Supabase"
     /Explicit target-bound owner approval/,
   );
   assert.deepEqual(calls, []);
+});
+
+test("readiness-only preflight checks safeguards without owner lookup or bootstrap RPC", async () => {
+  const { client, calls } = fakeClient({});
+  assert.deepEqual(await checkBootstrapReadiness(client), readyBootstrap);
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap stops on a missing migration before looking up the owner", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    null,
+    { message: "readiness RPC is missing" },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready; no owner lookup or promotion was attempted/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap rejects an incompatible readiness RPC signature before owner lookup", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ready: false,
+      rpc_signature_ok: false,
+      rpc_security_ok: false,
+      single_super_admin_guard_ok: true,
+      audit_privileges_ok: true,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap rejects incorrect audit privileges before owner lookup", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ...readyBootstrap,
+      ready: false,
+      audit_privileges_ok: false,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
 });
 
 test("bootstrap rejects an invalid or mismatched target confirmation before querying Supabase", async () => {
@@ -94,7 +184,7 @@ test("bootstrap verifies the exact owner UUID, email, confirmation status, and v
     () => bootstrapSuperAdmin(mismatchedIdentity.client, approval()),
     /identity could not be verified/,
   );
-  assert.deepEqual(mismatchedIdentity.calls, ["verified-user"]);
+  assert.deepEqual(mismatchedIdentity.calls, ["readiness-check", "verified-user"]);
 
   const mismatchedEmail = fakeClient({
     id: userId,
@@ -106,7 +196,7 @@ test("bootstrap verifies the exact owner UUID, email, confirmation status, and v
     () => bootstrapSuperAdmin(mismatchedEmail.client, approval()),
     /does not match the privately approved owner identity/,
   );
-  assert.deepEqual(mismatchedEmail.calls, ["verified-user"]);
+  assert.deepEqual(mismatchedEmail.calls, ["readiness-check", "verified-user"]);
 
   const noVerifiedEmail = fakeClient({
     id: userId,
@@ -117,7 +207,7 @@ test("bootstrap verifies the exact owner UUID, email, confirmation status, and v
     () => bootstrapSuperAdmin(noVerifiedEmail.client, approval()),
     /email must be verified/,
   );
-  assert.deepEqual(noVerifiedEmail.calls, ["verified-user"]);
+  assert.deepEqual(noVerifiedEmail.calls, ["readiness-check", "verified-user"]);
 
   const verifiedPhoneOnly = {
     ...verifiedTotp,
@@ -133,7 +223,7 @@ test("bootstrap verifies the exact owner UUID, email, confirmation status, and v
     () => bootstrapSuperAdmin(noTotp.client, approval()),
     /verified TOTP factor/,
   );
-  assert.deepEqual(noTotp.calls, ["verified-user"]);
+  assert.deepEqual(noTotp.calls, ["readiness-check", "verified-user"]);
 
   const unverifiedTotp = { ...verifiedTotp, status: "unverified" } as NonNullable<User["factors"]>[number];
   const unverifiedFactor = fakeClient({
@@ -146,10 +236,10 @@ test("bootstrap verifies the exact owner UUID, email, confirmation status, and v
     () => bootstrapSuperAdmin(unverifiedFactor.client, approval()),
     /verified TOTP factor/,
   );
-  assert.deepEqual(unverifiedFactor.calls, ["verified-user"]);
+  assert.deepEqual(unverifiedFactor.calls, ["readiness-check", "verified-user"]);
 });
 
-test("bootstrap handles successful creation and a repeated idempotent run", async () => {
+test("bootstrap passes readiness before owner lookup and supports same-target idempotency", async () => {
   const verified = {
     id: userId,
     email: expectedEmail.toUpperCase(),
@@ -158,7 +248,7 @@ test("bootstrap handles successful creation and a repeated idempotent run", asyn
   };
   const created = fakeClient(verified, "created");
   assert.equal(await bootstrapSuperAdmin(created.client, approval()), "created");
-  assert.deepEqual(created.calls, ["verified-user", "bootstrap-rpc"]);
+  assert.deepEqual(created.calls, ["readiness-check", "verified-user", "bootstrap-rpc"]);
   assert.equal(created.rpcArgs?.target_user_id, userId);
   assert.equal(created.rpcArgs?.confirmed_target_user_id, userId);
   assert.match(String(created.rpcArgs?.operation_id), /^[0-9a-f-]{36}$/i);
@@ -169,7 +259,7 @@ test("bootstrap handles successful creation and a repeated idempotent run", asyn
 
   const repeated = fakeClient(verified, "already-configured");
   assert.equal(await bootstrapSuperAdmin(repeated.client, approval()), "already-configured");
-  assert.deepEqual(repeated.calls, ["verified-user", "bootstrap-rpc"]);
+  assert.deepEqual(repeated.calls, ["readiness-check", "verified-user", "bootstrap-rpc"]);
 });
 
 test("bootstrap RPC failures do not report success", async () => {
@@ -187,5 +277,5 @@ test("bootstrap RPC failures do not report success", async () => {
     () => bootstrapSuperAdmin(failed.client, approval()),
     /Super Admin bootstrap did not complete/,
   );
-  assert.deepEqual(failed.calls, ["verified-user", "bootstrap-rpc"]);
+  assert.deepEqual(failed.calls, ["readiness-check", "verified-user", "bootstrap-rpc"]);
 });

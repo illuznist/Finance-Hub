@@ -72,7 +72,11 @@ test("follow-up bootstrap migration binds the confirmed target and avoids false 
   assert.match(bootstrapSafeguardsMigration, /'approved_target_user_id',\s*target_user_id/i);
   assert.match(
     bootstrapSafeguardsMigration,
-    /revoke update, delete, truncate on table public\.admin_audit_logs\s+from service_role/i,
+    /revoke all privileges on table public\.admin_audit_logs from service_role/i,
+  );
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /grant select, insert on table public\.admin_audit_logs to service_role/i,
   );
   assert.match(
     bootstrapSafeguardsMigration,
@@ -81,5 +85,38 @@ test("follow-up bootstrap migration binds the confirmed target and avoids false 
   assert.doesNotMatch(
     bootstrapSafeguardsMigration,
     /grant execute on function public\.bootstrap_super_admin\(uuid, uuid, uuid\)\s+to authenticated/i,
+  );
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /create or replace function public\.check_super_admin_bootstrap_readiness\(\)\s+returns jsonb/i,
+  );
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /revoke all on function public\.check_super_admin_bootstrap_readiness\(\)\s+from public, anon, authenticated, service_role/i,
+  );
+  assert.match(
+    bootstrapSafeguardsMigration,
+    /grant execute on function public\.check_super_admin_bootstrap_readiness\(\)\s+to service_role/i,
+  );
+  assert.match(bootstrapSafeguardsMigration, /has_table_privilege/i);
+  for (const privilege of ["UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+    assert.match(
+      bootstrapSafeguardsMigration,
+      new RegExp(`has_table_privilege\\([\\s\\S]*'${privilege}'`, "i"),
+    );
+  }
+  assert.match(bootstrapSafeguardsMigration, /single_super_admin_guard_ok/i);
+  const readinessFunction = bootstrapSafeguardsMigration.slice(
+    bootstrapSafeguardsMigration.indexOf(
+      "create or replace function public.check_super_admin_bootstrap_readiness()",
+    ),
+  );
+  assert.doesNotMatch(
+    readinessFunction,
+    /\b(?:perform|select)\s+public\.bootstrap_super_admin\s*\(/i,
+  );
+  assert.doesNotMatch(
+    bootstrapSafeguardsMigration,
+    /grant all on table public\.admin_audit_logs to service_role/i,
   );
 });
