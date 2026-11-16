@@ -104,6 +104,8 @@ const ARABIC_TRANSLATIONS: Record<string, string> = {
   "Enter your account email to receive a secure password reset link.": "أدخل بريد حسابك لتلقي رابط آمن لإعادة تعيين كلمة المرور.",
   "Too many requests. Please wait a little and try again.": "عدد الطلبات كبير جدًا. انتظر قليلًا ثم حاول مرة أخرى.",
   "Too many password recovery emails were requested. Please wait before requesting another.": "تم طلب رسائل كثيرة لاستعادة كلمة المرور. انتظر قبل طلب رسالة أخرى.",
+  "Could not send password recovery email. Check your connection and try again.": "تعذّر إرسال رسالة استعادة كلمة المرور. تحقق من اتصالك وحاول مرة أخرى.",
+  "Could not request password recovery. Please try again.": "تعذّر طلب استعادة كلمة المرور. حاول مرة أخرى.",
   "Could not connect to the account service. Check your connection and try again.": "تعذر الاتصال بخدمة الحساب. تحقق من اتصالك وحاول مرة أخرى.",
   "This recovery link has expired or was already used. Request a new email and open its latest link once.": "انتهت صلاحية رابط الاستعادة أو سبق استخدامه. اطلب رسالة جديدة وافتح أحدث رابط مرة واحدة.",
   "This recovery link has no matching Expo Go session. Request a new link and open it on the same iPhone in the same Expo Go app.": "لا توجد جلسة Expo Go مطابقة لرابط الاستعادة. اطلب رابطًا جديدًا وافتحه على جهاز iPhone نفسه وفي تطبيق Expo Go نفسه.",

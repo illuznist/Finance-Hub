@@ -1,7 +1,7 @@
 import {
   classifyOnlineAuthError,
   type OnlineAuthErrorCategory,
-} from "./onlineAuthError";
+} from "./onlineAuthError.ts";
 
 export type PasswordRecoveryUpdateOutcome =
   | { status: "confirmed"; cleanupFailed: boolean }

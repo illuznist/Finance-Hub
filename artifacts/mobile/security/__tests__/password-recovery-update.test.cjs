@@ -2,14 +2,14 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { updatePasswordWithCleanup } = require("../passwordRecoveryUpdate.ts");
 
-test("confirmed password update stays confirmed if recovery cleanup fails", async () => {
+test("confirmed password update stays successful after a navigation or session-refresh failure", async () => {
   let updateCalls = 0;
   let confirmed = false;
 
   const result = await updatePasswordWithCleanup(
     async () => { updateCalls++; },
     () => { confirmed = true; },
-    async () => { throw new Error("recovery state cleanup failed"); },
+    async () => { throw new Error("post-update navigation or session-refresh failure"); },
   );
 
   assert.equal(updateCalls, 1);

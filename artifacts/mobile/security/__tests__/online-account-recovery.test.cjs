@@ -94,6 +94,28 @@ test("password recovery uses the allowlisted Expo callback and PKCE recovery eve
   assert.doesNotMatch(settingsSource(), /console\.(?:log|warn|error)\([^)]*(?:password|token|recovery)/i);
 });
 
+test("a confirmed password update cannot be changed into a failure by later cleanup or navigation", () => {
+  const context = read("context/OnlineAccountContext.tsx");
+  const callback = read("app/auth/callback.tsx");
+  const updateFlow = read("security/passwordRecoveryUpdate.ts");
+  const saveHandler = callback.match(/async function saveNewPassword\(\) \{([\s\S]*?)\n  \}/)?.[1];
+
+  assert.ok(saveHandler, "password update handler should remain explicit");
+  assert.match(saveHandler, /updatePasswordWithCleanup/);
+  assert.doesNotMatch(saveHandler, /router\.replace|online\.signOut/);
+  assert.ok(updateFlow.indexOf("onConfirmed();") < updateFlow.indexOf("await cleanup();"));
+  assert.match(updateFlow, /status: "confirmed", cleanupFailed: true/);
+  assert.match(callback, /passwordUpdated \? \(/);
+  assert.match(callback, /Password update is confirmed and the recovery session is closed/);
+  assert.match(context, /const completePasswordRecovery = useCallback\(async \(password: string\) => \{[\s\S]*?auth\.updateUser\(\{ password \}\)[\s\S]*?if \(error\) throw error;\n  \}, \[\]\);/);
+});
+
+test("password recovery email rate limits use email-specific guidance", () => {
+  const settings = read("components/OnlineAccountSettings.tsx");
+  assert.match(settings, /category === "rate-limit" && mode === "recovery"/);
+  assert.match(settings, /Too many password recovery emails were requested/);
+});
+
 function settingsSource() {
   return read("components/OnlineAccountSettings.tsx");
 }

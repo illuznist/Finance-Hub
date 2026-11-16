@@ -235,7 +235,7 @@ export default function OnlineAuthCallbackScreen() {
                 testID="online-recovery-open-settings"
                 accessibilityRole="button"
                 onPress={() => router.replace("/settings")}
-              style={[styles.button, { borderWidth: 1, borderColor: colors.border, flexDirection: "row", gap: 8 }]}
+                style={[styles.button, { borderWidth: 1, borderColor: colors.border, flexDirection: "row", gap: 8 }]}
               >
                 <Text style={[styles.buttonText, { color: colors.foreground }]}>{t("Open Settings")}</Text>
               </Pressable>
@@ -288,9 +288,19 @@ export default function OnlineAuthCallbackScreen() {
                   </Text>
                 </Pressable>
                 {returnToSignInError ? (
-                  <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
-                    {t(returnToSignInError)}
-                  </Text>
+                  <>
+                    <Text accessibilityRole="alert" style={[styles.note, { color: colors.warning }]}>
+                      {t(returnToSignInError)}
+                    </Text>
+                    <Pressable
+                      testID="online-recovery-open-settings"
+                      accessibilityRole="button"
+                      onPress={() => router.replace("/settings")}
+                      style={[styles.button, { borderWidth: 1, borderColor: colors.border }]}
+                    >
+                      <Text style={[styles.buttonText, { color: colors.foreground }]}>{t("Open Settings")}</Text>
+                    </Pressable>
+                  </>
                 ) : null}
               </>
             ) : null}
