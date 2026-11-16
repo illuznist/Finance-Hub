@@ -16,6 +16,7 @@ const readyBootstrap = {
   rpc_security_ok: true,
   single_super_admin_guard_ok: true,
   audit_privileges_ok: true,
+  audit_column_privileges_ok: true,
 };
 const verifiedTotp = {
   id: "totp-factor-id",
@@ -123,6 +124,7 @@ test("bootstrap rejects an incompatible readiness RPC signature before owner loo
       rpc_security_ok: false,
       single_super_admin_guard_ok: true,
       audit_privileges_ok: true,
+      audit_column_privileges_ok: true,
     },
   );
   await assert.rejects(
@@ -146,6 +148,101 @@ test("bootstrap rejects incorrect audit privileges before owner lookup", async (
       ...readyBootstrap,
       ready: false,
       audit_privileges_ok: false,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap rejects effective column UPDATE or REFERENCES grants", async () => {
+  for (const privilege of ["UPDATE", "REFERENCES"]) {
+    const { client, calls } = fakeClient(
+      {
+        id: userId,
+        email: expectedEmail,
+        email_confirmed_at: "now",
+        factors: [verifiedTotp],
+      },
+      "created",
+      null,
+      {
+        ...readyBootstrap,
+        ready: false,
+        audit_column_privileges_ok: false,
+      },
+    );
+    await assert.rejects(
+      () => bootstrapSuperAdmin(client, approval()),
+      /safeguards are not ready/,
+      `${privilege} must block bootstrap readiness`,
+    );
+    assert.deepEqual(calls, ["readiness-check"]);
+  }
+});
+
+test("bootstrap rejects PUBLIC or inherited audit write grants", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ...readyBootstrap,
+      ready: false,
+      audit_privileges_ok: false,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap rejects a missing or invalid single-Super-Admin index", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ...readyBootstrap,
+      ready: false,
+      single_super_admin_guard_ok: false,
+    },
+  );
+  await assert.rejects(
+    () => bootstrapSuperAdmin(client, approval()),
+    /safeguards are not ready/,
+  );
+  assert.deepEqual(calls, ["readiness-check"]);
+});
+
+test("bootstrap rejects privileged RPC execution grants to unauthorized roles", async () => {
+  const { client, calls } = fakeClient(
+    {
+      id: userId,
+      email: expectedEmail,
+      email_confirmed_at: "now",
+      factors: [verifiedTotp],
+    },
+    "created",
+    null,
+    {
+      ...readyBootstrap,
+      ready: false,
+      rpc_security_ok: false,
     },
   );
   await assert.rejects(

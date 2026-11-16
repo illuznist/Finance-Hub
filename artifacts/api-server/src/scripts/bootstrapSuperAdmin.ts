@@ -17,6 +17,7 @@ type BootstrapReadiness = {
   rpc_security_ok: true;
   single_super_admin_guard_ok: true;
   audit_privileges_ok: true;
+  audit_column_privileges_ok: true;
 };
 
 const SUPABASE_USER_ID_PATTERN =
@@ -33,7 +34,8 @@ function hasReadyBootstrapSafeguards(value: unknown): value is BootstrapReadines
     && readiness.rpc_signature_ok === true
     && readiness.rpc_security_ok === true
     && readiness.single_super_admin_guard_ok === true
-    && readiness.audit_privileges_ok === true;
+    && readiness.audit_privileges_ok === true
+    && readiness.audit_column_privileges_ok === true;
 }
 
 export async function checkBootstrapReadiness(

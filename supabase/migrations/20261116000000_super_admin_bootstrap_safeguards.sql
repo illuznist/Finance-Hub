@@ -73,6 +73,32 @@ grant execute on function public.bootstrap_super_admin(uuid, uuid, uuid)
 revoke all privileges on table public.admin_audit_logs from service_role;
 grant select, insert on table public.admin_audit_logs to service_role;
 
+-- Clear direct column-specific write/reference grants without changing grants
+-- owned by PUBLIC or other roles. Effective inherited grants are checked below;
+-- if one remains, readiness fails closed instead of revoking a shared role.
+do $$
+declare
+  column_name text;
+begin
+  for column_name in
+    select a.attname
+      from pg_catalog.pg_attribute as a
+      where a.attrelid = 'public.admin_audit_logs'::regclass
+        and a.attnum > 0
+        and not a.attisdropped
+  loop
+    execute format(
+      'revoke update (%I) on table public.admin_audit_logs from service_role',
+      column_name
+    );
+    execute format(
+      'revoke references (%I) on table public.admin_audit_logs from service_role',
+      column_name
+    );
+  end loop;
+end;
+$$;
+
 -- This helper is a read-only readiness assertion, not a bootstrap operation.
 -- It deliberately returns only booleans and is callable only by the trusted
 -- server role. A missing or altered safeguard produces ready=false.
@@ -95,6 +121,7 @@ declare
   rpc_security_ok boolean := false;
   single_super_admin_guard_ok boolean := false;
   audit_privileges_ok boolean := false;
+  audit_column_privileges_ok boolean := false;
   ready boolean := false;
 begin
   select oid
@@ -108,7 +135,8 @@ begin
       'rpc_signature_ok', false,
       'rpc_security_ok', false,
       'single_super_admin_guard_ok', false,
-      'audit_privileges_ok', false
+      'audit_privileges_ok', false,
+      'audit_column_privileges_ok', false
     );
   end if;
 
@@ -224,11 +252,26 @@ begin
         on index_schema.oid = index_relation.relnamespace
       where index_schema.nspname = 'public'
         and index_relation.relname = 'user_roles_single_super_admin'
+        and i.indrelid =
+          pg_catalog.to_regclass('public.user_roles')::oid
         and i.indisunique
+        and i.indisready
         and i.indisvalid
+        and i.indnatts = 1
+        and i.indnkeyatts = 1
         and i.indpred is not null
-        and pg_catalog.pg_get_expr(i.indpred, i.indrelid) ilike '%SUPER_ADMIN%'
-        and pg_catalog.pg_get_indexdef(i.indexrelid) ilike '%(role)%'
+        and lower(
+          replace(pg_catalog.pg_get_indexdef(i.indexrelid, 1, true), '"', '')
+        ) = 'role'
+        and pg_catalog.regexp_replace(
+          lower(pg_catalog.pg_get_expr(i.indpred, i.indrelid)),
+          '[[:space:]()]',
+          '',
+          'g'
+        ) in (
+          'role=''super_admin''::text',
+          'role=''super_admin'''
+        )
   );
 
   if audit_table_oid is not null then
@@ -295,20 +338,65 @@ begin
         audit_table_oid,
         'TRIGGER'
       );
+
+    audit_column_privileges_ok :=
+      not exists (
+        select 1
+          from pg_catalog.pg_attribute as column_attribute
+          where column_attribute.attrelid = audit_table_oid
+            and column_attribute.attnum > 0
+            and not column_attribute.attisdropped
+            and (
+              pg_catalog.has_column_privilege(
+                'service_role',
+                audit_table_oid,
+                column_attribute.attname,
+                'UPDATE'
+              )
+              or pg_catalog.has_column_privilege(
+                'service_role',
+                audit_table_oid,
+                column_attribute.attname,
+                'REFERENCES'
+              )
+            )
+      )
+      and not exists (
+        select 1
+          from pg_catalog.pg_attribute as column_attribute
+          cross join lateral pg_catalog.aclexplode(
+            coalesce(column_attribute.attacl, '{}'::aclitem[])
+          ) as column_privilege
+          where column_attribute.attrelid = audit_table_oid
+            and column_attribute.attnum > 0
+            and not column_attribute.attisdropped
+            and column_privilege.privilege_type in ('UPDATE', 'REFERENCES')
+            and case
+              when column_privilege.grantee = 0 then true
+              when column_privilege.grantee = service_role_oid then true
+              else pg_catalog.pg_has_role(
+                service_role_oid,
+                column_privilege.grantee,
+                'USAGE'
+              )
+            end
+      );
   end if;
 
   ready :=
     rpc_signature_ok
     and rpc_security_ok
     and single_super_admin_guard_ok
-    and audit_privileges_ok;
+    and audit_privileges_ok
+    and audit_column_privileges_ok;
 
   return jsonb_build_object(
     'ready', ready,
     'rpc_signature_ok', rpc_signature_ok,
     'rpc_security_ok', rpc_security_ok,
     'single_super_admin_guard_ok', single_super_admin_guard_ok,
-    'audit_privileges_ok', audit_privileges_ok
+    'audit_privileges_ok', audit_privileges_ok,
+    'audit_column_privileges_ok', audit_column_privileges_ok
   );
 exception
   when others then
@@ -317,7 +405,8 @@ exception
       'rpc_signature_ok', false,
       'rpc_security_ok', false,
       'single_super_admin_guard_ok', false,
-      'audit_privileges_ok', false
+      'audit_privileges_ok', false,
+      'audit_column_privileges_ok', false
     );
 end;
 $$;
