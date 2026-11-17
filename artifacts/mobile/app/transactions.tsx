@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useFinance } from "@/context/FinanceContext";
@@ -516,12 +517,13 @@ function FormShell({ title, colors, topInset, bottomInset, onClose, onSave, save
           colors={colors}
           leading={<HeaderAction icon="x" label={t("Cancel")} variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />}
         />
-        <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
+        <KeyboardAwareScrollViewCompat keyboardDismissMode="interactive" contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
           {children}
           <Pressable testID={`${testID}-save`} onPress={onSave} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 24 }]}>
             <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t(saveLabel)}</Text>
           </Pressable>
         </KeyboardAwareScrollViewCompat>
+        <NumericKeyboardToolbarDone />
       </View>
     </Modal>
   );

@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -28,6 +29,7 @@ import { ExpensePaymentModal } from "@/components/ExpensePaymentModal";
 import { useToast } from "@/context/ToastContext";
 import { SkeletonExpenseCard } from "@/components/Skeleton";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { formatAppCurrency, parseLocalizedNumberInput } from "@/i18n/localization";
@@ -173,6 +175,7 @@ function AddExpenseModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t(editing ? "Edit Expense" : "Add Expense")}</Text>
@@ -281,6 +284,7 @@ function AddExpenseModal({
             </Pressable>
           </View>
         </View>
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );

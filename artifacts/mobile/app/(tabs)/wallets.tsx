@@ -16,7 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { KeyboardToolbar } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -28,6 +27,7 @@ import {
 import { useToast } from "@/context/ToastContext";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { useColors } from "@/hooks/useColors";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { PaymentAccountPicker } from "@/components/PaymentAccountPicker";
@@ -288,30 +288,13 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
   const [type, setType] = useState<"bank" | "cash" | "savings">("bank");
   const [colorIdx, setColorIdx] = useState(0);
   const [error, setError] = useState("");
-  const [openingBalanceFocused, setOpeningBalanceFocused] = useState(false);
   const submitted = useRef(false);
   useEffect(() => {
     if (visible) {
       submitted.current = false;
       setError("");
-      setOpeningBalanceFocused(false);
     }
   }, [visible]);
-
-  const keyboardToolbarTheme = {
-    light: {
-      primary: colors.primary,
-      disabled: colors.mutedForeground,
-      background: colors.card,
-      ripple: colors.muted,
-    },
-    dark: {
-      primary: colors.primary,
-      disabled: colors.mutedForeground,
-      background: colors.card,
-      ripple: colors.muted,
-    },
-  };
 
   function submit() {
     const parsedBalance = parseLocalizedNumberInput(balance);
@@ -363,8 +346,6 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
             keyboardType="numeric"
             value={balance}
             onChangeText={setBalance}
-            onFocus={() => setOpeningBalanceFocused(true)}
-            onBlur={() => setOpeningBalanceFocused(false)}
           />
           <Text style={[styles.accountLimitNote, { color: colors.mutedForeground }]}>{t("Only active accounts can be used for new transactions.")}</Text>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Color")}</Text>
@@ -379,11 +360,7 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
             <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("Add")}</Text></Pressable>
           </View>
         </View>
-        {Platform.OS === "ios" && openingBalanceFocused ? (
-          <KeyboardToolbar theme={keyboardToolbarTheme}>
-            <KeyboardToolbar.Done text={t("Done")} />
-          </KeyboardToolbar>
-        ) : null}
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );
@@ -438,6 +415,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
         <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30} style={{ flexGrow: 0, maxHeight: "85%" }} contentContainerStyle={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t(editing ? "Edit Income" : "Add Income")}</Text>
@@ -480,6 +458,7 @@ function AddIncomeModal({ visible, onClose, editing }: { visible: boolean; onClo
           </View>
           {!!error && <Text accessibilityRole="alert" style={{ color: colors.destructive, marginTop: 12 }}>{t(error)}</Text>}
         </KeyboardAwareScrollViewCompat>
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );
@@ -516,6 +495,7 @@ function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => v
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("New Savings Goal")}</Text>
@@ -544,6 +524,7 @@ function AddGoalModal({ visible, onClose }: { visible: boolean; onClose: () => v
             <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("Create Goal")}</Text></Pressable>
           </View>
         </View>
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );
@@ -641,6 +622,7 @@ export default function WalletsScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 90 + (Platform.OS === "web" ? 34 : 0), gap: 20 }}
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="interactive"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
         }
@@ -814,6 +796,7 @@ export default function WalletsScreen() {
         </View>
       </ScrollView>
 
+      <NumericKeyboardToolbarDone enabled={!showAddAccount && !showAddIncome && !showAddGoal} />
       <AddAccountModal
         visible={showAddAccount}
         onClose={() => setShowAddAccount(false)}

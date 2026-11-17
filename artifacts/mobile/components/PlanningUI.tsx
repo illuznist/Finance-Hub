@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { useFinance } from "@/context/FinanceContext";
 import type { getBudgetView } from "@/finance/budgets";
@@ -141,10 +142,11 @@ export function FormModal({ title, topInset, bottomInset, onClose, testID, child
       <View style={{ flex: 1, backgroundColor: colors.background }} testID={testID}>
         <ScreenHeader title={t(title)} topInset={topInset} colors={colors}
           leading={<HeaderAction icon="x" label={t("Cancel")} variant="neutral" testID={`${testID}-cancel`} onPress={onClose} />} />
-        <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
+        <KeyboardAwareScrollViewCompat keyboardDismissMode="interactive" contentContainerStyle={{ padding: 20, paddingBottom: bottomInset + 32 }} bottomOffset={24}>
           {children}
           {footer}
         </KeyboardAwareScrollViewCompat>
+        <NumericKeyboardToolbarDone />
       </View>
     </Modal>
   );

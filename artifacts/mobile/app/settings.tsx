@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { BrandAttribution } from "@/components/BrandAttribution";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { OnlineAccountSettings } from "@/components/OnlineAccountSettings";
 import {
   type NotificationSettings,
@@ -1008,6 +1009,7 @@ export default function SettingsScreen() {
         onCancel={() => setPasswordAction(null)}
         onConfirm={confirmSecurityPassword}
       />
+      <NumericKeyboardToolbarDone />
     </View>
   );
 }

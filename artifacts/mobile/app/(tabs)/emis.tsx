@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import { type Account, type EMI, type EMIPayment, useFinance } from "@/context/FinanceContext";
 import { useToast } from "@/context/ToastContext";
@@ -458,6 +460,7 @@ function EMIFormModal({ visible, onClose, onLimitReached, editing }: { visible: 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
         <View style={[styles.formSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
@@ -470,6 +473,7 @@ function EMIFormModal({ visible, onClose, onLimitReached, editing }: { visible: 
             style={{ flexGrow: 0 }}
             contentContainerStyle={{ paddingBottom: 20 }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             bottomOffset={72}
             showsVerticalScrollIndicator={false}
           >
@@ -540,6 +544,7 @@ function EMIFormModal({ visible, onClose, onLimitReached, editing }: { visible: 
             </View>
           </KeyboardAwareScrollViewCompat>
         </View>
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );
@@ -588,7 +593,8 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30}
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
+        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" bottomOffset={30}
           style={{ flexGrow: 0, maxHeight: "90%" }} contentContainerStyle={[styles.paymentSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
@@ -618,6 +624,7 @@ function PaymentModal({ visible, onClose, emi, editing, paymentType }: {
             </Pressable>
           </View>
         </KeyboardAwareScrollViewCompat>
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );

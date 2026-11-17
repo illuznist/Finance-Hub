@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SUPPORTED_CURRENCIES, useFinance } from "@/context/FinanceContext";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { TYPOGRAPHY } from "@/constants/typography";
 import { usePreferences } from "@/context/PreferencesContext";
 import { formatAppNumber, parseLocalizedNumberInput } from "@/i18n/localization";
@@ -311,6 +312,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             </LinearGradient>
           </Pressable>
         </View>
+        <NumericKeyboardToolbarDone />
       </KeyboardAvoidingView>
     </LinearGradient>
   );

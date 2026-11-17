@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { financialAlert as Alert } from "@/utils/financialAlert";
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
 import {
   type Loan,
@@ -341,6 +343,7 @@ function LoanFormModal({ visible, onClose, onLimitReached, editing }: { visible:
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
         <View style={[styles.formSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
@@ -351,6 +354,7 @@ function LoanFormModal({ visible, onClose, onLimitReached, editing }: { visible:
             style={{ flexShrink: 1 }}
             contentContainerStyle={{ paddingBottom: 18 }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             bottomOffset={70}
             showsVerticalScrollIndicator={false}
           >
@@ -440,6 +444,7 @@ function LoanFormModal({ visible, onClose, onLimitReached, editing }: { visible:
             </View>
           </KeyboardAwareScrollViewCompat>
         </View>
+        <NumericKeyboardToolbarDone enabled={visible} />
       </View>
     </Modal>
   );
@@ -477,7 +482,8 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" bottomOffset={30}
+        <Pressable accessible={false} onPress={Keyboard.dismiss} style={StyleSheet.absoluteFill} />
+        <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" bottomOffset={30}
           style={{ flexGrow: 0, maxHeight: "90%" }} contentContainerStyle={[styles.paymentSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={styles.modalHeader}>
@@ -503,6 +509,7 @@ function PaymentModal({ loan, editing, onClose }: { loan: Loan; editing?: LoanPa
             </Pressable>
           </View>
         </KeyboardAwareScrollViewCompat>
+        <NumericKeyboardToolbarDone />
       </View>
     </Modal>
   );

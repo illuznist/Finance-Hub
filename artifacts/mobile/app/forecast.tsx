@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ForecastChart } from "@/components/forecast/ForecastChart";
 import { Button, Chips, Field, Input, money, parseMoney, shortDate, ui, type Colors } from "@/components/PlanningUI";
 import { HeaderAction, ScreenHeader } from "@/components/ScreenHeader";
+import { NumericKeyboardToolbarDone } from "@/components/NumericKeyboardToolbarDone";
 import { ProFeatureGate } from "@/components/ProFeatureGate";
 import { useEntitlements } from "@/context/EntitlementContext";
 import { useFinance } from "@/context/FinanceContext";
@@ -297,7 +298,7 @@ export default function ForecastScreen() {
           onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} />}
       />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 + bottomInset, gap: 16 }}
-        showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         <View style={{ gap: 4 }}>
           <Text style={[ui.label, { color: colors.mutedForeground }]}>{t("FORECAST PERIOD")}</Text>
           <Chips prefix="forecast-range" value={preset} onChange={setPreset} items={PRESETS} />
@@ -487,6 +488,7 @@ export default function ForecastScreen() {
           </>
         ) : null}
       </ScrollView>
+      <NumericKeyboardToolbarDone />
     </View>
   );
 }
