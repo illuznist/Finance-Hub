@@ -241,6 +241,7 @@ const ARABIC_TRANSLATIONS: Record<string, string> = {
   "Enter the PIN again to confirm": "أدخل PIN مرة أخرى للتأكيد",
   "PINs don't match — try again": "رمزا PIN غير متطابقين — حاول مرة أخرى",
   "Cancel": "إلغاء",
+  "Done": "تم",
   "Unlock FinanceApp": "فتح FinanceApp",
   "Enter your 4-digit app PIN": "أدخل PIN التطبيق المكوّن من 4 أرقام",
   "Use PIN or password": "استخدم PIN أو كلمة المرور",

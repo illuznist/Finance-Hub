@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Modal,
+  Keyboard,
   Platform,
   Pressable,
   RefreshControl,
@@ -15,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardToolbar } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -286,8 +288,30 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
   const [type, setType] = useState<"bank" | "cash" | "savings">("bank");
   const [colorIdx, setColorIdx] = useState(0);
   const [error, setError] = useState("");
+  const [openingBalanceFocused, setOpeningBalanceFocused] = useState(false);
   const submitted = useRef(false);
-  useEffect(() => { if (visible) { submitted.current = false; setError(""); } }, [visible]);
+  useEffect(() => {
+    if (visible) {
+      submitted.current = false;
+      setError("");
+      setOpeningBalanceFocused(false);
+    }
+  }, [visible]);
+
+  const keyboardToolbarTheme = {
+    light: {
+      primary: colors.primary,
+      disabled: colors.mutedForeground,
+      background: colors.card,
+      ripple: colors.muted,
+    },
+    dark: {
+      primary: colors.primary,
+      disabled: colors.mutedForeground,
+      background: colors.card,
+      ripple: colors.muted,
+    },
+  };
 
   function submit() {
     const parsedBalance = parseLocalizedNumberInput(balance);
@@ -311,6 +335,11 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
+        <Pressable
+          accessible={false}
+          onPress={Keyboard.dismiss}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <Text style={[styles.modalTitle, { color: colors.foreground, textAlign: isRTL ? "right" : "left" }]}>{t("Add Account")}</Text>
@@ -325,7 +354,18 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
             ))}
           </View>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Opening balance")} ({finance.currency})</Text>
-          <TextInput style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]} placeholder="0" placeholderTextColor={colors.mutedForeground} keyboardType="numeric" value={balance} onChangeText={setBalance} />
+          <TextInput
+            testID="add-account-opening-balance"
+            accessibilityLabel={t("Opening balance")}
+            style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: "transparent" }]}
+            placeholder="0"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="numeric"
+            value={balance}
+            onChangeText={setBalance}
+            onFocus={() => setOpeningBalanceFocused(true)}
+            onBlur={() => setOpeningBalanceFocused(false)}
+          />
           <Text style={[styles.accountLimitNote, { color: colors.mutedForeground }]}>{t("Only active accounts can be used for new transactions.")}</Text>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("Color")}</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
@@ -339,6 +379,11 @@ function AddAccountModal({ visible, onClose, onLimitReached }: { visible: boolea
             <Pressable onPress={submit} style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}><Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("Add")}</Text></Pressable>
           </View>
         </View>
+        {Platform.OS === "ios" && openingBalanceFocused ? (
+          <KeyboardToolbar theme={keyboardToolbarTheme}>
+            <KeyboardToolbar.Done text={t("Done")} />
+          </KeyboardToolbar>
+        ) : null}
       </View>
     </Modal>
   );
