@@ -21,6 +21,7 @@ require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileMo
 const policy = require("../entitlements.ts");
 const archive = require("../accountArchive.ts");
 const { createDevelopmentPurchaseAdapter } = require("../developmentPurchaseAdapter.ts");
+const { resolveServerEntitlement } = require("../serverEntitlement.ts");
 const { migrateFinanceState } = require("../migration.ts");
 const { isLoanSettled } = require("../../utils/loanCalculations.ts");
 
@@ -128,4 +129,68 @@ test("development purchase adapter is session-only and cannot grant Pro in produ
   assert.deepEqual(developmentAdapter.getSnapshot(), { isPro: true, source: "development_preview" });
   developmentAdapter.resetPreview();
   assert.deepEqual(developmentAdapter.getSnapshot(), { isPro: false, source: "free" });
+});
+
+test("server Pro access is accepted only for the current account from a fresh successful response", () => {
+  const ready = { isSuccess: true, isError: false, isFetching: false };
+  const access = {
+    accountId: "user-1",
+    isPro: true,
+    proSource: "promotional",
+  };
+
+  assert.deepEqual(resolveServerEntitlement("user-1", access, ready), {
+    isPro: true,
+    source: "promotional_grant",
+  });
+  assert.deepEqual(resolveServerEntitlement("user-1", {
+    ...access,
+    proSource: "super_admin",
+  }, ready), {
+    isPro: true,
+    source: "super_admin",
+  });
+  assert.deepEqual(resolveServerEntitlement(null, access, ready), {
+    isPro: false,
+    source: "free",
+  });
+  assert.deepEqual(resolveServerEntitlement("user-2", access, ready), {
+    isPro: false,
+    source: "free",
+  });
+});
+
+test("server access fails closed for Free, unknown, paid, pending, refreshing, or failed responses", () => {
+  const ready = { isSuccess: true, isError: false, isFetching: false };
+  const free = { isPro: false, source: "free" };
+  const proResponse = { accountId: "user-1", isPro: true, proSource: "promotional" };
+
+  assert.deepEqual(resolveServerEntitlement("user-1", {
+    accountId: "user-1",
+    isPro: false,
+    proSource: "free",
+  }, ready), free);
+  assert.deepEqual(resolveServerEntitlement("user-1", {
+    ...proResponse,
+    proSource: "paid_purchase",
+  }, ready), free);
+  assert.deepEqual(resolveServerEntitlement("user-1", {
+    ...proResponse,
+    proSource: "unknown",
+  }, ready), free);
+  assert.deepEqual(resolveServerEntitlement("user-1", proResponse, {
+    isSuccess: false,
+    isError: false,
+    isFetching: false,
+  }), free);
+  assert.deepEqual(resolveServerEntitlement("user-1", proResponse, {
+    isSuccess: true,
+    isError: false,
+    isFetching: true,
+  }), free);
+  assert.deepEqual(resolveServerEntitlement("user-1", proResponse, {
+    isSuccess: false,
+    isError: true,
+    isFetching: false,
+  }), free);
 });
